@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Next.js build
+.next/
+out/
+
+# Electron compiled output
+electron/
+
+# Build output (DMG, ZIP, etc.)
+dist/
+
+# User data (databases, cookies, collected content)
+data/
+
+# Claude Code conversation records
+.claude/
+
+# Environment variables
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -1,0 +1,19 @@
+appId: com.datacollector.app
+productName: Data Collector
+directories:
+  output: dist
+  buildResources: resources
+files:
+  - electron/**/*
+  - .next/standalone/**/*
+  - .next/static/**/*
+  - public/**/*
+mac:
+  category: public.app-category.productivity
+  target:
+    - dmg
+    - zip
+publish:
+  provider: github
+  owner: Marvinngg
+  repo: datacollector
