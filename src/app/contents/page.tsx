@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -419,6 +419,14 @@ function ZsxqContentRenderer({ content, onOpenUrl }: { content: string; onOpenUr
 // ========== 主页面 ==========
 
 export default function ContentsPage() {
+  return (
+    <Suspense>
+      <ContentsPageInner />
+    </Suspense>
+  )
+}
+
+function ContentsPageInner() {
   const searchParams = useSearchParams()
   const [contents, setContents] = useState<ContentItem[]>([])
   const [total, setTotal] = useState(0)
