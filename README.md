@@ -12,6 +12,13 @@
 - **RSS** — 订阅源抓取
 - **网页剪藏** — 任意网页保存
 
+## 应用截图
+
+![概览](png/1.png)
+![数据源](png/2.png)
+![内容库](png/3.png)
+![设置](png/4.png)
+
 ## 技术栈
 
 Electron + Next.js，本地 SQLite 索引，Markdown 文件存储。
