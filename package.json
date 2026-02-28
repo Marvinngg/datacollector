@@ -9,7 +9,7 @@
     "dev": "concurrently -n next,electron \"npm run dev:next\" \"npm run dev:electron\"",
     "build:next": "next build",
     "build:electron": "tsc -p tsconfig.electron.json",
-    "build": "npm run build:next && npm run build:electron && electron-builder",
+    "build": "npm run build:next && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public && npm run build:electron && electron-builder",
     "start": "next start",
     "lint": "next lint"
   },

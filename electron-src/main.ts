@@ -1,10 +1,12 @@
 import { app, BrowserWindow, ipcMain, session, dialog } from 'electron'
 import path from 'path'
+import { spawn, ChildProcess } from 'child_process'
 import { autoUpdater } from 'electron-updater'
 import { createTray } from './tray'
 import { startScheduler, stopScheduler } from './scheduler'
 
 let mainWindow: BrowserWindow | null = null
+let nextServer: ChildProcess | null = null
 let isQuitting = false
 
 const isDev = !app.isPackaged
@@ -33,6 +35,69 @@ async function saveCookiesToSettings(ses: Electron.Session, domain: string, sett
   } catch {}
 }
 
+/** 启动 Next.js standalone 服务器（生产模式） */
+function startNextServer(): Promise<void> {
+  return new Promise((resolve) => {
+    const appPath = app.getAppPath()
+    const serverPath = path.join(appPath, '.next', 'standalone', 'server.js')
+    const serverCwd = path.join(appPath, '.next', 'standalone')
+    console.log('[next] starting standalone server:', serverPath)
+    console.log('[next] cwd:', serverCwd)
+
+    // 用 Electron 自身的 Node 运行 server.js（process.execPath 指向 Electron binary，它能执行 JS）
+    nextServer = spawn(process.execPath, [serverPath], {
+      env: {
+        ...process.env,
+        PORT: String(PORT),
+        HOSTNAME: 'localhost',
+        NODE_ENV: 'production',
+        ELECTRON_RUN_AS_NODE: '1',  // 让 Electron 以纯 Node.js 模式运行
+      },
+      cwd: serverCwd,
+      stdio: 'pipe',
+    })
+
+    nextServer.stdout?.on('data', (data: Buffer) => {
+      console.log('[next]', data.toString().trim())
+    })
+
+    nextServer.stderr?.on('data', (data: Buffer) => {
+      console.error('[next]', data.toString().trim())
+    })
+
+    nextServer.on('error', (err) => {
+      console.error('[next] spawn error:', err)
+    })
+
+    nextServer.on('exit', (code) => {
+      console.log('[next] server exited with code', code)
+      nextServer = null
+    })
+
+    // 轮询等服务就绪
+    let resolved = false
+    const poll = setInterval(async () => {
+      if (resolved) return
+      try {
+        await fetch(`http://localhost:${PORT}/`)
+        resolved = true
+        clearInterval(poll)
+        console.log('[next] server is ready')
+        resolve()
+      } catch {}
+    }, 300)
+
+    setTimeout(() => {
+      if (!resolved) {
+        resolved = true
+        clearInterval(poll)
+        console.log('[next] timeout waiting for server, proceeding anyway')
+        resolve()
+      }
+    }, 15000)
+  })
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -48,10 +113,7 @@ function createWindow() {
     show: false,
   })
 
-  const url = isDev
-    ? `http://localhost:${PORT}`
-    : `file://${path.join(__dirname, '../.next/server/app/index.html')}`
-
+  const url = `http://localhost:${PORT}`
   mainWindow.loadURL(url)
 
   mainWindow.once('ready-to-show', () => {
@@ -358,7 +420,12 @@ function setupAutoUpdater() {
   autoUpdater.checkForUpdatesAndNotify()
 }
 
-app.on('ready', () => {
+app.on('ready', async () => {
+  // 生产模式：先启动 Next.js standalone 服务器
+  if (!isDev) {
+    await startNextServer()
+  }
+
   createWindow()
   if (mainWindow) {
     createTray(mainWindow, PORT)
@@ -378,6 +445,10 @@ app.on('activate', () => {
 app.on('before-quit', () => {
   isQuitting = true
   stopScheduler()
+  if (nextServer) {
+    nextServer.kill()
+    nextServer = null
+  }
 })
 
 app.on('window-all-closed', () => {
