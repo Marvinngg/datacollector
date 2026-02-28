@@ -2,13 +2,23 @@ import Database from 'better-sqlite3'
 import path from 'path'
 import fs from 'fs'
 import type { Source, SourceType, Content, Task } from '@/types'
+import { getDataDir } from './data-dir'
 
 let db: Database.Database | null = null
+let dbDataDir: string | null = null
 
 export function getDb(): Database.Database {
-  if (db) return db
+  const currentDataDir = getDataDir()
 
-  const dbDir = path.join(process.cwd(), 'data')
+  // 数据目录变化时（用户切换了目录），关闭旧连接重新打开
+  if (db && dbDataDir === currentDataDir) return db
+  if (db) {
+    try { db.close() } catch {}
+    db = null
+  }
+
+  dbDataDir = currentDataDir
+  const dbDir = currentDataDir
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true })
   }
@@ -64,6 +74,9 @@ export function getDb(): Database.Database {
 
   // 一次性迁移：修复 zsxq 标题
   migrateZsxqTitles(db)
+
+  // 一次性迁移：绝对路径 → 相对路径
+  migrateFilePathsToRelative(db)
 
   return db
 }
@@ -170,6 +183,39 @@ function migrateZsxqTitles(database: Database.Database) {
 
   if (fixed > 0) {
     console.log(`[migration] v4 fixed ${fixed} zsxq titles (DB + files)`)
+  }
+}
+
+/** 迁移：将绝对路径的 file_path 转为相对于 dataDir 的相对路径 */
+function migrateFilePathsToRelative(database: Database.Database) {
+  const migrated = database.prepare("SELECT value FROM settings WHERE key = 'file_paths_relative_v1'").get() as { value: string } | undefined
+  if (migrated) return
+
+  const dataDir = getDataDir()
+  // 确保以 / 结尾方便 startsWith 匹配
+  const prefix = dataDir.endsWith(path.sep) ? dataDir : dataDir + path.sep
+
+  const rows = database.prepare(
+    "SELECT id, file_path FROM contents WHERE file_path LIKE '/%' OR file_path LIKE ?",
+  ).all(`${dataDir}%`) as { id: number; file_path: string }[]
+
+  const update = database.prepare('UPDATE contents SET file_path = ? WHERE id = ?')
+  let fixed = 0
+
+  for (const row of rows) {
+    if (!path.isAbsolute(row.file_path)) continue
+    if (row.file_path.startsWith(prefix)) {
+      const relative = row.file_path.slice(prefix.length)
+      update.run(relative, row.id)
+      fixed++
+    }
+  }
+
+  database.prepare("INSERT INTO settings (key, value) VALUES ('file_paths_relative_v1', ?) ON CONFLICT(key) DO UPDATE SET value = ?")
+    .run(String(fixed), String(fixed))
+
+  if (fixed > 0) {
+    console.log(`[migration] file_paths_relative_v1: converted ${fixed} absolute paths to relative`)
   }
 }
 

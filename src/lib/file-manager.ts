@@ -144,7 +144,7 @@ export function writeContent(dataDir: string, item: CollectedItem): string {
   ].filter(Boolean).join('\n')
 
   fs.writeFileSync(filePath, frontmatter, 'utf-8')
-  return filePath
+  return path.relative(dataDir, filePath)
 }
 
 export function generateIndex(dataDir: string): void {

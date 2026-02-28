@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getDb, getAllSources, getSetting } from '@/lib/db'
-import path from 'path'
+import { getDb, getAllSources } from '@/lib/db'
+import { getDataDir } from '@/lib/data-dir'
 
 export async function GET() {
   const db = getDb()
@@ -34,7 +34,7 @@ export async function GET() {
     .all()
 
   const sources = getAllSources()
-  const dataDir = getSetting('data_dir')?.trim() || path.join(process.cwd(), 'data')
+  const dataDir = getDataDir()
 
   return NextResponse.json({
     total,

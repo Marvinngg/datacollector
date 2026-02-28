@@ -1,16 +1,61 @@
 import { app, BrowserWindow, ipcMain, session, dialog } from 'electron'
 import path from 'path'
-import { spawn, ChildProcess } from 'child_process'
+import fs from 'fs'
 import { autoUpdater } from 'electron-updater'
 import { createTray } from './tray'
 import { startScheduler, stopScheduler } from './scheduler'
 
 let mainWindow: BrowserWindow | null = null
-let nextServer: ChildProcess | null = null
 let isQuitting = false
 
 const isDev = !app.isPackaged
 const PORT = 3456
+
+// ========== 数据目录 config 管理 ==========
+const configPath = path.join(app.getPath('userData'), 'config.json')
+
+function getUserDataDir(): string {
+  try {
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+      if (config.dataDir?.trim()) return config.dataDir
+    }
+  } catch {}
+  // 默认路径：dev 模式用项目目录下的 data，生产模式用 userData/data
+  return isDev
+    ? path.join(app.getAppPath(), 'data')
+    : path.join(app.getPath('userData'), 'data')
+}
+
+function setUserDataDir(dir: string): void {
+  let config: Record<string, any> = {}
+  try {
+    if (fs.existsSync(configPath)) {
+      config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+    }
+  } catch {}
+  config.dataDir = dir
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8')
+}
+
+/** 在主进程内启动 Next.js standalone 服务器（无子进程，无额外 Dock 图标） */
+function startNextServer(): void {
+  const appPath = app.getAppPath()
+  const serverPath = path.join(appPath, '.next', 'standalone', 'server.js')
+  const serverCwd = path.join(appPath, '.next', 'standalone')
+  const dataDir = getUserDataDir()
+
+  process.env.PORT = String(PORT)
+  process.env.HOSTNAME = 'localhost'
+  process.env.NODE_ENV = 'production'
+  process.env.DATA_DIR = dataDir
+  process.chdir(serverCwd)
+
+  console.log('[next] loading standalone server in-process:', serverPath)
+  console.log('[next] DATA_DIR:', dataDir)
+
+  require(serverPath)
+}
 
 // 持久化 session 分区 — 登录窗口和链接查看窗口共享同一个 session
 // cookies 自动持久化到磁盘，跨窗口、跨重启共享
@@ -27,76 +72,19 @@ async function saveCookiesToSettings(ses: Electron.Session, domain: string, sett
   try {
     const cookies = await ses.cookies.get({ domain })
     const cookieStr = cookies.map((c) => `${c.name}=${c.value}`).join('; ')
-    await fetch(`http://localhost:${PORT}/api/settings`, {
+    const res = await fetch(`http://localhost:${PORT}/api/settings`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ [settingsKey]: cookieStr }),
     })
-  } catch {}
+    if (!res.ok) {
+      console.error(`[saveCookies] PUT /api/settings failed: ${res.status} ${await res.text()}`)
+    }
+  } catch (e) {
+    console.error('[saveCookies] Error:', e)
+  }
 }
 
-/** 启动 Next.js standalone 服务器（生产模式） */
-function startNextServer(): Promise<void> {
-  return new Promise((resolve) => {
-    const appPath = app.getAppPath()
-    const serverPath = path.join(appPath, '.next', 'standalone', 'server.js')
-    const serverCwd = path.join(appPath, '.next', 'standalone')
-    console.log('[next] starting standalone server:', serverPath)
-    console.log('[next] cwd:', serverCwd)
-
-    // 用 Electron 自身的 Node 运行 server.js（process.execPath 指向 Electron binary，它能执行 JS）
-    nextServer = spawn(process.execPath, [serverPath], {
-      env: {
-        ...process.env,
-        PORT: String(PORT),
-        HOSTNAME: 'localhost',
-        NODE_ENV: 'production',
-        ELECTRON_RUN_AS_NODE: '1',  // 让 Electron 以纯 Node.js 模式运行
-      },
-      cwd: serverCwd,
-      stdio: 'pipe',
-    })
-
-    nextServer.stdout?.on('data', (data: Buffer) => {
-      console.log('[next]', data.toString().trim())
-    })
-
-    nextServer.stderr?.on('data', (data: Buffer) => {
-      console.error('[next]', data.toString().trim())
-    })
-
-    nextServer.on('error', (err) => {
-      console.error('[next] spawn error:', err)
-    })
-
-    nextServer.on('exit', (code) => {
-      console.log('[next] server exited with code', code)
-      nextServer = null
-    })
-
-    // 轮询等服务就绪
-    let resolved = false
-    const poll = setInterval(async () => {
-      if (resolved) return
-      try {
-        await fetch(`http://localhost:${PORT}/`)
-        resolved = true
-        clearInterval(poll)
-        console.log('[next] server is ready')
-        resolve()
-      } catch {}
-    }, 300)
-
-    setTimeout(() => {
-      if (!resolved) {
-        resolved = true
-        clearInterval(poll)
-        console.log('[next] timeout waiting for server, proceeding anyway')
-        resolve()
-      }
-    }, 15000)
-  })
-}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -421,9 +409,31 @@ function setupAutoUpdater() {
 }
 
 app.on('ready', async () => {
-  // 生产模式：先启动 Next.js standalone 服务器
+  // 生产模式：在主进程内加载 Next.js standalone 服务器
   if (!isDev) {
-    await startNextServer()
+    startNextServer()
+    // 等待服务就绪
+    await new Promise<void>((resolve) => {
+      let resolved = false
+      const poll = setInterval(async () => {
+        if (resolved) return
+        try {
+          await fetch(`http://localhost:${PORT}/`)
+          resolved = true
+          clearInterval(poll)
+          console.log('[next] server is ready')
+          resolve()
+        } catch {}
+      }, 300)
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true
+          clearInterval(poll)
+          console.log('[next] timeout waiting for server, proceeding anyway')
+          resolve()
+        }
+      }, 15000)
+    })
   }
 
   createWindow()
@@ -445,10 +455,6 @@ app.on('activate', () => {
 app.on('before-quit', () => {
   isQuitting = true
   stopScheduler()
-  if (nextServer) {
-    nextServer.kill()
-    nextServer = null
-  }
 })
 
 app.on('window-all-closed', () => {
@@ -458,4 +464,30 @@ app.on('window-all-closed', () => {
 })
 
 ipcMain.handle('get-app-path', () => app.getAppPath())
-ipcMain.handle('get-data-path', () => path.join(app.getAppPath(), 'data'))
+
+ipcMain.handle('get-data-dir', () => {
+  return getUserDataDir()
+})
+
+ipcMain.handle('select-data-dir', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory', 'createDirectory'],
+    title: '选择数据存储目录',
+  })
+  if (result.canceled || !result.filePaths[0]) return null
+
+  const chosen = result.filePaths[0]
+  setUserDataDir(chosen)
+
+  const { response } = await dialog.showMessageBox({
+    type: 'info',
+    title: '数据目录已更换',
+    message: `数据目录已设置为：\n${chosen}\n\n需要重启应用才能生效。`,
+    buttons: ['立即重启', '稍后'],
+  })
+  if (response === 0) {
+    app.relaunch()
+    app.exit(0)
+  }
+  return chosen
+})

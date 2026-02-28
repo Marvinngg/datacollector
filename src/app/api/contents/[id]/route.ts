@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getContentById, deleteContent } from '@/lib/db'
+import { getDataDir } from '@/lib/data-dir'
+import path from 'path'
 import fs from 'fs'
+
+/** 兼容旧绝对路径和新相对路径 */
+function resolveFilePath(filePath: string): string {
+  return path.isAbsolute(filePath)
+    ? filePath
+    : path.join(getDataDir(), filePath)
+}
 
 export async function GET(
   _request: NextRequest,
@@ -14,8 +23,9 @@ export async function GET(
 
   let body = ''
   try {
-    if (fs.existsSync(content.file_path)) {
-      body = fs.readFileSync(content.file_path, 'utf-8')
+    const fullPath = resolveFilePath(content.file_path)
+    if (fs.existsSync(fullPath)) {
+      body = fs.readFileSync(fullPath, 'utf-8')
     }
   } catch {}
 
@@ -33,8 +43,9 @@ export async function DELETE(
   }
 
   try {
-    if (fs.existsSync(content.file_path)) {
-      fs.unlinkSync(content.file_path)
+    const fullPath = resolveFilePath(content.file_path)
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath)
     }
   } catch {}
 

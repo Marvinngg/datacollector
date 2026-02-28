@@ -1,6 +1,7 @@
 appId: com.datacollector.app
 productName: Data Collector
 asar: false
+npmRebuild: false
 directories:
   output: dist
   buildResources: resources

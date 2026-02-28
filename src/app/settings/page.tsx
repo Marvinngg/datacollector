@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Save, CheckCircle2, Loader2, LogIn, Eye, EyeOff } from 'lucide-react'
+import { Save, CheckCircle2, Loader2, LogIn, Eye, EyeOff, FolderOpen } from 'lucide-react'
 
 const frequencyOptions = [
   { value: '0 */6 * * *', label: '每 6 小时' },
@@ -19,7 +19,6 @@ const frequencyOptions = [
 ]
 
 interface SettingsForm {
-  data_dir: string
   cron_schedule: string
   bilibili_cookie: string
   zsxq_cookie: string
@@ -27,7 +26,6 @@ interface SettingsForm {
 }
 
 const defaultSettings: SettingsForm = {
-  data_dir: '',
   cron_schedule: '0 8 * * *',
   bilibili_cookie: '',
   zsxq_cookie: '',
@@ -146,6 +144,7 @@ export default function SettingsPage() {
   const [biliLogging, setBiliLogging] = useState(false)
   const [zsxqLogging, setZsxqLogging] = useState(false)
   const [ytLogging, setYtLogging] = useState(false)
+  const [dataDir, setDataDir] = useState<string>('')
   const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI?.isElectron
 
   useEffect(() => {
@@ -156,6 +155,14 @@ export default function SettingsPage() {
         setLoaded(true)
       })
       .catch(() => setLoaded(true))
+
+    // 获取数据目录路径
+    const api = (window as any).electronAPI
+    if (api?.getDataDir) {
+      api.getDataDir().then((dir: string) => setDataDir(dir || ''))
+    } else {
+      setDataDir('./data')
+    }
   }, [])
 
   const handleSave = async () => {
@@ -261,12 +268,31 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-1.5">
             <Label className="text-sm">数据存储路径</Label>
-            <Input
-              value={form.data_dir}
-              onChange={(e) => update('data_dir', e.target.value)}
-              placeholder="留空使用默认路径（./data）"
-              className="max-w-md text-sm"
-            />
+            <div className="flex items-center gap-2 max-w-md">
+              <Input
+                value={dataDir}
+                readOnly
+                className="text-sm flex-1 bg-muted"
+              />
+              {isElectron && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    const api = (window as any).electronAPI
+                    if (api?.selectDataDir) {
+                      await api.selectDataDir()
+                    }
+                  }}
+                >
+                  <FolderOpen className="h-4 w-4 mr-1.5" />
+                  更换
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {isElectron ? '更换目录后需要重启应用' : '开发模式下使用项目根目录的 ./data'}
+            </p>
           </div>
         </CardContent>
       </Card>

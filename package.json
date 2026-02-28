@@ -9,7 +9,9 @@
     "dev": "concurrently -n next,electron \"npm run dev:next\" \"npm run dev:electron\"",
     "build:next": "next build",
     "build:electron": "tsc -p tsconfig.electron.json",
-    "build": "npm run build:next && rm -rf .next/standalone/data && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public && npm run build:electron && electron-builder",
+    "rebuild:electron": "cd node_modules/better-sqlite3 && npx node-gyp rebuild --target=$(node -p \"require('../../node_modules/electron/package.json').version\") --dist-url=https://electronjs.org/headers --release",
+    "rebuild:node": "cd node_modules/better-sqlite3 && npx node-gyp rebuild --release",
+    "build": "npm run build:next && rm -rf .next/standalone/data && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public && npm run build:electron && npm run rebuild:electron && electron-builder && npm run rebuild:node",
     "start": "next start",
     "lint": "next lint"
   },

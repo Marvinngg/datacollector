@@ -170,8 +170,9 @@ function parseZsxqContent(text: string): ContentPart[] {
   // 2. [text](<e type="web" href="..." .../> ) — 套娃链接
   // 3. <e type="TYPE" .../> — 各种标签
   // 4. ![alt](url) — 普通 markdown 图片
-  // 5. [包含 N 张图片] — 图片占位符
-  const regex = /!\[([^\]]*)\]\(\s*<e\s+type="web"\s+([^/]*?)\/>\s*\)|\[([^\]]+)\]\(\s*<e\s+type="web"\s+([^/]*?)\/>\s*\)|<e\s+type="(\w+)"\s+([^/]*?)\/?>|!\[([^\]]*)\]\(([^)]+)\)|\[包含\s*(\d+)\s*张图片\]/g
+  // 5. [text](url) — 普通 markdown 链接
+  // 6. [包含 N 张图片] — 图片占位符
+  const regex = /!\[([^\]]*)\]\(\s*<e\s+type="web"\s+([^/]*?)\/>\s*\)|\[([^\]]+)\]\(\s*<e\s+type="web"\s+([^/]*?)\/>\s*\)|<e\s+type="(\w+)"\s+([^/]*?)\/?>|!\[([^\]]*)\]\(([^)]+)\)|\[([^\]]+)\]\(([^)]+)\)|\[包含\s*(\d+)\s*张图片\]/g
 
   let lastIndex = 0
   let match
@@ -219,9 +220,18 @@ function parseZsxqContent(text: string): ContentPart[] {
     } else if (match[7] !== undefined && match[8] !== undefined) {
       // 普通 markdown 图片 ![alt](url)
       parts.push({ type: 'image', src: match[8], alt: match[7] || '图片' })
-    } else if (match[9] !== undefined) {
+    } else if (match[9] !== undefined && match[10] !== undefined) {
+      // 普通 markdown 链接 [text](url)
+      const href = match[10]
+      const label = match[9]
+      if (/\.(jpg|jpeg|png|gif|webp|bmp)/i.test(href)) {
+        parts.push({ type: 'image', src: href, alt: label })
+      } else {
+        parts.push({ type: 'link', href, label })
+      }
+    } else if (match[11] !== undefined) {
       // [包含 N 张图片] 占位符
-      parts.push({ type: 'image_placeholder', count: parseInt(match[9]) })
+      parts.push({ type: 'image_placeholder', count: parseInt(match[11]) })
     }
 
     lastIndex = match.index + match[0].length
@@ -757,7 +767,7 @@ function ContentsPageInner() {
 
             {/* 内容区：根据 source_type 选择不同的渲染方式 */}
             <div className="flex-1 overflow-y-auto p-4">
-              {previewSourceType === 'zsxq' && getContentBody(previewBody).includes('<e ') ? (
+              {previewSourceType === 'zsxq' ? (
                 <ZsxqContentRenderer content={getContentBody(previewBody)} onOpenUrl={handleOpenUrl} />
               ) : (
                 <pre className="whitespace-pre-wrap text-sm leading-relaxed font-mono">

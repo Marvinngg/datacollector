@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import path from 'path'
 import {
   getAllSources,
   getSourceById,
   createTask,
   updateTask,
   updateSource,
-  getSetting,
 } from '@/lib/db'
 import { generateIndex } from '@/lib/file-manager'
+import { getDataDir } from '@/lib/data-dir'
 import { BilibiliCollector } from '@/lib/collectors/bilibili'
 import { YouTubeCollector } from '@/lib/collectors/youtube'
 import { ZsxqCollector } from '@/lib/collectors/zsxq'
@@ -16,11 +15,6 @@ import { RssCollector } from '@/lib/collectors/rss'
 import { WebCollector } from '@/lib/collectors/web'
 import type { Source } from '@/types'
 import { BaseCollector } from '@/lib/collectors/base'
-
-function getDataDir(): string {
-  const custom = getSetting('data_dir')
-  return custom?.trim() || path.join(process.cwd(), 'data')
-}
 
 function createCollector(source: Source, dataDir: string): BaseCollector {
   switch (source.type) {
