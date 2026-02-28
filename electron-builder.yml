@@ -9,6 +9,10 @@ files:
   - .next/standalone/**/*
   - .next/static/**/*
   - public/**/*
+  - "!**/data/**"
+  - "!**/*.db"
+  - "!**/*.db-shm"
+  - "!**/*.db-wal"
 mac:
   category: public.app-category.productivity
   target:
