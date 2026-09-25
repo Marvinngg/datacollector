@@ -28,10 +28,14 @@
    *  T is absolute time so fog drift / player pulse stay continuous across scene cuts. */
   function mapState(T, o = {}) {
     const reveal = [World.homeReveal()].concat(o.reveal || []);
+    const ma = o.markA == null ? 1 : o.markA;
     World.draw(cam, { fog: 0.85, reveal, t: T });
-    World.marker(cam, SP.money.x, SP.money.y, { color: P.gold, label: '挣钱', drop: 1 });
-    World.player(cam, HOME.x, HOME.y, { t: T });
+    World.marker(cam, SP.money.x, SP.money.y, { color: P.gold, label: '挣钱', drop: 1, alpha: ma });
+    World.player(cam, HOME.x, HOME.y, { t: T, alpha: ma });
   }
+  /** map pins/player fade with the veil (so a half-covered 挣钱 never peeks out between windows);
+   *  1 at veil ≤ 0.1 (the standard map state stays pixel-identical), 0.1 at the full 0.85 veil */
+  const markAFor = v => 1 - 0.9 * ease.inOut(clamp((v - 0.1) / 0.75));
   function veil(a, color = P.bg) {
     if (a <= 0) return;
     ctx.save(); ctx.globalAlpha = clamp(a); ctx.fillStyle = color; ctx.fillRect(0, 0, W, H); ctx.restore();
@@ -357,7 +361,11 @@
       // 1. the standard map, dimming under the incoming UI (static backdrop once the full grid covers it)
       const dim = 0.55 * ease.inOut(prog(lt, tm.dimIn[0], tm.dimIn[1])) + 0.3 * ease.inOut(prog(lt, tm.stages[2], tm.stages[4]));
       if (lt >= tm.stages[5] + SPLIT) blit(backdrop('map'));
-      else { mapState(T); veil(dim); }
+      else {
+        // pins recede with the veil, and are fully gone (0.1) before the first window can half-cover 挣钱
+        const ma = dim <= 0 ? 1 : Math.min(markAFor(dim + 0.1), 1 - 0.9 * ease.inOut(prog(lt, tm.enter - 0.4, tm.stages[1] + 0.2)));
+        mapState(T, { markA: ma }); veil(dim);
+      }
       E.questBox('挣钱', { alpha: (1 - 0.55 * ease.inOut(prog(lt, tm.dimIn[0], tm.dimIn[1]))) * (1 - ease.inOut(prog(lt, tm.stages[1] - 0.1, tm.stages[1] + 0.4))) });
       // 2. the chat input, then the team
       drawDialog(lt, tm, T);
@@ -391,19 +399,22 @@
     const out0 = Math.max(f1 + 0.6, L24.start - 1.25), out1 = out0 + 1.0;
     const clock = Math.max(out0 + 0.5, L24.start - 0.45);
     const ember0 = clock - 0.1, ember1 = ember0 + 1.4;
-    const black = D - 0.3, cardOut = black - 0.9, card0 = cardOut - 3.6, mapOut0 = card0 - 0.5;
-    const log0 = L24.end + 0.35, span = Math.max(2.5, mapOut0 - log0);
-    const logL1 = log0 + 0.25, logL2 = log0 + 0.75, trig = log0 + Math.min(1.7, span * 0.3), logOut = log0 + span * 0.5;
-    const drop0 = logOut + 0.25, dropD = 0.75, path0 = drop0 + 0.5, path1 = path0 + 1.1;
+    // ending: the quest log (已触发 stays fully readable ≥ 3s) → new marker + path → 游戏进行中 (~3s) → black
+    const black = D - 0.3, cardOut = black - 0.8;
+    const log0 = L24.end, logL1 = log0 + 0.2, logL2 = log0 + 0.6, trig = log0 + 1.2, logOut = trig + 3.2;
+    const drop0 = logOut + 0.05, dropD = 0.75, path0 = drop0 + 0.4, path1 = path0 + 1.0;
+    const mapOut0 = Math.max(path1 + 0.5, cardOut - 3.5), card0 = mapOut0 + 0.5;
     return { D, L21, L22, L23, L24, c0, c1, type0, cps, bar0, bar87, th0, th1, dive0, dive1, f0, f1, out0, out1, clock, ember0, ember1, black, cardOut, card0, mapOut0, log0, logL1, logL2, trig, logOut, drop0, dropD, path0, path1 };
   }
   // task panel geometry; k = thumbnail reveal (0: narrow, 1: with thumbnail)
-  const THW = 384, THH = 216, PPAD = 40, COLW = 668;
+  const THW = 512, THH = 288, PPAD = 40, COLW = 668, LBL = 34;
   function panelGeom(k) {
-    const narrowW = COLW + PPAD * 2, wideW = narrowW + THW + 36;
-    const w = lerp(narrowW, wideW, k), hh = lerp(232, THH + PPAD * 2 - 8, k);
-    const x = W / 2 - w / 2, y = 452 - hh / 2;
-    return { x, y, w, h: hh, cx: x + PPAD + lerp(0, THW + 36, k), th: { x: x + PPAD, y: y + hh / 2 - THH / 2, w: THW, h: THH } };
+    const narrowW = COLW + PPAD * 2, wideW = narrowW + THW + 40;
+    const w = lerp(narrowW, wideW, k), hh = lerp(232, THH + LBL + PPAD * 2 - 12, k);
+    const x = W / 2 - w / 2, y = 440 - hh / 2;
+    // the slot scales with k and sits left of the text column, so it never covers 任务 / 渲染中 while opening
+    const tw = THW * k, thh = THH * k;
+    return { x, y, w, h: hh, cx: x + PPAD + lerp(0, THW + 40, k), th: { x: x + PPAD, y: y + PPAD - 6, w: tw, h: thh } };
   }
   const BAR = { lblW: 92, gap: 5, pctW: 84, h: 30 };
   function barCell(g, i) {
@@ -435,6 +446,13 @@
       ctx.globalAlpha = fa; ctx.fillStyle = P.bg; ctx.fillRect(r.x, r.y, r.w, r.h);
       ctx.globalAlpha = fa * 0.6; ctx.strokeStyle = P.teal; ctx.lineWidth = 1.5; ctx.strokeRect(r.x - 1.5, r.y - 1.5, r.w + 3, r.h + 3);
       ctx.globalAlpha = a;
+      // what the thumbnail is: this file, at this very moment
+      const la = fa * ease.out(prog(k, 0.7, 1)), ly = r.y + r.h + 26;
+      if (la > 0) {
+        const tc = s => `${pad2(Math.floor(s / 60))}:${pad2(Math.floor(s % 60))}`;
+        E.text('地球 Online.mp4', r.x, ly, { size: 16, family: F.mono, color: P.dim, alpha: la });
+        E.text(`${tc(T)} / ${tc(E.TL.duration)}`, r.x + r.w, ly, { size: 16, family: F.mono, color: P.faint, alpha: la, align: 'right' });
+      }
     }
     const p = progressAt(lt, tm), done = lt >= tm.f1;
     const doneK = ease.out(prog(lt, tm.f1, tm.f1 + 0.5));
@@ -508,7 +526,7 @@
     if (BDS[kind] && BDS[kind].key === key) return BDS[kind].cv;
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = P.bg; ctx.fillRect(0, 0, W, H);
-    mapState(fixT()); veil(0.85);
+    mapState(fixT(), { markA: markAFor(0.85) }); veil(0.85);
     if (kind === 'dive') panelShadow(panelGeom(1), 1);
     ctx.restore();
     const cv = (BDS[kind] && BDS[kind].cv) || Object.assign(document.createElement('canvas'), { width: W, height: H });
@@ -577,7 +595,10 @@
       const frozen = o.backdrop || ((lt < tm.c0 || lt >= tm.c1) && lt < tm.out0 && backdrop('map'));
       if (frozen) blit(frozen);
       else if (mapOut < 1) {
-        mapState(T, { reveal: spark > 0 ? [{ x: SP.spark.x, y: SP.spark.y, r: 210 * spark, a: 0.55 }] : [] });
+        const vIn = ease.inOut(prog(lt, tm.out0, tm.out1));
+        const vLog = ease.inOut(prog(lt, tm.log0 - 0.2, tm.log0 + 0.5)) * (1 - ease.inOut(prog(lt, tm.logOut, tm.logOut + 0.6)));
+        const vv = lerp(0.85, 0.08, vIn) + 0.4 * vLog;
+        mapState(T, { markA: markAFor(vv), reveal: spark > 0 ? [{ x: SP.spark.x, y: SP.spark.y, r: 210 * spark, a: 0.55 }] : [] });
         drawSpark(T, spark);
         // new ember marker + dashed path from the player
         const dk = prog(lt, tm.drop0, tm.drop0 + tm.dropD);
@@ -593,10 +614,7 @@
         }
         if (dk > 0) World.marker(cam, SP.newMark.x, SP.newMark.y, { color: P.ember, drop: dk, size: 0.85 });
         // veil: full dark while the team/panel owns the screen, light for 02:13, medium under the log
-        const d5 = 0.85;
-        const vIn = ease.inOut(prog(lt, tm.out0, tm.out1));
-        const vLog = ease.inOut(prog(lt, tm.log0 - 0.2, tm.log0 + 0.5)) * (1 - ease.inOut(prog(lt, tm.logOut, tm.logOut + 0.6)));
-        veil(lerp(d5, 0.08, vIn) + 0.4 * vLog);
+        veil(vv);
         // HUD
         const hud = vIn * (1 - 0.6 * vLog);
         E.questBox('挣钱', { alpha: hud });

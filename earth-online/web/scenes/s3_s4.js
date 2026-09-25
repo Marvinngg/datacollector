@@ -74,14 +74,14 @@
 
   // notifications: vivid (real life) then numb (repetition)
   const VIVID = [
-    { type: 'money', title: '工资已到账', detail: '+ 8,000.00', amt: 8000, date: '2016.07' },
-    { type: 'ok', title: '季度目标', check: true, detail: 'Q3 完成率 103%', date: '2016.09' },
-    { type: 'work', pre: '23:47', title: '方案第 6 版', detail: '「这真的是最后一版」', date: '2016.11' },
-    { type: 'money', title: '报销已通过', detail: '+ 326.00 · 打车 × 14', amt: 326, date: '2016.12' },
-    { type: 'money', title: '工资已到账', detail: '+ 8,000.00', amt: 8000, date: '2017.01' },
-    { type: 'money', title: '年终奖已到账', detail: '+ 24,000.00', amt: 24000, date: '2017.02' },
-    { type: 'ok', title: '绩效 B+', detail: '「还有提升空间」', date: '2017.06' },
-    { type: 'work', pre: '01:12', title: '方案第 7 版', detail: '方案_最终版_改3.pptx', date: '2017.09' },
+    { type: 'money', title: '工资已到账', detail: '+ 8,000.00', amt: 8000, date: '2013.07' },
+    { type: 'ok', title: '季度目标', check: true, detail: 'Q3 完成率 103%', date: '2013.09' },
+    { type: 'work', pre: '23:47', title: '方案第 6 版', detail: '「这真的是最后一版」', date: '2013.11' },
+    { type: 'money', title: '报销已通过', detail: '+ 326.00 · 打车 × 14', amt: 326, date: '2013.12' },
+    { type: 'money', title: '工资已到账', detail: '+ 8,000.00', amt: 8000, date: '2014.01' },
+    { type: 'money', title: '年终奖已到账', detail: '+ 24,000.00', amt: 24000, date: '2014.02' },
+    { type: 'ok', title: '绩效 B+', detail: '「还有提升空间」', date: '2014.06' },
+    { type: 'work', pre: '01:12', title: '方案第 7 版', detail: '方案_最终版_改3.pptx', date: '2014.09' },
   ];
   const NUMB = [
     { type: 'work', pre: '00:58', title: '方案第 8 版', detail: '方案_最终版_不改了.pptx' },
@@ -97,7 +97,7 @@
   function tim3(sc) {
     const dur = sc.end - sc.start;
     const l7 = L('L07'), l8 = L('L08'), l9 = L('L09'), l10 = L('L10');
-    const k1 = l7.start + l7.dur * 0.5, k2 = k1 + 0.22, enter = k2 + 0.55;
+    const k1 = l7.start + l7.dur * 0.75, k2 = k1 + 0.22, enter = k2 + 0.55;
     const drop0 = enter + 0.18, dropDur = 0.85, land = drop0 + dropDur * 0.37;
     const path0 = land + 0.2, path1 = path0 + 1.1;
     const bal0 = path0 + 0.1;
@@ -120,7 +120,7 @@
       p.d = p.dull ? (p.i - D + 1) / nd : 0;                              // 0 vivid … 1 most numb
       p.v = p.dull ? +lerp(1, 0.2, nd > 1 ? (p.i - D) / (nd - 1) : 1).toFixed(2) : 1;
       p.react = p.i < D ? 1 : p.i < K ? lerp(0.75, 0.3, (p.i - D) / Math.max(1, K - 1 - D)) : 0;
-      if (!p.it.date) p.date = String(2018 + (p.i - D)) + '.0' + (3 + ((p.i * 5) % 7));
+      if (!p.it.date) p.date = String(2015 + (p.i - D)) + '.0' + (3 + ((p.i * 5) % 7));
       else p.date = p.it.date;
     });
     const numb0 = l9.start - 0.5, numb1 = l10.end;
@@ -136,6 +136,20 @@
     return v;
   }
 
+  // odometer digits: [{d, roll}] from 0.01 upward. A digit only rolls while the digit below it is rolling 9→0
+  // (roll_k = d_{k-1} == 9 ? roll_{k-1} : 0), so the shown number never runs backwards. Fast digits just count.
+  function odoDigits(v, rate, n) {
+    const out = [];
+    for (let k = 0; k < n; k++) {
+      const val = v * 100 / Math.pow(10, k), d = Math.floor(val) % 10;
+      let roll;
+      if (k === 0) roll = rate * 100 > 6 ? 0 : val - Math.floor(val);
+      else roll = out[k - 1].d === 9 ? out[k - 1].roll : 0;
+      if (rate * 100 / Math.pow(10, k) > 6) roll = 0;
+      out.push({ d, roll });
+    }
+    return out;
+  }
   // odometer-style rolling number, right-aligned
   function odometer(v, rate, xr, yb, size, color, alpha) {
     if (alpha <= 0.003) return;
@@ -146,17 +160,14 @@
     const slots = [{ k: 0 }, { k: 1 }, { s: '.' }];
     for (let i = 0; i < intLen; i++) { if (i && i % 3 === 0) slots.push({ s: ',' }); slots.push({ k: i + 2 }); }
     slots.push({ s: '¥', gap: 10 });
+    const digs = odoDigits(v, rate, intLen + 2);
     let x = xr;
     ctx.beginPath(); ctx.rect(xr - cw * (slots.length + 1) - 20, yb - size * 0.92, cw * (slots.length + 1) + 30, size * 1.12); ctx.clip();
     for (const sl of slots) {
       x -= cw + (sl.gap || 0);
       const cx = x + cw / 2;
       if (sl.s) { ctx.fillText(sl.s, cx, yb); continue; }
-      const val = v * 100 / Math.pow(10, sl.k), base = Math.floor(val), f = val - base;
-      let roll = clamp((f - 0.9) * 10);
-      if (rate * 100 / Math.pow(10, sl.k) > 6) roll = 0;        // fast digits just count
-      roll = ease.inOut(roll);
-      const d0 = base % 10, d1 = (d0 + 1) % 10;
+      const roll = ease.inOut(digs[sl.k].roll), d0 = digs[sl.k].d, d1 = (d0 + 1) % 10;
       if (roll < 0.999) ctx.fillText(String(d0), cx, yb - roll * lh);
       if (roll > 0.001) ctx.fillText(String(d1), cx, yb + (1 - roll) * lh);
     }
@@ -316,7 +327,7 @@
         const k = q.dull ? ease.inOut(prog(lt, q.t, q.t + 0.22)) : ease.outExpo(prog(lt, q.t, q.t + 0.5));
         y -= k * (cardH(q) + lerp(14, 8, q.d));
       }
-      const ink = p.dull ? prog(lt, p.t, p.t + 0.18) : ease.out(prog(lt, p.t, p.t + 0.35));
+      const ink = p.dull ? prog(lt, p.t + 0.12, p.t + 0.3) : ease.out(prog(lt, p.t, p.t + 0.35));   // numb: wait for the stack to move up
       const slide = p.dull ? (1 - ease.inOut(prog(lt, p.t, p.t + 0.2))) * 36 : (1 - ease.outExpo(prog(lt, p.t, p.t + 0.6))) * 90;
       const depth = 1 - smooth(505, 400, y);          // dissolve before reaching the marker
       notifCard(p, NX + slide, y, ink * depth * out);
@@ -331,7 +342,7 @@
     return c;
   }
 
-  E.register('s3_money', { draw(ctx_, lt, sc, T) { drawS3(lt, sc, T); }, cues: cuesS3 });
+  E.register('s3_money', { draw(ctx_, lt, sc, T) { drawS3(lt, sc, T); }, cues: cuesS3, _probe: { tim3, balance, odoDigits } });
 
   // ================================================================
   // s4_others
@@ -616,7 +627,6 @@
       }
     }
 
-    E.questBox('挣钱', { alpha: lerp(1, 0.6, smooth(0, 1, u)) });
 
     // clock HUD: 01:40 … minute by minute … 08:00
     const ca = ease.out(prog(lt, tm.clockIn, tm.clockIn + 0.6)) * (1 - ease.inOut(prog(lt, tm.clockOut0, tm.clockOut1)));
@@ -630,6 +640,8 @@
       if (!alarmed) dot(W - 80 - 28, 72 + 32, 3, P.ember, { alpha: ca * sI * 0.9 });
       ctx.restore();
     }
+
+    E.questBox('挣钱', { alpha: lerp(1, 0.6, smooth(0, 1, u)) });   // HUD last: above the other players
   }
 
   function cuesS4(sc) {
