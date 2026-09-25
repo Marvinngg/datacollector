@@ -462,8 +462,8 @@ for j, m in enumerate([50, 57, 62, 66]):
     gm(b6p, L24s - 0.5 + 0.15 * j, STR, m, 58, final_t - L24s + 0.5, gain=0.45, pan=(j - 1.5) * 0.4, tail=4)
 # felt-piano melody: sparse, stepwise, mostly in the gaps
 mel = [(anchor6 + 0.25, 74, 40), (tl.le('L21') + 0.05, 78, 38), (tl.ls('L22') - 0.1, 76, 38),
-       (tl.le('L22') + 0.1, 74, 36), (tl.le('L22') + 0.35, 71, 34), (tl.le('L23') + 0.6, 73, 38), (tl.le('L23') + 1.0, 76, 40),
-       (L24s - 0.3, 78, 44), (L24s + 1.2, 76, 40), (L24s + tl.ln['L24']['dur'] * 0.5, 74, 44),
+       (tl.le('L22') + 0.1, 74, 36), (tl.le('L22') + 0.35, 71, 34), (tl.le('L23') + 0.7, 76, 36),
+       (clock_t + 0.02, 78, 44), (L24s + 1.2, 76, 40), (L24s + tl.ln['L24']['dur'] * 0.5, 74, 44),
        (L24s + tl.ln['L24']['dur'] * 0.5 + 0.55, 71, 38), (L24e + 0.25, 69, 40), (final_t - 2.4, 74, 36), (final_t - 1.2, 73, 36)]
 for t, m, v in mel:
     if t < final_t - 0.3:

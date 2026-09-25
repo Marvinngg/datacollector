@@ -182,15 +182,27 @@ def s_alarm(c):
 _win_count = [0]
 
 
+_win_prev = [0]
+
+
 def s_window(c):
-    """AI window opens: small pitched pop, walks up the pentatonic as windows multiply"""
-    k = _win_count[0]; _win_count[0] += 1
+    """AI window(s) open: small pitched pops walking up the D pentatonic as windows multiply.
+    With `n` (total windows after this split) one pop per new window (max 6), spread over ~0.2 s."""
     PEN = [74, 76, 78, 81, 83, 86, 88, 90, 93]
-    m = PEN[k % len(PEN)]
-    n = n_of(0.3); t = t_(n)
-    x = bell(mtof(m), 0.3, taus=(0.07, 0.03), parts=(1.0, 2.0), amps=(1.0, 0.2), attack=0.002)
-    air = filt(noise(n) * np.exp(-t / 0.015), 'bp', 5000, q=1.0) * 0.15
-    return st((x + air) * 0.09, 0.6), float(np.clip(rng.normal(0, 0.4), -0.7, 0.7))
+    n_tot = int(c.get('n', _win_prev[0] + 1))
+    new = max(1, n_tot - _win_prev[0]); _win_prev[0] = n_tot
+    pops = min(new, 6)
+    dur = 0.3 + 0.2; n = n_of(dur); t = t_(n); x = np.zeros((n, 2))
+    for j in range(pops):
+        k = _win_count[0]; _win_count[0] += 1
+        m = PEN[min(k, len(PEN) - 1)] if pops == 1 else PEN[(k % 5) + 2]
+        d = n_of(0.2 * j / max(1, pops - 1)) if pops > 1 else 0
+        nn = n - d
+        y = bell(mtof(m), nn / SR, taus=(0.07, 0.03), parts=(1.0, 2.0), amps=(1.0, 0.2), attack=0.002)
+        y = y + filt(noise(nn) * np.exp(-t_(nn) / 0.015), 'bp', 5000, q=1.0) * 0.15
+        gl, gr = pan_gains(float(np.clip(rng.normal(0, 0.45), -0.7, 0.7)))
+        x[d:, 0] += y * gl / np.sqrt(pops); x[d:, 1] += y * gr / np.sqrt(pops)
+    return x * 0.09, 0.0
 
 
 def s_tick(c):
@@ -234,7 +246,7 @@ wet = buf(D + 4)
 SEND = {'ping': 0.35, 'ping_dull': 0.25, 'check': 0.25, 'drop': 0.3, 'spark': 0.5, 'window': 0.3, 'alarm': 0.2,
         'final': 0.5, 'card': 0.2, 'key': 0.08, 'enter': 0.1, 'whoosh': 0.2, 'fizzle': 0.3, 'tick': 0.1}
 # peak level of each sound in sfx.wav (dBFS). mix.py adds sfx at unity against voice at ~-19 LUFS.
-TARGET = {'key': -31, 'enter': -26, 'check': -25, 'ping': -20, 'ping_dull': -24, 'whoosh': -26, 'drop': -24,
+TARGET = {'key': -31, 'enter': -26, 'check': -25, 'ping': -22, 'ping_dull': -24, 'whoosh': -26, 'drop': -24,
           'card': -29, 'spark': -30, 'fizzle': -31, 'alarm': -22, 'window': -29, 'tick': -33, 'final': -26,
           'boot': -15}
 cues = sorted(tl.cues, key=lambda c: c['t'])
