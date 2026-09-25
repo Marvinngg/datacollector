@@ -41,7 +41,7 @@
   // archive slot = rank of the float height, so filing paths never cross
   const ARCH_SLOT = FUN.map(f => FUN.filter(g => g.y < f.y).length);
   const TASK = { size: 34, family: F.sans, weight: 400 };
-  const DATE = { size: 17, family: F.mono, weight: 400 };
+  const DATE = { size: 19, family: F.mono, weight: 400 };
 
   // ------------------------------------------------------------------ helpers
   const wcache = new Map();
@@ -153,18 +153,18 @@
     ctx.stroke(); ctx.restore();
   }
   /** small hairline label box, e.g. 「娱乐」. x = left edge, y = text baseline */
-  const TAG = { size: 14, family: F.sans, weight: 500, spacing: 2 };
-  const tagW = () => width('娱乐', TAG) + 16;
+  const TAG = { size: 20, family: F.sans, weight: 500, spacing: 3 };
+  const tagW = () => width('娱乐', TAG) + 22;
   function tag(x, y, o = {}) {
-    const w = tagW(), d = disp(o.seed || 9, x + w / 2, y - 5); if (d.a <= 0.004) return;
+    const w = tagW(), d = disp(o.seed || 9, x + w / 2, y - 7); if (d.a <= 0.004) return;
     const a = (o.alpha == null ? 1 : o.alpha) * d.a, s = o.scale || 1;
     ctx.save(); ctx.globalAlpha *= a;
-    ctx.translate(x + w / 2 + d.dx, y - 5 + d.dy); ctx.rotate(d.rot); ctx.scale(s, s);
-    ctx.strokeStyle = o.color || P.faint; ctx.lineWidth = 1;
-    ctx.strokeRect(-w / 2 + 0.5, -11.5, w - 1, 23);
+    ctx.translate(x + w / 2 + d.dx, y - 7 + d.dy); ctx.rotate(d.rot); ctx.scale(s, s);
+    ctx.strokeStyle = o.color || P.dim; ctx.lineWidth = 1.25;
+    ctx.strokeRect(-w / 2 + 0.5, -15.5, w - 1, 31);
     ctx.font = E.font(TAG.size, TAG.family, TAG.weight); ctx.letterSpacing = TAG.spacing + 'px';
-    ctx.fillStyle = o.color || P.faint; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-    ctx.fillText('娱乐', -w / 2 + 8, 5);
+    ctx.fillStyle = o.color || P.ink; ctx.globalAlpha *= 0.82; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText('娱乐', -w / 2 + 11, 7.5);
     ctx.restore();
   }
   function caretBar(x, y, w, h, a, glow = 0) {
@@ -216,7 +216,7 @@
   // ================================================================== s0 — boot
   const TITLE = { size: 92, family: F.serif, weight: 400 };
   const TITLE_Y = 478, SUB_Y = 552, BAR_Y = 588;
-  const SUB = { size: 19, family: F.mono, weight: 400, spacing: 3, color: P.dim };
+  const SUB = { size: 22, family: F.mono, weight: 400, spacing: 3, color: P.dim };
   function titleLayout() {
     const parts = [['地', 12], ['球', 34], ['O', 3], ['n', 3], ['l', 3], ['i', 3], ['n', 3], ['e', 0]];
     const f = E.font(TITLE.size, TITLE.family, TITLE.weight);
@@ -279,9 +279,9 @@
       const sub = '载入存档', subN = Math.floor(clamp((lt - T.sub0) * 16, 0, 4));
       const sw = run([seg(sub, SUB)], L.left + 2, SUB_Y, { n: subN });
       const dotsN = Math.floor(clamp((lt - T.dots0) / T.dotStep + 1, 0, 6));
-      for (let i = 0; i < dotsN; i++) E.dot(L.left + 2 + width(sub, SUB) + 12 + i * 11, SUB_Y - 7, 1.6, P.dim);
+      for (let i = 0; i < dotsN; i++) E.dot(L.left + 2 + width(sub, SUB) + 13 + i * 13, SUB_Y - 8, 2, P.dim);
       const lp = loadCurve(prog(lt, T.bar0, T.bar1));
-      if (lt > T.bar0) run([seg(String(Math.round(lp * 100)).padStart(3, '0') + '%', { size: 14, family: F.mono, color: P.faint, spacing: 2 })], L.right, SUB_Y, { align: 'right', alpha: ease.out(prog(lt, T.bar0, T.bar0 + 0.3)) });
+      if (lt > T.bar0) run([seg(String(Math.round(lp * 100)).padStart(3, '0') + '%', { size: 17, family: F.mono, color: P.dim, alpha: 0.8, spacing: 2 })], L.right, SUB_Y, { align: 'right', alpha: ease.out(prog(lt, T.bar0, T.bar0 + 0.3)) });
       c.restore();
       // --- the loading line: track, fill, then it travels up and becomes the log's top rule
       const mv = ease.inOut(prog(lt, T.move0, T.move1));
@@ -301,8 +301,8 @@
         ca *= ease.out(prog(lt, T.caret0, T.caret0 + 0.12));
       } else {
         const f = ease.inOut(prog(lt, T.sub0 - 0.18, T.sub0));
-        const endX = L.left + 2 + (subN ? width(sub.slice(0, subN), SUB) + 8 : 0) + (dotsN > 0 ? 4 + dotsN * 11 : 0);
-        cx = lerp(L.right + 16, endX, f); cy = lerp(TITLE_Y - 30, SUB_Y - 7, f); ch = lerp(84, 22, f); cwid = lerp(3, 2, f);
+        const endX = L.left + 2 + (subN ? width(sub.slice(0, subN), SUB) + 8 : 0) + (dotsN > 0 ? 5 + dotsN * 13 : 0);
+        cx = lerp(L.right + 16, endX, f); cy = lerp(TITLE_Y - 30, SUB_Y - 8, f); ch = lerp(84, 26, f); cwid = lerp(3, 2, f);
         ca = lt > T.dots0 + 6 * T.dotStep + 0.1 ? blink(lt) : 1;
         ca *= 1 - ease.out(prog(lt, T.out0, T.out0 + 0.3));
       }
@@ -325,21 +325,21 @@
     hline(X0, X1, TOP, { color: P.dim, alpha: 1, seed: 11 });
     // header
     const hw = run([seg('任务日志', { size: 22, family: F.sans, weight: 500, spacing: 7, color: P.ink })], X0, hdrY, { alpha: hdrA, seed: 21 });
-    run([seg('QUEST LOG', { size: 12, family: F.mono, spacing: 3, color: P.faint })], X0 + hw + 22, hdrY - 1, { alpha: ease.out(prog(lt1, 0.2, 0.7)) * (1 - hdrOut), seed: 22 });
+    run([seg('QUEST LOG', { size: 14, family: F.mono, spacing: 3, color: P.dim, alpha: 0.6 })], X0 + hw + 22, hdrY - 1, { alpha: ease.out(prog(lt1, 0.2, 0.7)) * (1 - hdrOut), seed: 22 });
     // right of header: 新手村 · LV.17 (s2 rolls it to 18)
     const lvA = ease.out(prog(lt1, 0.3, 0.8));
     const lvRoll = x2 ? x2.lv : 0;
     ctx.save();
     ctx.beginPath(); ctx.rect(X1 - 60, HEAD_Y - 24, 64, 32); ctx.clip();
-    run([seg('17', { size: 15, family: F.mono, color: P.dim, spacing: 1 })], X1, HEAD_Y - 18 * lvRoll, { align: 'right', alpha: lvA * (1 - lvRoll), seed: 23 });
-    if (lvRoll > 0) run([seg('18', { size: 15, family: F.mono, color: P.ink, spacing: 1 })], X1, HEAD_Y + 18 * (1 - lvRoll), { align: 'right', alpha: lvA * lvRoll, seed: 24 });
+    run([seg('17', { size: 17, family: F.mono, color: P.dim, spacing: 1 })], X1, HEAD_Y - 18 * lvRoll, { align: 'right', alpha: lvA * (1 - lvRoll), seed: 23 });
+    if (lvRoll > 0) run([seg('18', { size: 17, family: F.mono, color: P.ink, spacing: 1 })], X1, HEAD_Y + 18 * (1 - lvRoll), { align: 'right', alpha: lvA * lvRoll, seed: 24 });
     ctx.restore();
-    const lvw = width('17', { size: 15, family: F.mono, spacing: 1 });
-    run([seg('LV.', { size: 15, family: F.mono, color: P.faint, spacing: 1 })], X1 - lvw - 2, HEAD_Y, { align: 'right', alpha: lvA, seed: 25 });
-    run([seg('新手村', { size: 16, family: F.sans, color: P.faint, spacing: 4 })], X1 - lvw - 52, HEAD_Y, { align: 'right', alpha: lvA, seed: 26 });
+    const lvw = width('17', { size: 17, family: F.mono, spacing: 1 }), LVP = { size: 17, family: F.mono, spacing: 1 };
+    run([seg('LV.', Object.assign({ color: P.dim, alpha: 0.7 }, LVP))], X1 - lvw - 2, HEAD_Y, { align: 'right', alpha: lvA, seed: 25 });
+    run([seg('新手村', { size: 18, family: F.sans, color: P.dim, spacing: 4 })], X1 - lvw - 2 - width('LV.', LVP) - 20, HEAD_Y, { align: 'right', alpha: lvA, seed: 26 });
     // column labels + ruler ticks on the top rule
     const labA = ease.out(prog(lt1, 0.35, 0.9));
-    const LAB = { size: 11, family: F.mono, spacing: 3, color: P.faint };
+    const LAB = { size: 14, family: F.mono, spacing: 3, color: P.dim, alpha: 0.72 };
     run([seg('DATE', LAB)], COL.date, LABEL_Y, { alpha: labA, seed: 31 });
     run([seg('TYPE', LAB)], COL.tag, LABEL_Y, { alpha: labA, seed: 32 });
     run([seg('QUEST', LAB)], COL.task, LABEL_Y, { alpha: labA, seed: 33 });
@@ -355,13 +355,13 @@
       let dateStr = R.date;
       if (i === 2 && x2) dateStr = x2.date;
       run([seg(dateStr, Object.assign({ color: P.dim, spacing: 0.5 }, DATE))], COL.date, y, { alpha: a, seed: 200 + i * 10 });
-      run([seg('[', { size: 18, family: F.mono, color: P.gold, alpha: 0.7 }), seg('主线', { size: 18, family: F.sans, weight: 500, color: P.gold, spacing: 2 }), seg(']', { size: 18, family: F.mono, color: P.gold, alpha: 0.7 })], COL.tag, y - 2, { alpha: a, seed: 201 + i * 10 });
+      run([seg('[', { size: 20, family: F.mono, color: P.gold, alpha: 0.7 }), seg('主线', { size: 20, family: F.sans, weight: 500, color: P.gold, spacing: 2 }), seg(']', { size: 20, family: F.mono, color: P.gold, alpha: 0.7 })], COL.tag, y - 2, { alpha: a, seed: 201 + i * 10 });
       const typedN = Math.floor(clamp((lt1 - rt.type) * rt.cps, 0, Array.from(R.task).length));
       if (i < 2) {
         run([seg(R.task, Object.assign({ color: P.ink }, TASK))], COL.task, y, { n: typedN, alpha: a, seed: 202 + i * 10 });
         const ck = prog(lt1, rt.check, rt.check + 0.22);
         check(COL.check, y - 12, 26, ease.out(ck), { seed: 203 + i * 10 });
-        run([seg(R.score, { size: 16, family: F.mono, color: P.dim, spacing: 1 })], COL.score, y - 1, { align: 'right', alpha: ease.out(prog(lt1, rt.check + 0.12, rt.check + 0.45)), seed: 204 + i * 10 });
+        run([seg(R.score, { size: 18, family: F.mono, color: P.dim, spacing: 1 })], COL.score, y - 1, { align: 'right', alpha: ease.out(prog(lt1, rt.check + 0.12, rt.check + 0.45)), seed: 204 + i * 10 });
       } else {
         // 高考 倒计时 100 天 — the number is mono in a fixed 3-cell slot so it can count down in s2
         const NUM = { size: 31, family: F.mono, weight: 400, color: P.ink };
@@ -387,7 +387,7 @@
           let secs = 7 * 3600 + 42 * 60 + 19 - Math.max(0, Math.floor(lt1 - T1.ticker0));
           if (x2 && x2.spin) secs = Math.floor(hash2(Math.floor(E.t * 30), 17) * 86400);   // days flying by
           const str = [Math.floor(secs / 3600), Math.floor(secs / 60) % 60, secs % 60].map(v => String(v).padStart(2, '0')).join(':');
-          run([seg(str, { size: 16, family: F.mono, color: P.dim, spacing: 1 })], X1, y - 1, { align: 'right', alpha: tk * a, seed: 234 });
+          run([seg(str, { size: 18, family: F.mono, color: P.dim, spacing: 1 })], X1, y - 1, { align: 'right', alpha: tk * a, seed: 234 });
         }
         if (x2) check(COL.check, y - 12, 26, x2.check, { seed: 235 });
         return x3;
@@ -398,9 +398,9 @@
     const archA = ease.out(prog(lt1, T1.arch0 - 0.1, T1.arch0 + 0.5));
     if (archA > 0) {
       hline(C0, C1, TOP, { color: P.line, p: ease.inOut(prog(lt1, T1.arch0 - 0.1, T1.arch0 + 0.6)), seed: 12 });
-      const aw = run([seg('娱乐', { size: 16, family: F.sans, weight: 500, spacing: 6, color: P.dim })], C0, HEAD_Y, { alpha: archA, seed: 51 });
-      run([seg('ARCHIVED', { size: 12, family: F.mono, spacing: 3, color: P.faint })], C0 + aw + 18, HEAD_Y - 1, { alpha: archA, seed: 52 });
-      run([seg(String(FUN.length).padStart(2, '0'), { size: 14, family: F.mono, spacing: 1, color: P.faint })], C1, HEAD_Y, { align: 'right', alpha: archA, seed: 53 });
+      const aw = run([seg('娱乐', { size: 18, family: F.sans, weight: 500, spacing: 6, color: P.dim })], C0, HEAD_Y, { alpha: archA, seed: 51 });
+      run([seg('ARCHIVED', { size: 14, family: F.mono, spacing: 3, color: P.dim, alpha: 0.6 })], C0 + aw + 18, HEAD_Y - 1, { alpha: archA, seed: 52 });
+      run([seg(String(FUN.length).padStart(2, '0'), { size: 16, family: F.mono, spacing: 1, color: P.dim, alpha: 0.7 })], C1, HEAD_Y, { align: 'right', alpha: archA, seed: 53 });
     }
     const FXsave = FX;
     FUN.forEach((it, j) => {
@@ -414,7 +414,7 @@
       // filed items shrink to 20px: drawn at their float size and scaled, so no fractional font sizes
       const sk = lerp(1, 20 / it.size, mv), FS = { size: it.size, family: F.sans, weight: 400, color: P.dim, spacing: 0.5 };
       const x = lerp(fx, C0, mv), y = lerp(fy, ARCH_Y(ARCH_SLOT[j]), mv);
-      const alpha = ea * lerp(0.9, 0.55, ease.out(prog(lt1, T1.stamp[j], T1.stamp[j] + 0.35)));
+      const alpha = ea * lerp(0.9, 0.6, ease.out(prog(lt1, T1.stamp[j], T1.stamp[j] + 0.35)));
       ctx.save(); ctx.translate(x, y); ctx.scale(sk, sk);
       if (FX) { const f0 = FX; FX = { dt: f0.dt, maxD: f0.maxD / sk, cx: (f0.cx - x) / sk, cy: (f0.cy - y) / sk }; }
       run([seg(it.s, FS)], 0, 0, { alpha, seed: 300 + j * 10 });
@@ -499,7 +499,7 @@
         // banner: 主线任务已完成
         const bk = ease.out(prog(lt, T2.ban, T2.ban + 0.4));
         if (bk > 0) {
-          run([seg('MAIN QUEST COMPLETE', { size: 12, family: F.mono, spacing: 4, color: P.gold })], X0, HEAD_Y - 58 + (1 - bk) * 12, { alpha: bk, seed: 61 });
+          run([seg('MAIN QUEST COMPLETE', { size: 14, family: F.mono, spacing: 4, color: P.gold })], X0, HEAD_Y - 58 + (1 - bk) * 12, { alpha: bk, seed: 61 });
           run([seg('主线任务已完成', { size: 40, family: F.sans, weight: 500, spacing: 6, color: P.ink })], X0 - 2, HEAD_Y + 2 + (1 - bk) * 16, { alpha: bk, seed: 62 });
         }
         // row 3: 下一个任务：——
@@ -508,7 +508,7 @@
           const eo = ease.out(nl), y = rowBase(3) - (1 - eo) * 18;
           hline(X0, X1, rowRule(3), { color: P.line, p: ease.inOut(prog(lt, T2.nextLand, T2.nextLand + 0.55)), seed: 104 });
           run([seg('2009.06.08', Object.assign({ color: P.dim, spacing: 0.5 }, DATE))], COL.date, y, { alpha: eo, seed: 240 });
-          run([seg('[', { size: 18, family: F.mono, color: P.faint }), seg('    ', { size: 18, family: F.sans, spacing: 2 }), seg(']', { size: 18, family: F.mono, color: P.faint })], COL.tag, y - 2, { alpha: eo, seed: 241 });
+          run([seg('[', { size: 20, family: F.mono, color: P.faint }), seg('    ', { size: 20, family: F.sans, spacing: 2 }), seg(']', { size: 20, family: F.mono, color: P.faint })], COL.tag, y - 2, { alpha: eo, seed: 241 });
           const n = Math.floor(clamp((lt - T2.nextType) * T2.nextCps, 0, 8));
           run([seg('下一个任务：', Object.assign({}, TASK, { color: P.dim, spacing: 0.5 })), seg('——', Object.assign({}, TASK, { color: P.faint, spacing: 0.5 }))], COL.task, y, { n, alpha: eo, seed: 242 });
         }
