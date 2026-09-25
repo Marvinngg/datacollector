@@ -137,7 +137,7 @@
           }
         }
         const major = li % 5 === 0;
-        c.strokeStyle = major ? 'rgba(140,160,180,0.30)' : 'rgba(120,140,165,0.14)';
+        c.strokeStyle = major ? 'rgba(150,170,190,0.46)' : 'rgba(125,145,170,0.22)';
         c.lineWidth = major ? 1.6 : 1; c.stroke();
       });
       // faint lat/long grid
@@ -270,16 +270,21 @@
   // subtitles (global, restrained): hand font, bottom center
   function drawSubtitles(t) {
     if (!E.subtitles) return;
-    for (const l of E.TL.lines) {
-      const a = window_(t, l.start - 0.1, l.start + l.dur + 0.35, 0.25, 0.3);
+    const ls = E.TL.lines;
+    for (let i = 0; i < ls.length; i++) {
+      const l = ls[i], next = ls[i + 1];
+      const a0 = next ? Math.max(l.start, next.start - 0.12) : l.start;           // next line's fade-in start
+      const end = Math.min(l.start + l.dur + 0.35, next ? a0 : Infinity);        // fade out before it
+      const fo = Math.min(0.3, Math.max(0.08, end - (l.start + l.dur)));
+      const a = window_(t, l.start - 0.1, end, 0.25, fo);
       if (a <= 0) continue;
       const str = l.text.replace(/[。]$/, '');
       ctx.save(); ctx.globalAlpha = a * 0.92;
-      const w = measure(str, { size: 38, family: F.hand, spacing: 2 });
+      const w = measure(str, { size: 44, family: F.hand, spacing: 2 });
       const g = ctx.createLinearGradient(0, H - 150, 0, H);
       g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.35)');
       ctx.fillStyle = g; ctx.fillRect(W / 2 - w / 2 - 120, H - 150, w + 240, 150);
-      text(str, W / 2, H - 72, { size: 38, family: F.hand, color: P.ink, align: 'center', spacing: 2 });
+      text(str, W / 2, H - 70, { size: 44, family: F.hand, color: P.ink, align: 'center', spacing: 2 });
       ctx.restore();
     }
   }
@@ -288,7 +293,7 @@
   let grain = null;
   function post(t) {
     const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.95);
-    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.55)');
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.42)');
     ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
     if (!grain) {
       grain = document.createElement('canvas'); grain.width = grain.height = 256;

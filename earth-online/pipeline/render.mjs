@@ -62,7 +62,7 @@ async function main() {
   const TL = JSON.parse(fs.readFileSync(path.join(ROOT, 'build/timeline.json'), 'utf8'));
   try {
     if (mode === 'still') {
-      const out = path.join(ROOT, opt('out', 'build/stills')); fs.mkdirSync(out, { recursive: true });
+      const out = path.resolve(ROOT, opt('out', 'build/stills')); fs.mkdirSync(out, { recursive: true });
       const page = await openPage(browser, base);
       for (const ts of positional) {
         const f = path.join(out, `t${(+ts).toFixed(2).padStart(7, '0')}.png`);
@@ -71,7 +71,7 @@ async function main() {
     } else if (mode === 'sheet') {
       // contact sheet: n evenly spaced frames of a scene, tiled 4 across at 480x270
       const sc = TL.scenes.find(s => s.id === positional[0]); const n = +opt('n', 12);
-      const out = path.join(ROOT, opt('out', 'build/stills')); fs.mkdirSync(out, { recursive: true });
+      const out = path.resolve(ROOT, opt('out', 'build/stills')); fs.mkdirSync(out, { recursive: true });
       const page = await openPage(browser, base);
       const times = Array.from({ length: n }, (_, i) => sc.start + (sc.end - sc.start) * (i + 0.5) / n);
       const shots = []; for (const t of times) shots.push(await grab(page, t, 'image/jpeg', 0.85));
@@ -113,7 +113,7 @@ async function main() {
       });
       const segs = (await Promise.all(jobs)).filter(Boolean);
       const list = path.join(segDir, 'list.txt'); fs.writeFileSync(list, segs.map(s => `file '${s}'`).join('\n'));
-      const out = path.join(ROOT, opt('out', 'build/video.mp4'));
+      const out = path.resolve(ROOT, opt('out', 'build/video.mp4'));
       await new Promise(r => spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', out], { stdio: 'inherit' }).on('close', r));
       console.log(`${out} (${((Date.now() - started) / 1000).toFixed(0)}s)`);
     } else {
