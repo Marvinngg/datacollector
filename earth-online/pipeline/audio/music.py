@@ -152,6 +152,22 @@ CH = {  # voicings (MIDI). D major.
 BROOT = {'D': 38, 'Bm': 35, 'G': 43, 'A': 45, 'A/C#': 37, 'Dsus2': 38}
 PENTA = [62, 64, 66, 69, 71, 74, 76, 78, 81, 83, 86]   # D major pentatonic D4..D6
 
+def fit_tempo(interval, pref=88.0, lo=80.0, hi=96.0):
+    """BPM such that `interval` is a whole number of beats; prefer lo..hi, closest to pref"""
+    for a, b in ((lo, hi), (72.0, 104.0)):
+        c = [60.0 * k / interval for k in range(1, 9) if a <= 60.0 * k / interval <= b]
+        if c: return min(c, key=lambda v: abs(v - pref))
+    return pref
+
+
+def clusters(ts, gap):
+    out = []
+    for t in sorted(ts):
+        if not out or t - out[-1][-1] > gap: out.append([t])
+        else: out[-1].append(t)
+    return out
+
+
 buses = []
 gates = {}
 BUS_DB = {'s0': -3.0, 's3': -3.0, 's3k': -3.5}      # section trims (dB)
@@ -172,12 +188,15 @@ b0.add(s0, sub_drone(26, drone_end - s0 + 1), gain=0.09, send=0.0)     # D1 sub,
 b0.pre = lambda x: filt(x, 'lp', 2400, order=2)
 gates['s0'] = [(s0, 0.0), (s0 + 3.2, 1.0), (s1s + 1.0, 1.0), (drone_end, 0.0)]
 
-# ============================================================================= s1_school  (88 BPM, 4/4)
+# ============================================================================= s1_school  (~88-92 BPM, 4/4)
 s1e = tl.e('s1_school')
 b1 = section_bus('s1', s1s - 0.5, s1e + 1, rt60=2.0, send=0.22, bright=0.5, seed=11)
 b1long = section_bus('s1strike', s1s, s1e + 10, rt60=5.5, send=0.6, bright=0.35, width=1.2, seed=12)   # the ✓ chord rings into s2
-beat = 60 / 88; bar = 4 * beat; e8 = beat / 2
-t0 = s1s
+# tempo & phase from the picture: each log row starts typing on a beat (key-cue clusters)
+rows = [c_[0] for c_ in clusters(tl.cue_times('key', 's1_school', lo=s1s, hi=tl.le('L02')), 0.4)]
+bpm1 = fit_tempo(float(np.median(np.diff(rows)))) if len(rows) >= 2 else 88.0
+beat = 60 / bpm1; bar = 4 * beat; e8 = beat / 2
+t0 = rows[0] - beat * np.floor((rows[0] - s1s + 0.05) / beat) if rows else s1s
 n_full = max(1, int((s1e - t0 - 0.4) // bar))
 prog1 = ['D', 'Bm', 'G', 'A']
 MEL1 = {'D': [78, 81], 'Bm': [78, 74], 'G': [74, 71], 'A': [73, 76]}
@@ -205,8 +224,8 @@ s3s, s3e = tl.s('s3_money'), tl.e('s3_money')
 b2 = section_bus('s2', s2s - 0.5, tl.e('s3_money'), rt60=6.0, send=0.9, bright=0.25, width=1.3, seed=13)
 # the only things left: a far-away pad fifth that barely moves, and a lone piano note or two
 enter_t, _ = tl.first_cue('enter', 's3_money', tl.le('L07') - 0.15, lo=s3s, hi=tl.le('L08'))
-gm(b2, s2s + 0.6, HALO, 50, 34, enter_t - s2s - 0.6, gain=0.28, pan=-0.2, tail=4)
-gm(b2, s2s + 1.4, GLASS, 57, 30, enter_t - s2s - 1.4, gain=0.18, pan=0.25, tail=4)
+gm(b2, s2s + 0.6, HALO, 50, 34, enter_t - s2s - 0.6, gain=0.17, pan=-0.2, tail=4)
+gm(b2, s2s + 1.4, GLASS, 57, 30, enter_t - s2s - 1.4, gain=0.11, pan=0.25, tail=4)
 lone1 = tl.le('L04') + 0.35
 gm(b2, lone1, PIANO, 69, 34, 3.0, gain=0.9, pan=0.15, tail=5)             # A4, alone
 lone2 = min(tl.le('L06') + 0.45, s2e - 0.2)
@@ -217,8 +236,16 @@ gates['s2'] = [(s2s, 1.0), (enter_t - 0.5, 1.0), (enter_t + 1.2, 0.0)]
 # ============================================================================= s3_money (90 BPM groove)
 b3 = section_bus('s3', s3s, s3e + 1, rt60=1.4, send=0.14, bright=0.5, seed=14)
 b3k = section_bus('s3k', s3s, s3e + 1, rt60=0.8, send=0.03, seed=15)
-beat = 60 / 90; bar = 4 * beat; e8 = beat / 2
-g0 = enter_t
+# the notifications land on the beat: tempo from their spacing, first downbeat right after 'enter'
+pings = tl.cue_times('ping', 's3_money') + tl.cue_times('ping_dull', 's3_money')
+pings = sorted(pings)
+if len(pings) >= 3:
+    bpm3 = fit_tempo(float(np.median(np.diff(pings))), pref=84)
+    beat = 60 / bpm3
+    g0 = pings[0] - beat * np.floor((pings[0] - enter_t + 0.02) / beat)
+else:
+    bpm3 = 90.0; beat = 60 / bpm3; g0 = enter_t
+bar = 4 * beat; e8 = beat / 2; e16 = beat / 4
 freeze_from = tl.ls('L09')
 f_end = tl.le('L10')
 prog3 = ['D', 'A/C#', 'Bm', 'G']
@@ -243,6 +270,8 @@ while True:
         b3.add(tt + ht(0.003), bass(m, e8 * 0.8), gain=0.2 * (1.0 if j % 2 == 0 else 0.8), pan=0, send=0.02)
         if j % 2 == 1 and i >= 1:
             b3.add(tt + ht(0.004), hat(j % 3, 0.045), gain=0.05 * (hv(100, 10) / 100), pan=0.3)
+        if bpm3 < 84 and i >= 1 and not frozen:          # slow tempo: light 16th ghost hats keep it moving
+            b3.add(tt + e16 + ht(0.004), hat(3 + j % 2, 0.03), gain=0.022, pan=0.35)
     # EP stabs: 1 (long), 2&, 4
     for off, du, v in [(0, 1.4 * beat, 66), (1.5 * beat, 0.4 * beat, 56), (3 * beat, 0.6 * beat, 58)]:
         tt = tb + off
@@ -307,7 +336,7 @@ for k, t in enumerate(cards[:6]):
         gm(b4f, t + j * 0.21 + hum_t(0.012), PIANO, m, hum_v(40 - 3 * j, 3), 0.9, gain=0.9, pan=0.2 * (k - 1), tail=3)
 # spark: a small bright twinkle (celesta)
 for j, m in enumerate([78, 81, 86, 90]):
-    gm(b4f, spark_t + j * 0.07, CELESTA, m, 52 - 5 * j, 0.5, gain=0.55, pan=0.3 + 0.05 * j, send=0.6, tail=3)
+    gm(b4, spark_t + j * 0.07, CELESTA, m, 56 - 5 * j, 0.5, gain=0.7, pan=0.3 + 0.05 * j, send=0.6, tail=3)
 # after the alarm: fall back to a thin, low pad that carries into s5
 gm(b4p, fall + 0.1, HALO, 50, 36, s4e - fall + 1.2, gain=0.35, pan=-0.15, tail=3)
 gm(b4p, fall + 0.3, HALO, 57, 30, s4e - fall + 1.0, gain=0.25, pan=0.2, tail=3)
@@ -334,7 +363,7 @@ for t in wins:
     if not splits or t - splits[-1][-1] > 0.35: splits.append([t])
     else: splits[-1].append(t)
 splits = [s_[0] for s_ in splits]
-NL = 4
+NL = 5
 if len(splits) < 2:   # fallback: dialog enter after L17 starts, then splits spread up to L19
     splits = list(np.linspace(tl.ls('L17') + 0.8, tl.ls('L19'), NL))
 if len(splits) > NL:  # more splits than layers: keep first and last, spread the rest
@@ -343,11 +372,11 @@ while len(splits) < NL: splits.append(tl.ls('L19'))
 splits = [min(s_, tl.ls('L19')) for s_ in splits]
 
 
-def q_next(t, grid):   # quantise to the next grid line
-    k = np.ceil((t - g5) / grid - 1e-6); return g5 + k * grid
+def q_next(t, grid):   # quantise to the nearest grid line
+    k = np.round((t - g5) / grid); return g5 + k * grid
 
 
-L_on = [q_next(s_, e8) for s_ in splits]     # layer 1..4 on-times
+L_on = [q_next(s_, e16) for s_ in splits]    # layer 1..5 on-times
 i = 0
 while True:
     tb = g5 + i * bar
@@ -380,11 +409,12 @@ while True:
         if tt >= L_on[3] - 1e-6:
             if s16 % 2 == 1: b5d.add(tt, hat(s16 % 4, 0.035, 8000), gain=0.035, pan=0.25)
             if s16 % 4 == 2: b5d.add(tt, shaker(s16 % 3), gain=0.035, pan=-0.3)
+        if tt >= L_on[4] - 1e-6:
             if s16 % 8 == 0:
                 gm(b5, tt, CELESTA, arp[[3, 2][(s16 // 8) % 2]] + 12, 46, 0.4, gain=0.35, pan=0.3, send=0.4, tail=2)
-            if s16 == 0:
+            if s16 == 0 or abs(tt - L_on[4]) < 1e-6:
                 for k, m in enumerate(PADV[c][1:]):
-                    gm(b5, tt + 0.005 * k, STR, m + 12, 56, bar, gain=0.35, pan=(k - 1) * 0.4, send=0.3, tail=2)
+                    gm(b5, tt + 0.005 * k, STR, m + 12, 56, tb + bar - tt, gain=0.35, pan=(k - 1) * 0.4, send=0.3, tail=2)
     i += 1
 # a soft rising air into L20 -- that is cut together with everything else
 rs = tl.ls('L19')
@@ -404,11 +434,14 @@ b6p = section_bus('s6pad', s6s - 0.5, D + 1, rt60=4.5, send=0.45, bright=0.35, w
 b6f = section_bus('s6felt', s6s - 0.5, D + 1, rt60=3.4, send=0.42, bright=0.3, seed=24)
 b6f.pre = lambda x: filt(x, 'lp', 3000, order=2)
 final_t, _ = tl.first_cue('final', 's6_loop', tl.le('L24') + 3.5, lo=tl.le('L23'))
-final_t = min(final_t, D - 5.5)
+final_t = min(final_t, D - 3.0)
 L24s, L24e = tl.ls('L24'), tl.le('L24')
+# '停一拍': the Asus4 just hangs over the 02:13 clock; the next chord lands with the clock tick (or just before L24)
+clock_t, _ = tl.first_cue('tick', 's6_loop', L24s - 0.3, lo=tl.le('L23'), hi=L24s + 0.6)
+spark6 = tl.cue_times('spark', 's6_loop', lo=L24s)
 ev6 = [(anchor6, 'Gadd9'), (tl.ls('L22') - 0.3, 'D/F#'), (tl.ls('L22') + tl.ln['L22']['dur'] * 0.55, 'Em9'),
-       (tl.ls('L23') - 0.3, 'Asus4'), (tl.le('L23') + 0.6, 'Aadd9'),
-       (L24s - 0.3, 'Bm9'), (L24s + tl.ln['L24']['dur'] * 0.5, 'Gmaj9'),
+       (tl.ls('L23') - 0.3, 'Asus4'),
+       (clock_t, 'Bm9'), (L24s + tl.ln['L24']['dur'] * 0.5, 'Gmaj9'),
        (max(L24e + 0.2, final_t - 3.6), 'D/F#'), (final_t - 2.4, 'Asus4'), (final_t - 1.2, 'A7sus')]
 ev6 = sorted(ev6)
 clean = []
@@ -435,6 +468,11 @@ mel = [(anchor6 + 0.25, 74, 40), (tl.le('L21') + 0.05, 78, 38), (tl.ls('L22') - 
 for t, m, v in mel:
     if t < final_t - 0.3:
         gm(b6f, t + hum_t(0.01), PIANO, m, hum_v(v, 2), 1.4, gain=0.95, pan=0.15, tail=3)
+# the side quest triggers: the same little twinkle as the spark in s4 (callback)
+for ts in spark6[:1]:
+    if ts < final_t - 0.5:
+        for j, m in enumerate([78, 81, 86, 90]):
+            gm(b6, ts + j * 0.07, CELESTA, m, 52 - 5 * j, 0.5, gain=0.6, pan=0.3 + 0.05 * j, send=0.6, tail=3)
 # final: one complete, clean D chord, left to decay on its own
 fk = CH['Dadd9']
 for k, m in enumerate(fk):

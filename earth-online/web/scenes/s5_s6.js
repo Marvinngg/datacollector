@@ -220,6 +220,7 @@
     E.rrect(x, y, w, hh, o.rad == null ? RAD : o.rad);
     ctx.fillStyle = P.bg2; ctx.fill();
     ctx.save(); ctx.clip();
+    if (o.tint) { ctx.globalAlpha = o.alpha * 0.14 * o.tint; ctx.fillStyle = P.teal; ctx.fill(); }
     const ca = o.alpha * o.contentA;
     if (ca > 0.002) {
       // title bar
@@ -269,7 +270,7 @@
     // border (after the clip so the full stroke shows); a teal flash when a window is born
     ctx.globalAlpha = o.alpha;
     ctx.lineWidth = 1.5; ctx.strokeStyle = P.teal;
-    ctx.globalAlpha = o.alpha * clamp(lerp(0.34, 0.2, o.idle) + 0.6 * o.flash);
+    ctx.globalAlpha = o.alpha * clamp(lerp(0.34, 0.2, o.idle) + 0.6 * o.flash) * (1 - (o.tint || 0));
     E.rrect(x, y, w, hh, o.rad == null ? RAD : o.rad); ctx.stroke();
     ctx.restore();
   }
@@ -307,7 +308,8 @@
     for (const s of gs.wins) {
       drawWindow(s.role, s.idx, o.rectOf ? o.rectOf(s) : s.rect, {
         alpha: o.alphaOf ? o.alphaOf(s) : 1, fillA: s.fillA, contentA: s.contentA * (o.contentOf ? o.contentOf(s) : 1),
-        flash: s.flash, work: s.work, stopA: s.stopA, idle: s.idle, T, rad: s.w === 0 && gs.k === 1 ? lerp(20, RAD, prog(t, tm.stages[1], tm.stages[1] + 0.5)) : RAD,
+        flash: s.flash, work: s.work, stopA: s.stopA, idle: s.idle, T, tint: o.tintOf ? o.tintOf(s) : 0,
+        rad: o.radOf ? o.radOf(s) : s.w === 0 && gs.k === 1 ? lerp(20, RAD, prog(t, tm.stages[1], tm.stages[1] + 0.5)) : RAD,
       });
     }
     return gs;
@@ -379,7 +381,7 @@
   function T6() {
     const sc = S6(), D = sc.end - sc.start;
     const L21 = E.lineLocal('L21'), L22 = E.lineLocal('L22'), L23 = E.lineLocal('L23'), L24 = E.lineLocal('L24');
-    const c0 = clamp(L21.start - 1.05, 0.25, 10), c1 = c0 + 1.1;
+    const c0 = clamp(L21.start - 1.15, 0.25, 10), c1 = c0 + 1.3;
     const type0 = Math.max(c1 - 0.2, L21.start + 0.15), cps = 13;
     const bar0 = L22.start + 0.15, bar87 = Math.max(bar0 + 1.5, L22.end - 0.1);
     const th0 = L23.start - 0.45, th1 = th0 + 0.75;
@@ -389,9 +391,9 @@
     const out0 = Math.max(f1 + 0.6, L24.start - 1.25), out1 = out0 + 1.0;
     const clock = Math.max(out0 + 0.5, L24.start - 0.45);
     const ember0 = clock - 0.1, ember1 = ember0 + 1.4;
-    const black = D - 0.3, cardOut = black - 0.9, card0 = cardOut - 3.6, mapOut0 = card0 - 1.0;
+    const black = D - 0.3, cardOut = black - 0.9, card0 = cardOut - 3.6, mapOut0 = card0 - 0.5;
     const log0 = L24.end + 0.35, span = Math.max(2.5, mapOut0 - log0);
-    const logL1 = log0 + 0.25, logL2 = log0 + 0.75, trig = log0 + Math.min(1.7, span * 0.3), logOut = log0 + span * 0.56;
+    const logL1 = log0 + 0.25, logL2 = log0 + 0.75, trig = log0 + Math.min(1.7, span * 0.3), logOut = log0 + span * 0.5;
     const drop0 = logOut + 0.25, dropD = 0.75, path0 = drop0 + 0.5, path1 = path0 + 1.1;
     return { D, L21, L22, L23, L24, c0, c1, type0, cps, bar0, bar87, th0, th1, dive0, dive1, f0, f1, out0, out1, clock, ember0, ember1, black, cardOut, card0, mapOut0, log0, logL1, logL2, trig, logOut, drop0, dropD, path0, path1 };
   }
@@ -402,6 +404,11 @@
     const w = lerp(narrowW, wideW, k), hh = lerp(232, THH + PPAD * 2 - 8, k);
     const x = W / 2 - w / 2, y = 452 - hh / 2;
     return { x, y, w, h: hh, cx: x + PPAD + lerp(0, THW + 36, k), th: { x: x + PPAD, y: y + hh / 2 - THH / 2, w: THW, h: THH } };
+  }
+  const BAR = { lblW: 92, gap: 5, pctW: 84, h: 30 };
+  function barCell(g, i) {
+    const cw = (COLW - BAR.lblW - BAR.pctW - BAR.gap * (CELLS - 1)) / CELLS;
+    return { x: g.cx + BAR.lblW + i * (cw + BAR.gap), y: g.y + g.h / 2 - 108 + 152, w: cw, h: BAR.h };
   }
   function progressAt(lt, tm) {
     if (lt < tm.bar0) return 0;
@@ -431,7 +438,7 @@
     }
     const p = progressAt(lt, tm), done = lt >= tm.f1;
     const doneK = ease.out(prog(lt, tm.f1, tm.f1 + 0.5));
-    const cx = g.cx, top = g.y + g.h / 2 - 116 + 8;
+    const cx = g.cx, top = g.y + g.h / 2 - 108;
     // meta row
     E.text('TASK 001', cx, top + 30, { size: 14, family: F.mono, color: P.teal, alpha: a * 0.9, spacing: 3 });
     E.text('10 AGENTS', cx + COLW, top + 30, { size: 14, family: F.mono, color: P.faint, alpha: a, spacing: 3, align: 'right' });
@@ -444,14 +451,15 @@
     }
     // bar row: label · 20 cells · percent
     const barA = a * ease.out(prog(lt, tm.bar0 - 0.35, tm.bar0 + 0.15));
-    const by = top + 152, lblW = 92, cellGap = 5, pctW = 84;
-    const cw = (COLW - lblW - pctW - cellGap * (CELLS - 1)) / CELLS;
+    const by = top + 152, cw = barCell(g, 0).w;
     E.text('渲染中', cx, by + 23, { size: 22, color: P.dim, alpha: barA * (1 - doneK) });
     E.text('已完成', cx, by + 23, { size: 22, color: P.ok, alpha: barA * doneK });
     for (let i = 0; i < CELLS; i++) {
       const fill = clamp(p * CELLS - i);
-      const x = cx + lblW + i * (cw + cellGap);
-      ctx.globalAlpha = barA * 0.14; ctx.fillStyle = P.teal; ctx.fillRect(x, by, cw, 30);
+      const x = barCell(g, i).x;
+      // track cells appear as the agent that owns them lands (two cells per agent)
+      const own = Math.floor(i / 2), landed = prog(lt, tm.c0 + own * 0.045 + 0.7, tm.c0 + own * 0.045 + 0.8);
+      ctx.globalAlpha = a * 0.14 * landed; ctx.fillStyle = P.teal; ctx.fillRect(x, by, cw, 30);
       if (fill > 0) { ctx.globalAlpha = barA * (0.35 + 0.65 * fill); ctx.fillStyle = done ? lerpCol(doneK) : P.teal; ctx.fillRect(x, by, cw, 30); }
     }
     ctx.globalAlpha = 1;
@@ -526,7 +534,7 @@
   }
   function drawLog(lt, tm, a) {
     if (a <= 0) return;
-    const w = 900, hh = 250, x = W / 2 - w / 2, y = 470 - hh / 2;
+    const w = 860, hh = 250, x = W / 2 - w / 2, y = 488 - hh / 2;
     E.panel(x, y, w, hh, { alpha: a * 0.92, r: 14 });
     E.text('任务日志', x + 44, y + 54, { size: 20, weight: 500, color: P.dim, alpha: a, spacing: 4 });
     E.text('QUEST LOG', x + w - 44, y + 54, { size: 16, family: F.mono, color: P.faint, alpha: a, align: 'right', spacing: 3 });
@@ -596,20 +604,30 @@
         E.clockHUD('02:13', { alpha: ck * (1 - 0.6 * vLog) });
         veil(mapOut);
       } else veil(1);
-      // ---- the team, folding into the task panel
+      // ---- task panel (+ Droste slot); the team folds into its track, so the panel is drawn first
+      const pa = ease.out(prog(lt, tm.c0 + 0.4, tm.c0 + 1.0)) * (1 - ease.inOut(prog(lt, tm.out0, tm.out0 + 0.8)));
+      const tp = drawTaskPanel(lt, tm, pa, T, !!o.backdrop);
+      // ---- the team: each window flattens and glides into its own two cells of the progress track,
+      //      left to right in reading order — ten agents become one bar
       if (collapse < 1) {
-        const target = panelGeom(0);
+        const g0 = panelGeom(0);
+        const ek = s => prog(lt, tm.c0 + s.idx * 0.045, tm.c0 + s.idx * 0.045 + 0.8);
         drawGrid(s5len, t5, T, {
-          rectOf: s => { const e = ease.inOut(prog(lt, tm.c0 + dly(s), tm.c0 + dly(s) + 0.75)); return mix(s.rect, target, e); },
-          contentOf: s => 1 - prog(lt, tm.c0 + dly(s), tm.c0 + dly(s) + 0.25),
-          alphaOf: s => 1 - ease.in(prog(lt, tm.c0 + dly(s) + 0.45, tm.c0 + dly(s) + 0.8)),
+          rectOf: s => {
+            const k = ek(s), a0 = s.rect, q0 = barCell(g0, s.idx * 2), q1 = barCell(g0, s.idx * 2 + 1);
+            const b = { x: q0.x, y: q0.y, w: q1.x + q1.w - q0.x, h: q0.h };
+            const e = ease.inOut(k), eh = ease.out(clamp(k * 1.5));
+            const cy = lerp(a0.y + a0.h / 2, b.y + b.h / 2, e), hh = lerp(a0.h, b.h, eh);
+            return { x: lerp(a0.x, b.x, e), y: cy - hh / 2, w: lerp(a0.w, b.w, e), h: hh };
+          },
+          contentOf: s => 1 - prog(ek(s), 0, 0.22),
+          tintOf: s => ease.inOut(prog(ek(s), 0.5, 1)),
+          radOf: s => lerp(RAD, 1, ease.out(prog(ek(s), 0.2, 0.8))),
+          alphaOf: s => 1 - prog(ek(s), 0.92, 1),
         });
         const gs = gridState(s5len, t5);
         drawHeader(gs, 1 - ease.out(prog(lt, tm.c0, tm.c0 + 0.4)), T);
       }
-      // ---- task panel (+ Droste thumbnail)
-      const pa = ease.out(prog(lt, tm.c0 + 0.55, tm.c1)) * (1 - ease.inOut(prog(lt, tm.out0, tm.out0 + 0.8)));
-      const tp = drawTaskPanel(lt, tm, pa, T, !!o.backdrop);
       // ---- quest log, last time
       const la = ease.out(prog(lt, tm.log0, tm.log0 + 0.5)) * (1 - ease.inOut(prog(lt, tm.logOut, tm.logOut + 0.6)));
       drawLog(lt, tm, la);
@@ -655,6 +673,4 @@
       ];
     },
   });
-  // collapse stagger: outer windows leave first, the director (slot 0) arrives last
-  function dly(s) { const c = s.idx % 5, r = Math.floor(s.idx / 5); return (Math.abs(c - 2) * 0.06 + r * 0.03) * -1 + 0.14 + (s.idx === 0 ? 0.08 : 0); }
 })();
