@@ -28,7 +28,7 @@ WPAD, HALO, GLASS, STR, CELESTA, SYNSTR = (0, 89), (0, 94), (0, 92), (0, 49), (0
 
 class Bus:
     """a section bus covering [lo, hi] (+ reverb pad) of the absolute timeline"""
-    def __init__(self, name, lo, hi, rt60=2.2, send=0.25, bright=0.45, width=1.0, seed=1):
+    def __init__(self, name, lo, hi, rt60=2.2, send=0.25, bright=0.45, width=0.8, seed=1):
         self.name, self.send = name, send
         self.lo = max(0.0, lo)
         self.dry, self.wet = buf(hi - self.lo + PAD), buf(hi - self.lo + PAD)
@@ -170,7 +170,7 @@ def clusters(ts, gap):
 
 buses = []
 gates = {}
-BUS_DB = {'s0': -3.0, 's3': -3.0, 's3k': -3.5}      # section trims (dB)
+BUS_DB = {'s0': -5.0, 's2': -2.0, 's3': -3.0, 's3k': -3.5}      # section trims (dB)
 
 
 def section_bus(name, lo, hi, **kw):
@@ -191,7 +191,7 @@ gates['s0'] = [(s0, 0.0), (s0 + 3.2, 1.0), (s1s + 1.0, 1.0), (drone_end, 0.0)]
 # ============================================================================= s1_school  (~88-92 BPM, 4/4)
 s1e = tl.e('s1_school')
 b1 = section_bus('s1', s1s - 0.5, s1e + 1, rt60=2.0, send=0.22, bright=0.5, seed=11)
-b1long = section_bus('s1strike', s1s, s1e + 10, rt60=5.5, send=0.6, bright=0.35, width=1.2, seed=12)   # the ✓ chord rings into s2
+b1long = section_bus('s1strike', s1s, s1e + 10, rt60=5.5, send=0.6, bright=0.35, width=0.8, seed=12)   # the ✓ chord rings into s2
 # tempo & phase from the picture: each log row starts typing on a beat (key-cue clusters)
 rows = [c_[0] for c_ in clusters(tl.cue_times('key', 's1_school', lo=s1s, hi=tl.le('L02')), 0.4)]
 bpm1 = fit_tempo(float(np.median(np.diff(rows)))) if len(rows) >= 2 else 88.0
@@ -221,7 +221,7 @@ gates['s1'] = [(s1s - 0.01, 1.0), (s1e + 6, 1.0)]
 # ============================================================================= s2_empty (almost nothing)
 s2s, s2e = tl.s('s2_empty'), tl.e('s2_empty')
 s3s, s3e = tl.s('s3_money'), tl.e('s3_money')
-b2 = section_bus('s2', s2s - 0.5, tl.e('s3_money'), rt60=6.0, send=0.9, bright=0.25, width=1.3, seed=13)
+b2 = section_bus('s2', s2s - 0.5, tl.e('s3_money'), rt60=6.0, send=0.9, bright=0.25, width=0.85, seed=13)
 # the only things left: a far-away pad fifth that barely moves, and a lone piano note or two
 enter_t, _ = tl.first_cue('enter', 's3_money', tl.le('L07') - 0.15, lo=s3s, hi=tl.le('L08'))
 gm(b2, s2s + 0.6, HALO, 50, 34, enter_t - s2s - 0.6, gain=0.17, pan=-0.2, tail=4)
@@ -297,8 +297,8 @@ gates['s3k'] = gates['s3']
 
 # ============================================================================= s4_others (free time, warm)
 s4s, s4e = tl.s('s4_others'), tl.e('s4_others')
-b4 = section_bus('s4', s4s, s4e + 3, rt60=3.2, send=0.32, bright=0.45, width=1.2, seed=16)
-b4p = section_bus('s4pad', s4s, s4e + 3, rt60=4.0, send=0.4, bright=0.35, width=1.4, seed=17)
+b4 = section_bus('s4', s4s, s4e + 3, rt60=3.2, send=0.32, bright=0.45, width=0.8, seed=16)
+b4p = section_bus('s4pad', s4s, s4e + 3, rt60=4.0, send=0.4, bright=0.35, width=0.85, seed=17)
 b4f = section_bus('s4felt', s4s, s4e + 3, rt60=3.0, send=0.4, bright=0.3, seed=18)
 wh, _ = tl.first_cue('whoosh', 's4_others', s4s + 2.0, lo=s4s + 0.8, hi=tl.ls('L11'))
 open_t = max(wh, s4s + 1.9)
@@ -348,7 +348,7 @@ gates['s4felt'] = [(open_t - 0.02, 0.0), (open_t, 1.0), (s4e + 1.0, 1.0), (s4e +
 s5s, s5e = tl.s('s5_team'), tl.e('s5_team')
 cut = tl.ls('L20')
 s6s, s6e = tl.s('s6_loop'), tl.e('s6_loop')
-b5 = section_bus('s5', s5s - 0.5, cut + 1, rt60=1.8, send=0.2, bright=0.5, width=1.2, seed=19)
+b5 = section_bus('s5', s5s - 0.5, cut + 1, rt60=1.8, send=0.2, bright=0.5, width=0.8, seed=19)
 b5d = section_bus('s5drums', s5s - 0.5, cut + 1, rt60=0.9, send=0.05, seed=20)
 beat = 60 / 96; bar = 4 * beat; e8 = beat / 2; e16 = beat / 4
 g5 = s5s + 0.3
@@ -418,19 +418,19 @@ while True:
     i += 1
 # a soft rising air into L20 -- that is cut together with everything else
 rs = tl.ls('L19')
-b5.add(rs, noise_riser(cut - rs + 0.2, 400, 6000), gain=0.02, pan=0, send=0.3)
+b5.add(rs, noise_riser(cut - rs + 0.2, 400, 4000), gain=0.016, pan=0, send=0.3)
 gates['s5'] = [(s5s - 0.5, 0.0), (s5s + 0.8, 1.0), (cut - 0.03, 1.0), (cut, 0.0)]
 gates['s5drums'] = gates['s5']
 # the one thing left after the stop: a quiet held note (revealed at the cut) that leads into s6
-bb = section_bus('bridge', cut - 2, s6e, rt60=4.0, send=0.5, bright=0.3, width=1.3, seed=21)
+bb = section_bus('bridge', cut - 2, s6e, rt60=4.0, send=0.5, bright=0.3, width=0.85, seed=21)
 anchor6 = max(s6s + 0.4, tl.ls('L21') - 0.8)
 gm(bb, cut - 1.5, HALO, 57, 34, anchor6 - cut + 3.0, gain=0.35, tail=3)
 gm(bb, cut - 1.5, GLASS, 69, 26, anchor6 - cut + 2.5, gain=0.12, pan=0.3, tail=3)
 gates['bridge'] = [(cut - 1.5, 0.0), (cut - 0.9, 1.0), (anchor6 + 0.5, 1.0), (anchor6 + 3.0, 0.0)]
 
 # ============================================================================= s6_loop (warm, resolving)
-b6 = section_bus('s6', s6s - 0.5, D + 1, rt60=3.2, send=0.3, bright=0.45, width=1.2, seed=22)
-b6p = section_bus('s6pad', s6s - 0.5, D + 1, rt60=4.5, send=0.45, bright=0.35, width=1.4, seed=23)
+b6 = section_bus('s6', s6s - 0.5, D + 1, rt60=3.2, send=0.3, bright=0.45, width=0.8, seed=22)
+b6p = section_bus('s6pad', s6s - 0.5, D + 1, rt60=4.5, send=0.45, bright=0.35, width=0.85, seed=23)
 b6f = section_bus('s6felt', s6s - 0.5, D + 1, rt60=3.4, send=0.42, bright=0.3, seed=24)
 b6f.pre = lambda x: filt(x, 'lp', 3000, order=2)
 final_t, _ = tl.first_cue('final', 's6_loop', tl.le('L24') + 3.5, lo=tl.le('L23'))
@@ -453,13 +453,15 @@ for k, (t, c) in enumerate(ev6[:-1]):
     d = ev6[k + 1][0] - t + 0.3
     keys = CH[c]
     v = 62 if c not in ('Bm9', 'Gmaj9') else 66
-    roll(b6, t, EPC, keys[1:], v, d, gain=0.95, spread=0.05, pan_w=0.35)
-    gm(b6, t, PIANO, keys[0], 46, d, gain=0.9, pan=-0.1, tail=3)
+    after = t > L24e                      # after the last line: breathe out, so the final chord can arrive
+    if after: v = 50
+    roll(b6, t, EPC, keys[1:], v, d, gain=0.95 if not after else 0.7, spread=0.05, pan_w=0.35)
+    gm(b6, t, PIANO, keys[0], 46 if not after else 40, d, gain=0.9, pan=-0.1, tail=3)
     for j, m in enumerate([keys[1] + 12, keys[2] + 12, keys[-1] + 12]):
-        gm(b6p, t - 0.05, WPAD, m, 50, d + 0.4, gain=0.42 if k else 0.3, pan=(j - 1) * 0.5, tail=3)
+        gm(b6p, t - 0.05, WPAD, m, 50, d + 0.4, gain=(0.42 if k else 0.3) * (0.35 if after else 1), pan=(j - 1) * 0.5, tail=3)
 # strings bloom under L24 (the most moving moment -- kept low, no crescendo to the sky)
 for j, m in enumerate([50, 57, 62, 66]):
-    gm(b6p, L24s - 0.5 + 0.15 * j, STR, m, 58, final_t - L24s + 0.5, gain=0.45, pan=(j - 1.5) * 0.4, tail=4)
+    gm(b6p, L24s - 0.5 + 0.15 * j, STR, m, 58, min(final_t - 0.3, L24e + 1.0) - L24s + 0.5 - 0.15 * j, gain=0.45, pan=(j - 1.5) * 0.4, tail=4)
 # felt-piano melody: sparse, stepwise, mostly in the gaps
 mel = [(anchor6 + 0.25, 74, 40), (tl.le('L21') + 0.05, 78, 38), (tl.ls('L22') - 0.1, 76, 38),
        (tl.le('L22') + 0.1, 74, 36), (tl.le('L22') + 0.35, 71, 34), (tl.le('L23') + 0.7, 76, 36),
@@ -476,23 +478,28 @@ for ts in spark6[:1]:
 # final: one complete, clean D chord, left to decay on its own
 fk = CH['Dadd9']
 for k, m in enumerate(fk):
-    gm(b6, final_t + 0.012 * k, PIANO, m, 54 - 2 * k, 6.5, gain=0.9, pan=(k / (len(fk) - 1) - 0.5) * 0.5, tail=5)
-roll(b6, final_t, EPC, [62, 66, 69, 76], 54, 6.0, gain=0.8, spread=0.02, human=False, tail=5)
+    gm(b6, final_t + 0.012 * k, PIANO, m, 60 - 2 * k, max(1.5, D - final_t - 3.2), gain=0.9, pan=(k / (len(fk) - 1) - 0.5) * 0.5, tail=5)
+roll(b6, final_t, EPC, [62, 66, 69, 76], 58, max(1.5, D - final_t - 3.2), gain=0.8, spread=0.02, human=False, tail=5)
 gm(b6f, final_t + 0.05, PIANO, 74, 42, 5.0, gain=0.9, pan=0.15, tail=5)
 gm(b6f, final_t + 0.65, CELESTA, 86, 34, 1.0, gain=0.35, pan=0.3, send=0.7, tail=4)
 for j, m in enumerate([50, 57, 62, 66]):
-    gm(b6p, final_t - 0.05, WPAD, m + 12, 52, 5.5, gain=0.4, pan=(j - 1.5) * 0.45, tail=4)
-end_fade0 = max(final_t + 5.0, D - 3.5)
-g6 = [(anchor6 - 0.02, 0.0), (anchor6, 1.0), (end_fade0, 1.0), (D - 0.25, 0.0)]
-gates['s6'] = gates['s6pad'] = gates['s6felt'] = g6
+    gm(b6p, final_t - 0.05, WPAD, m + 12, 52, max(1.5, D - final_t - 3.2), gain=0.4, pan=(j - 1.5) * 0.45, tail=4)
+end_fade0 = min(max(final_t + 3.5, D - 3.5), D - 1.2)      # let the chord ring, reach silence just before the end
+g6 = [(anchor6 - 0.02, 0.0), (anchor6, 1.0), (end_fade0, 1.0), (D - 0.1, 0.0)]
+gates['s6'] = gates['s6felt'] = g6
+# the pad bed thins out after the last line so the final chord arrives as an event
+gates['s6pad'] = [(anchor6 - 0.02, 0.0), (anchor6, 1.0), (L24e + 0.3, 1.0), (final_t - 0.4, 0.5), (final_t - 0.05, 1.0),
+                  (end_fade0, 1.0), (D - 0.1, 0.0)]
 
 # ============================================================================= render
 # windows where the voice must NOT duck the music (the score is deliberately silent there) -> mix.py
 import json
 os.makedirs(OUT, exist_ok=True)
 json.dump({'no_duck': [[cut - 0.05, anchor6]], 'cut': cut, 'final': final_t, 'open_s4': open_t,
-           'spark': spark_t, 'alarm': alarm_t, 'groove_s3': g0, 'splits_s5': L_on},
+           'spark': spark_t, 'alarm': alarm_t, 'groove_s3': g0, 'splits_s5': L_on,
+           'edits': sorted({round(t, 3) for g in gates.values() for t, _ in g if 0 < t < D})},
           open(f'{OUT}/music_meta.json', 'w'), indent=1)
+print(f'  tempi: s1 {bpm1:.1f} BPM (grid {t0:.2f}s)  s3 {bpm3:.1f} BPM (grid {g0:.2f}s)  s5 96 BPM')
 
 master = np.zeros((N + n_of(PAD + 2), 2))
 for b in buses:
@@ -500,10 +507,15 @@ for b in buses:
     if b.name in gates:
         y = y * env_points(len(y), [(t - b.lo, g) for t, g in gates[b.name]])[:, None]
     y *= 10 ** (BUS_DB.get(b.name, 0.0) / 20)
+    if os.environ.get('DEBUG_WIN'):
+        w0, w1 = map(float, os.environ['DEBUG_WIN'].split(','))
+        seg = y[max(0, n_of(w0 - b.lo)):max(0, n_of(w1 - b.lo))]
+        if len(seg): print(f'    [{w0}-{w1}] {b.name:9s} rms {db(np.sqrt((seg ** 2).mean()) + 1e-12):6.1f}')
     place(master, b.lo, y)
     print(f'  bus {b.name:9s} {b.lo:7.2f}s  peak {db(np.abs(y).max()):6.1f} dB')
 master = master[:N]
-master = filt(master, 'hp', 28, order=2)
+master = filt(master, 'hp', 35, order=2)
+master = filt(master, 'ls', 90, q=0.7, gain_db=-3.0)     # keep the sub region polite under the voice
 # gentle glue
 from pedalboard import Pedalboard, Compressor
 pb = Pedalboard([Compressor(threshold_db=-20, ratio=1.8, attack_ms=25, release_ms=300)])

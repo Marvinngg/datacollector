@@ -94,8 +94,9 @@ def s_ping(c, dull=False):
     """notification: A5 -> D6 soft bell (in D major). dull: low-passed, shorter, smaller"""
     v = float(c.get('v', 1.0)) if dull else 1.0
     n = n_of(1.4)
-    a = bell(mtof(81), 1.4)
-    b = pad_to(np.concatenate([np.zeros(n_of(0.085)), bell(mtof(86), 1.4 - 0.085)]), n)
+    tz = (0.5, 0.3, 0.18, 0.1)                   # short enough not to smear into a drone when they come on every beat
+    a = bell(mtof(81), 1.4, taus=tz)
+    b = pad_to(np.concatenate([np.zeros(n_of(0.085)), bell(mtof(86), 1.4 - 0.085, taus=tz)]), n)
     x = a * 0.75 + b
     if dull:
         x = x * np.exp(-t_(n) / (0.25 + 0.25 * v))
@@ -154,7 +155,7 @@ def s_spark(c):
     for k, m in enumerate([93, 98, 100, 105]):     # A6, D7, E7, A7 grains
         d = n_of(0.03 + 0.05 * k)
         x[d:] += bell(mtof(m), (n - d) / SR, taus=(0.12,), parts=(1.0,), amps=(1.0,)) * (0.5 - 0.08 * k)
-    air = filt(noise(n), 'hp', 5000, order=2) * np.sin(np.pi * np.clip(t / 0.6, 0, 1)) ** 2 * 0.25
+    air = filt(noise(n), 'hp', 5000, order=2) * np.sin(np.pi * np.clip(t / 0.6, 0, 1)) ** 2 * 0.1
     return st((x + air) * 0.07, 0.8), 0.25
 
 
@@ -246,9 +247,9 @@ wet = buf(D + 4)
 SEND = {'ping': 0.35, 'ping_dull': 0.25, 'check': 0.25, 'drop': 0.3, 'spark': 0.5, 'window': 0.3, 'alarm': 0.2,
         'final': 0.5, 'card': 0.2, 'key': 0.08, 'enter': 0.1, 'whoosh': 0.2, 'fizzle': 0.3, 'tick': 0.1}
 # peak level of each sound in sfx.wav (dBFS). mix.py adds sfx at unity against voice at ~-19 LUFS.
-TARGET = {'key': -31, 'enter': -26, 'check': -25, 'ping': -22, 'ping_dull': -24, 'whoosh': -26, 'drop': -24,
+TARGET = {'key': -31, 'enter': -26, 'check': -25, 'ping': -23, 'ping_dull': -24, 'whoosh': -26, 'drop': -24,
           'card': -29, 'spark': -30, 'fizzle': -31, 'alarm': -22, 'window': -29, 'tick': -33, 'final': -26,
-          'boot': -15}
+          'boot': -17}
 cues = sorted(tl.cues, key=lambda c: c['t'])
 counts = {}
 peaks = {}

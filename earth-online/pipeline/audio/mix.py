@@ -88,9 +88,16 @@ sfx = fit(load48(f'{OUT}/sfx.wav'), N) * 10 ** (SFX_GAIN_DB / 20)
 # ----------------------------------------------------------------------------- master
 mix = vo + music_d + sfx
 mix = filt(mix, 'hp', 25, order=1)
-for it in range(3):                                   # normalise -> limit -> re-measure
-    mix *= 10 ** ((TARGET_LUFS - lufs(mix)) / 20)
-    mix = limiter(mix, TP_CEIL - 0.3, lookahead=0.004, release=0.10)
+raw = mix
+gdb = TARGET_LUFS - lufs(raw)
+for it in range(4):                                   # gain -> limit -> re-measure (always from the raw sum)
+    pre_lim = raw * 10 ** (gdb / 20)
+    mix = limiter(pre_lim, TP_CEIL - 0.3, lookahead=0.004, release=0.10)
+    err = TARGET_LUFS - lufs(mix)
+    if abs(err) < 0.05: break
+    gdb += err
+gr = np.abs(mix).max(1) / np.maximum(np.abs(pre_lim).max(1), 1e-9)
+gr_db = 20 * np.log10(np.clip(gr[np.abs(pre_lim).max(1) > 1e-3], 1e-6, 1))
 L = lufs(mix)
 tp = true_peak_db(mix)
 if tp > TP_CEIL:                                      # safety (should not trigger)
@@ -104,6 +111,7 @@ import pyloudnorm as pyln
 meter = pyln.Meter(SR)
 print(f'mix.wav  {len(mix) / SR:.3f}s (timeline {D:.3f}s)  integrated {L:.2f} LUFS  true peak {tp:.2f} dBTP  '
       f'sample peak {db(np.abs(mix).max()):.2f} dBFS')
+print(f'  limiter: max gain reduction {-gr_db.min():.1f} dB, >1 dB on {(gr_db < -1).mean() * 100:.2f}% of samples')
 try:
     lra = meter.loudness_range(mix) if hasattr(meter, 'loudness_range') else None
     if lra is not None: print(f'  LRA {lra:.1f} LU')
@@ -119,16 +127,23 @@ for ln in tl.d['lines']:
     a, b = n_of(ln['start']), n_of(ln['start'] + ln['dur'])
     print(f"  {ln['id']} duck {db(duck[a:b].mean()):5.1f} dB", end='' if int(ln['id'][1:]) % 6 else '\n')
 print()
-# click check: isolated high-frequency bursts (a click is broadband energy with no HF around it)
-def clicks(x, name):
-    m = filt(x.mean(1), 'hp', 12000, order=3)
-    hop = 240; fr = len(m) // hop
-    e = 10 * np.log10((m[:fr * hop].reshape(fr, hop) ** 2).mean(1) + 1e-14)
-    from scipy.ndimage import median_filter
-    base = median_filter(e, size=81)
-    bad = np.where((e - base > 25) & (e > -75))[0]
-    print(f'  click scan {name}: {len(bad)} isolated HF bursts', [round(b_ * hop / SR, 2) for b_ in bad[:12]])
-clicks(mix, 'mix'); clicks(music, 'music'); clicks(sfx * 10, 'sfx(+20dB)')
+# click check at every edit point (section gates, voice take edges, file end): a click shows up as a burst of
+# >8 kHz energy right at the edit that is much louder than the 50 ms just before it
+def edit_clicks(x, times, name):
+    h = filt(x.mean(1), 'hp', 8000, order=3)
+    worst = []
+    for t in times:
+        i = n_of(t)
+        if i < n_of(0.06) or i > len(h) - n_of(0.01): continue
+        at = np.sqrt((h[i - n_of(0.004):i + n_of(0.004)] ** 2).mean()) + 1e-9
+        pre = np.sqrt((h[i - n_of(0.054):i - n_of(0.004)] ** 2).mean()) + 1e-9
+        worst.append((db(at / pre), db(at), t))
+    worst.sort(reverse=True)
+    bad = [w for w in worst if w[0] > 12 and w[1] > -70]
+    print(f'  edit-point click check {name}: {len(times)} edits, {len(bad)} suspicious',
+          [(round(w[2], 3), round(w[0], 1), round(w[1], 1)) for w in bad[:8]])
+edits = list(meta.get('edits', []))
+edits += [l['start'] for l in tl.d['lines']] + [l['start'] + l['dur'] for l in tl.d['lines']] + [D - 0.01]
+edit_clicks(mix, edits, 'mix'); edit_clicks(music, meta.get('edits', []), 'music')
 if '--plot' in sys.argv:
-    gm_ = 10 ** ((TARGET_LUFS - L) / 20)
     plot_tracks([('voice', vo), ('music(ducked)', music_d), ('sfx', sfx), ('mix', mix)], tl, f'{OUT}/plot_mix.png', 'stems (pre-master) + final mix')

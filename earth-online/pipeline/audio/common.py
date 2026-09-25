@@ -21,12 +21,13 @@ SF2_URL = 'https://raw.githubusercontent.com/mrbumpy409/GeneralUser-GS/main/Gene
 # ----------------------------------------------------------------------------- timeline
 class Timeline:
     def __init__(self):
-        self.d = json.load(open(os.path.join(BUILD, 'timeline.json')))
+        # EO_TIMELINE / EO_CUES env vars only exist for robustness tests; the build always uses build/*.json
+        self.d = json.load(open(os.environ.get('EO_TIMELINE') or os.path.join(BUILD, 'timeline.json')))
         self.duration = float(self.d['duration'])
         self.sc = {s['id']: s for s in self.d['scenes']}
         self.ln = {l['id']: l for l in self.d['lines']}
         self.vo_sr = int(self.d['sample_rate'])
-        p = os.path.join(BUILD, 'cues.json')
+        p = os.environ.get('EO_CUES') or os.path.join(BUILD, 'cues.json')
         self.cues = json.load(open(p)) if os.path.exists(p) else []
 
     def s(self, sid):  return float(self.sc[sid]['start'])
@@ -168,7 +169,7 @@ def sweep(x, kind, f_curve, q=0.707, block=128):
 
 
 # ----------------------------------------------------------------------------- reverb
-def make_ir(rt60=2.5, length=None, predelay=0.018, bright=0.5, seed=1, width=1.0):
+def make_ir(rt60=2.5, length=None, predelay=0.018, bright=0.5, seed=1, width=0.8):
     """Synthetic stereo hall IR: octave-band decorrelated noise, higher bands decay faster,
     plus a few early reflections. Energy-normalised."""
     rng = np.random.default_rng(seed)
@@ -182,6 +183,9 @@ def make_ir(rt60=2.5, length=None, predelay=0.018, bright=0.5, seed=1, width=1.0
     for (lo, hi), rtm, g in zip(bands, band_rt, band_g):
         sos = signal.butter(2, [lo, hi], 'bandpass', fs=SR, output='sos')
         nz = rng.standard_normal((n, 2))
+        if hi <= 700:   # low bands mostly shared between L/R: tails stay mono-compatible down low
+            common_ = rng.standard_normal(n)
+            nz = 0.9 * common_[:, None] + 0.44 * nz
         nz = signal.sosfilt(sos, nz, axis=0)
         ir += g * nz * np.exp(-6.91 * t / (rt60 * rtm))[:, None]
     # gentle build-up (diffusion) instead of hard onset
@@ -193,6 +197,7 @@ def make_ir(rt60=2.5, length=None, predelay=0.018, bright=0.5, seed=1, width=1.0
     pd = np.zeros((n_of(predelay), 2))
     ir = np.concatenate([pd, ir])
     # width: mid/side
+    # width < 1 keeps the tail mono-compatible (partly correlated L/R)
     m, s_ = (ir[:, 0] + ir[:, 1]) / 2, (ir[:, 0] - ir[:, 1]) / 2
     ir = np.stack([m + width * s_, m - width * s_], 1)
     ir /= np.sqrt((ir ** 2).sum() / 2)
@@ -274,6 +279,9 @@ class SF2:
         idx = np.where(e > 1e-5)[0]
         x = x[:idx[-1] + 1] if len(idx) else x[:1]
         x = fade(x, 0.0005, min(0.3, len(x) / SR / 4))
+        # centre the note (some GM samples are hard-panned); placement pan is applied by the caller
+        rl, rr = np.sqrt((x[:, 0] ** 2).mean()) + 1e-12, np.sqrt((x[:, 1] ** 2).mean()) + 1e-12
+        x = x * np.array([np.sqrt(rr / rl), np.sqrt(rl / rr)])
         self.cache[k] = x
         return x
 
