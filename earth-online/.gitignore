@@ -1,0 +1,5 @@
+models/
+build/
+node_modules/
+*.wav
+!assets/**/*.wav
