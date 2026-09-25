@@ -26,3 +26,10 @@ ffmpeg -y -loglevel error -i build/video.mp4 -i build/audio/mix.wav \
   out/earth-online.mp4
 ffprobe_dur=$(ffmpeg -i out/earth-online.mp4 2>&1 | grep -o "Duration: [0-9:.]*" || true)
 echo "done: out/earth-online.mp4  ${ffprobe_dur}"
+
+# compressed copy for sharing (release/ is not git-ignored; out/ is)
+mkdir -p release
+ffmpeg -y -loglevel error -i build/video.mp4 -i build/audio/mix.wav -map 0:v -map 1:a \
+  -c:v libx264 -preset slow -crf 24 -tune stillimage -pix_fmt yuv420p -c:a aac -b:a 192k -shortest -movflags +faststart \
+  "release/${RELEASE_NAME:-earth-online}.mp4"
+echo "release: release/${RELEASE_NAME:-earth-online}.mp4"
