@@ -35,7 +35,7 @@
   }
   /** map pins/player fade with the veil (so a half-covered 挣钱 never peeks out between windows);
    *  1 at veil ≤ 0.1 (the standard map state stays pixel-identical), 0.1 at the full 0.85 veil */
-  const markAFor = v => 1 - 0.9 * ease.inOut(clamp((v - 0.1) / 0.75));
+  const markAFor = v => 1 - 0.97 * ease.inOut(clamp((v - 0.1) / 0.75));
   function veil(a, color = P.bg) {
     if (a <= 0) return;
     ctx.save(); ctx.globalAlpha = clamp(a); ctx.fillStyle = color; ctx.fillRect(0, 0, W, H); ctx.restore();
@@ -363,7 +363,7 @@
       if (lt >= tm.stages[5] + SPLIT) blit(backdrop('map'));
       else {
         // pins recede with the veil, and are fully gone (0.1) before the first window can half-cover 挣钱
-        const ma = dim <= 0 ? 1 : Math.min(markAFor(dim + 0.1), 1 - 0.9 * ease.inOut(prog(lt, tm.enter - 0.4, tm.stages[1] + 0.2)));
+        const ma = dim <= 0 ? 1 : Math.min(markAFor(dim + 0.1), 1 - 0.97 * ease.inOut(prog(lt, tm.enter - 0.4, tm.stages[1] + 0.2)));
         mapState(T, { markA: ma }); veil(dim);
       }
       E.questBox('挣钱', { alpha: (1 - 0.55 * ease.inOut(prog(lt, tm.dimIn[0], tm.dimIn[1]))) * (1 - ease.inOut(prog(lt, tm.stages[1] - 0.1, tm.stages[1] + 0.4))) });
