@@ -1,6 +1,6 @@
 {
   "voice_sid": 62,
-  "speed": 1.15,
+  "speed": 1.0,
   "scenes": [
     {"id": "s0_boot",    "lead": 0.0, "tail": 4.0, "lines": []},
     {"id": "s1_school",  "lead": 1.2, "tail": 1.6, "lines": [
