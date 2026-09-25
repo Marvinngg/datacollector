@@ -4,3 +4,4 @@ node_modules/
 *.wav
 !assets/**/*.wav
 __pycache__/
+.bin/

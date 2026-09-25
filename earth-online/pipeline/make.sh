@@ -4,6 +4,7 @@
 #   SKIP_VO=1 bash pipeline/make.sh  # reuse existing build/vo + timeline
 set -euo pipefail
 cd "$(dirname "$0")/.."
+export PATH="$PWD/.bin:$PATH"   # bundled ffmpeg from setup.sh, if any
 
 if [ -z "${SKIP_VO:-}" ]; then
   echo "== voice-over"
