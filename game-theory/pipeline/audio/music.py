@@ -234,15 +234,16 @@ def pool(chd, lo, hi):
 
 
 # ----------------------------------------------------------------------------- 2. note events
-piano_ev, pulse_ev, spark_ev, pad_ev = [], [], [], []   # dicts
+piano_ev, pulse_ev, spark_ev, pad_ev, hb_ev = [], [], [], [], []   # dicts; hb_ev: (t, key, level)
 last_note = [66]
 
 
 def hv(v, sd=3): return int(np.clip(round(v + rng.normal(0, sd)), 12, 100))
 
 
-def add_piano(t, key, vel, bus=None, kind='mel'):
-    (bus if bus is not None else piano_ev).append(dict(t=t + float(rng.normal(0, 0.006)), key=int(key), vel=hv(vel), kind=kind))
+def add_piano(t, key, vel, bus=None, kind='mel', g=0.0):
+    """g: extra gain in dB (the SoundFont's velocity range is narrow; quiet moments are shaped with g)"""
+    (bus if bus is not None else piano_ev).append(dict(t=t + float(rng.normal(0, 0.006)), key=int(key), vel=hv(vel), kind=kind, g=g))
 
 
 def pick_walk(chd, reg, prev, shape='walk'):
@@ -261,7 +262,7 @@ def pick_walk(chd, reg, prev, shape='walk'):
     return int(rng.choice(cand, p=w / w.sum()))
 
 
-def phrase(t0, t_end, n, shape, vel, allow_over=0.5):
+def phrase(t0, t_end, n, shape, vel, allow_over=0.5, g=0.0):
     """n notes from t0, spaced on the 66 BPM grid (8th / dotted 8th / quarter), each on the chord sounding then"""
     t = t0
     for i in range(n):
@@ -277,12 +278,12 @@ def phrase(t0, t_end, n, shape, vel, allow_over=0.5):
         else:
             k = pick_walk(s['chord'], reg, prev, {'question': 'up', 'answer': 'down'}.get(shape, 'walk'))
         v = vel - 3 * i if shape == 'answer' else vel - (2 if i == n - 1 else 0)
-        add_piano(t, k, v)
+        add_piano(t, k, v, g=g - (1.5 * i if shape == 'answer' else 0))
         last_note[0] = k
         t += Q * float(rng.choice([0.5, 0.75, 1.0], p=[0.35, 0.3, 0.35]))
 
 
-def spark(t, inst, reg_hi=False):
+def spark(t, inst, g=0.0):
     s = slot_at(t)
     prog = SPARK[inst]
     if inst in ('harp', 'nylon'):
@@ -291,15 +292,15 @@ def spark(t, inst, reg_hi=False):
         ks = P[st:st + int(rng.integers(3, 5))]
         dt = float(rng.uniform(0.13, 0.2))
         for i, k in enumerate(ks):
-            spark_ev.append(dict(t=t + i * dt, key=k, vel=hv(34 - 2 * i), prog=prog, pan=-0.3 + 0.2 * i))
+            spark_ev.append(dict(t=t + i * dt, key=k, vel=hv(34 - 2 * i), prog=prog, pan=-0.3 + 0.2 * i, g=g))
     else:
         lo, hi = (72, 91) if inst == 'celesta' else (65, 84)
         P = pool(s['chord'], lo, hi)
         k = int(rng.choice(P))
-        spark_ev.append(dict(t=t, key=k, vel=hv(30), prog=prog, pan=float(rng.uniform(-0.5, 0.5))))
+        spark_ev.append(dict(t=t, key=k, vel=hv(30), prog=prog, pan=float(rng.uniform(-0.5, 0.5)), g=g))
         if rng.random() < 0.5:
             P2 = [x for x in P if 2 <= abs(x - k) <= 7]
-            if P2: spark_ev.append(dict(t=t + Q * 0.5, key=int(rng.choice(P2)), vel=hv(26), prog=prog, pan=float(rng.uniform(-0.5, 0.5))))
+            if P2: spark_ev.append(dict(t=t + Q * 0.5, key=int(rng.choice(P2)), vel=hv(26), prog=prog, pan=float(rng.uniform(-0.5, 0.5)), g=g - 2))
 
 
 # 2a. bass + chord colour at every harmonic change
@@ -309,18 +310,19 @@ for s in SLOTS:
     v = m['vel'] - (5 if tl.voiced(t0) else 0)
     if s['kind'] == 'thin': continue
     if s['kind'] == 'final':
-        keys = chd['bass'] + [k for k in chd['pad'] if k >= 50]
+        keys = chd['bass'][:2] + [k for k in chd['pad'] if k >= 54]
         for i, k in enumerate(keys):
-            piano_ev.append(dict(t=t0 + 0.07 * i, key=k, vel=hv(40 - i, 2), kind='final'))
+            piano_ev.append(dict(t=t0 + 0.08 * i, key=k, vel=hv(30 - 0.6 * i, 1), kind='final', g=-7.0))
         continue
-    add_piano(t0, chd['bass'][0] + (12 if chd['bass'][0] < 31 else 0), v - 2, kind='bass')
+    add_piano(t0, chd['bass'][0] + (12 if chd['bass'][0] < 31 else 0), v - 2, kind='bass',
+              g={'card': -7.0, 'cad': -3.0}.get(s['kind'], 0.0))
     if s['kind'] == 'cad':
         # gentle landing: rolled tonic
         up = sorted(chd['pad'])[-3:]
-        for i, k in enumerate(up): add_piano(t0 + 0.09 * (i + 1), k, v - 1 - i, kind='chord')
+        for i, k in enumerate(up): add_piano(t0 + 0.09 * (i + 1), k, v - 1 - i, kind='chord', g=-5.0 - i)
         last_note[0] = up[-1]
     elif s['kind'] == 'card':
-        add_piano(t0 + 0.05, max(chd['pad']), v - 4)
+        pass
 
 # 2b. voice-free gaps: short melodic cells ("question" after a chapter card, "answer" after a remember card)
 rem_line_ends = []
@@ -332,6 +334,7 @@ final_t = next((b['start'] for b in tl.beats if tl.btype(b) == 'endcard'), None)
 
 for a, b in tl.gaps(0.0, D):
     g = b - a
+    if any(slot_at(t)['kind'] == 'thin' for t in np.linspace(a, b, 6)): continue   # held breath
     if final_t is not None and a >= final_t - 0.2: continue
     m = mood_at(a + 0.05)
     cs = [c for c in card_starts if a - 0.05 <= c <= b]
@@ -341,17 +344,17 @@ for a, b in tl.gaps(0.0, D):
     if cs:
         c0 = cs[0]
         if after_rem and c0 - a > 0.5:
-            phrase(a + 0.12, c0 - 0.1, 2, 'answer', m['vel'] - 2, allow_over=0.0)
+            phrase(a + 0.12, c0 - 0.1, 2, 'answer', m['vel'] - 2, allow_over=0.0, g=-5.0)
         mm = mood_at(c0 + 0.1)
-        phrase(c0 + 0.75, b - 0.1, int(rng.integers(2, 4)), 'question', mm['vel'] - 3, allow_over=0.2)
-        if mm['spark'] and rng.random() < mm['spark'][1] + 0.2:
-            spark(c0 + 1.9, mm['spark'][0])
+        phrase(c0 + 0.75, b - 0.1, 2 + int(rng.random() < 0.4), 'question', mm['vel'] - 3, allow_over=0.2, g=-7.0)
+        if mm['spark'] and rng.random() < mm['spark'][1]:
+            spark(c0 + 1.9, mm['spark'][0], g=-5.0)
         continue
     if after_rem:
-        phrase(a + 0.1, b, 2 if g > 0.8 else 1, 'answer', m['vel'] - 2, allow_over=0.0)
+        phrase(a + 0.1, b, 2 if g > 0.8 else 1, 'answer', m['vel'] - 2, allow_over=0.0, g=-5.0)
         continue
     if g >= 1.6:
-        phrase(a + 0.1, b, int(rng.integers(2, 5)), 'walk', m['vel'])
+        phrase(a + 0.1, b, int(rng.integers(2, 4)), 'walk', m['vel'], g=-3.0)
         if m['spark'] and rng.random() < m['spark'][1]: spark(a + 0.1 + Q, m['spark'][0])
     elif g >= 0.6:
         phrase(a + 0.08, b, 1 + int(rng.random() < 0.35), 'walk', m['vel'] - 1, allow_over=0.3)
@@ -412,31 +415,36 @@ for b in tl.beats:
     per = 60 / 50.0; j = 0
     while t < t_b - 0.3:
         v = 38 + 8 * (t - b['start']) / max(1, t_b - b['start'])
-        pulse_ev.append(dict(t=t, key=root, vel=hv(v, 1), kind='hb'))
-        pulse_ev.append(dict(t=t + 0.27, key=root, vel=hv(v - 10, 1), kind='hb'))
+        hb_ev.append((t, root, v / 46.0)); hb_ev.append((t + 0.28, root, (v - 12) / 46.0))
         t += per; j += 1
 
-# 2e. pads (ties across slots when a pitch continues)
+# 2e. pads (ties across slots when a pitch continues). Inside a chapter the texture builds: the first
+# harmony after the card is the main pad alone; the other layers and the string floor join from the second on.
+stage, prev_cid = 0, None
 for s in SLOTS:
     m = plan(s['cid'])['mood']; chd = s['chord']
+    if s['cid'] != prev_cid: stage, prev_cid = 0, s['cid']
+    if s['kind'] != 'card': stage += 1
     layers = m['pad']
     t_on, t_off = s['t0'] - 0.35, s['t1'] + 0.25
     if s['kind'] == 'final':
         t_off = min(s['t1'], D) - 3.2
+    full = stage >= 2 or s['kind'] in ('cad', 'final') or s['cid'] == tl.chapters[0]['id']
     for li, (prog, gdb, octv) in enumerate(layers):
+        if li > 0 and (not full or s['kind'] == 'card'): continue
         keys = sorted(chd['pad'])
         if s['kind'] == 'thin': keys = keys[-2:]
         elif s['kind'] == 'card': keys = keys[-3:]
         keys = [k + 12 * octv for k in keys]
         if octv: keys = keys[-2:]           # the high shimmer layer only doubles the top
-        gain = gdb - (4 if s['kind'] in ('card', 'thin') else 0)
+        gain = gdb - {'card': 6, 'thin': 4, 'final': 3}.get(s['kind'], 0) - (0 if full else 1.5)
         for i, k in enumerate(keys):
             pan = (i / max(1, len(keys) - 1) - 0.5) * 0.7 * (-1 if li % 2 else 1)
             pad_ev.append(dict(t=t_on, off=t_off, key=k, vel=m['pv'], prog=prog, g=gain, pan=pan, layer=li))
-    # string bass under everything (octave above if very low) - warm floor, not a bass line
-    if s['kind'] not in ('thin',):
+    # string floor on the bass note (octave up if very low): warmth, not a bass line
+    if full and s['kind'] not in ('thin', 'card'):
         bk = chd['bass'][0]; bk = bk + 12 if bk < 34 else bk
-        pad_ev.append(dict(t=t_on, off=t_off, key=bk, vel=m['pv'] - 2, prog=STR, g=-5 - (3 if s['kind'] == 'card' else 0), pan=-0.1, layer=9))
+        pad_ev.append(dict(t=t_on, off=t_off, key=bk, vel=m['pv'] - 2, prog=STR, g=-5, pan=-0.1, layer=9))
 
 
 def tie(evs):
@@ -504,6 +512,16 @@ def felt(x, fc):
     return filt(x, 'hs', 6000, gain_db=-4)
 
 
+def thump(f, lv):
+    """soft felt heartbeat: a low sine with a small pitch drop, no click"""
+    n = n_of(0.9); t = np.arange(n) / SR
+    fr = f * (1 + 0.35 * np.exp(-t / 0.025))
+    ph = 2 * np.pi * np.cumsum(fr) / SR
+    e = (1 - np.exp(-t / 0.008)) * np.exp(-t / 0.17)
+    y = (np.sin(ph) + 0.28 * np.sin(2 * ph) + 0.08 * np.sin(3 * ph)) * e
+    return to_stereo(y * 0.05 * lv)
+
+
 def pan_of(k): return float(np.clip((k - 64) / 30.0, -0.45, 0.45))
 
 
@@ -514,14 +532,16 @@ stems = {}
 bus = Bus(3.4, 0.55, bright=0.4, width=0.9, seed=11, predelay=0.025)
 for e in piano_ev:
     y = note(PIANO, e['key'], e['vel'], e['off'] - e['t'], tail=3.0)
-    bus.add(e['t'], y, 1.0, pan_of(e['key']))
+    bus.add(e['t'], y, 10 ** (e.get('g', 0.0) / 20), pan_of(e['key']))
 stems['piano'] = bus.render(lambda d: felt(d, 3200)); del bus
 
 # pulse (muted felt, drier)
 bus = Bus(2.2, 0.35, bright=0.3, seed=12)
 for e in pulse_ev:
     y = note(PIANO, e['key'], e['vel'], e['off'] - e['t'], tail=1.5)
-    bus.add(e['t'], y, 1.0, -0.15 if e.get('kind') != 'hb' else 0.0)
+    bus.add(e['t'], y, 1.0, -0.15)
+for t, k, lv in hb_ev:
+    bus.add(t, thump(mtof(k), lv), 1.0, 0.0)
 stems['pulse'] = bus.render(lambda d: felt(d, 1300)); del bus
 
 # sparks (celesta / vibes / harp / nylon)
@@ -529,7 +549,7 @@ bus = Bus(3.8, 0.7, bright=0.5, width=1.0, seed=13, predelay=0.035)
 for e in spark_ev:
     if e['t'] >= D - 1: continue
     y = note(e['prog'], e['key'], e['vel'], 1.5 if e['prog'] in (HARP, NYLON) else 0.8, tail=4.0)
-    bus.add(e['t'], y, 1.0, e['pan'])
+    bus.add(e['t'], y, 10 ** (e.get('g', 0.0) / 20), e['pan'])
 stems['spark'] = bus.render(lambda d: filt(d, 'lp', 7000, order=1)); del bus
 
 # pads, with a very slow low-pass drift (per-chapter base cutoff, two slow LFOs)
@@ -591,7 +611,9 @@ meta = dict(
     chapters={c['id']: dict(key=plan(c['id'])['key'], mode=plan(c['id'])['mode'], scale=plan(c['id'])['scale']) for c in tl.chapters},
     chords=[dict(t0=round(s['t0'], 3), t1=round(s['t1'], 3), chapter=s['cid'], kind=s['kind'], name=s['chord']['name'],
                  pcs=s['chord']['pcs'], root=s['chord']['root'], scale=plan(s['cid'])['scale']) for s in SLOTS],
-    no_duck=[], edits=[])
+    no_duck=[], edits=[],
+    notes=[dict(t=round(e['t'], 3), key=e['key'], vel=e['vel'], g=round(e.get('g', 0.0), 1), bus=bn)
+           for bn, evs in (('piano', piano_ev), ('pulse', pulse_ev), ('spark', spark_ev)) for e in evs])
 json.dump(meta, open(f'{OUT}/music_meta.json', 'w'), indent=1, ensure_ascii=False)
 cnt = lambda ev: len(ev)
 print(f'slots {len(SLOTS)}, piano notes {len(piano_ev)}, pulse {len(pulse_ev)}, spark {len(spark_ev)}, pad {len(pad_ev)}')

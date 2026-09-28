@@ -1,12 +1,15 @@
-"""Sound effects for 《地球 Online》 -> build/audio/sfx.wav (48 kHz stereo float).
+"""Sound effects for 《博弈论：看局、解局、改局》 -> build/audio/sfx.wav (48 kHz stereo float).
 
-Reads build/cues.json ([{t, type, scene, ...}], t absolute seconds). All sounds are synthesised here
-(no samples), tuned to the score's key (D major) where they are pitched, and kept soft so they never
-compete with the voice.
+Reads build/cues.json ([{t, type, ...}], t in absolute seconds; exported by `node pipeline/render.mjs cues`).
+Vocabulary (BRIEF.md): tick pop whoosh(dur) chime click thud swish count(dur), plus the runtime's chapter / beat.
+Everything is synthesised here (no samples) and kept very soft: this is a learning film, the voice leads.
+Pitched sounds take their notes from the score's harmony at that moment (build/audio/music_meta.json, written by
+music.py); without it they fall back to D major.
 
   python3 sfx.py [--cues path] [--regen] [--plot]
     --regen  re-export cues first (node pipeline/render.mjs cues)
 """
+import json
 import os
 import subprocess
 import sys
@@ -21,266 +24,247 @@ if '--regen' in args:
         print('cue export failed, using existing cues.json:', ex)
 tl = Timeline()
 if '--cues' in args:
-    import json
     tl.cues = json.load(open(args[args.index('--cues') + 1]))
 D = tl.duration
-rng = np.random.default_rng(424242)
+rng = np.random.default_rng(1928)
 t_ = lambda n: np.arange(n) / SR
 
-
-def dmp(f, dur, tau, ph=0.0):
-    n = n_of(dur); t = t_(n)
-    return np.sin(2 * np.pi * f * t + ph) * np.exp(-t / tau)
-
-
-def noise(n, seed=None):
-    return (np.random.default_rng(seed) if seed is not None else rng).standard_normal(n)
+# ----------------------------------------------------------------------------- harmony from the score
+_mp = os.path.join(OUT, 'music_meta.json')
+CHORDS = json.load(open(_mp))['chords'] if os.path.exists(_mp) else []
+if not CHORDS: print('  (music_meta.json missing: pitched sfx use D major)')
 
 
-def env_attack(n, a):
-    return np.minimum(1, t_(n) / max(a, 1e-4))
+def harmony(t):
+    """(chord pitch classes, root pc, scale pcs) sounding at t"""
+    for c in CHORDS:
+        if c['t0'] <= t < c['t1']: return c['pcs'], c['root'], c['scale']
+    if CHORDS:
+        c = CHORDS[-1] if t >= CHORDS[-1]['t0'] else CHORDS[0]
+        return c['pcs'], c['root'], c['scale']
+    return [2, 6, 9, 4], 2, [2, 4, 6, 7, 9, 11, 1]
 
 
-def pad_to(x, n):
-    return np.pad(x, (0, max(0, n - len(x))))[:n]
+def notes_in(pcs, lo, hi): return [k for k in range(lo, hi + 1) if k % 12 in pcs]
 
 
-def st(x, w=0.0, seed=0):
+def nearest(pcs, target):
+    ks = notes_in(pcs, target - 7, target + 7)
+    return min(ks, key=lambda k: abs(k - target)) if ks else target
+
+
+# ----------------------------------------------------------------------------- building blocks
+def noise(n, seed=None): return (np.random.default_rng(seed) if seed is not None else rng).standard_normal(n)
+def env_attack(n, a): return np.minimum(1, t_(n) / max(a, 1e-4))
+def pad_to(x, n): return np.pad(x, (0, max(0, n - len(x))))[:n]
+
+
+def st(x, w=0.0):
     """mono -> stereo with a tiny decorrelation (w = 0..1)"""
     if w <= 0: return to_stereo(x)
-    d = n_of(0.0004 + 0.0006 * w)
-    r = np.concatenate([np.zeros(d), x[:-d]]) if d > 0 else x
+    d = n_of(0.0004 + 0.0008 * w)
+    r = np.concatenate([np.zeros(d), x[:-d]])
     return np.stack([x, (1 - w * 0.5) * x + w * 0.5 * r], 1)
 
 
-# ----------------------------------------------------------------------------- designs
-def s_key(c):
-    """soft mechanical key: bandpassed click + short thock body + faint upstroke"""
-    n = n_of(0.16)
-    g = 10 ** (rng.uniform(-3, 1.5) / 20)
-    fc = rng.uniform(2400, 4200)
-    clk = filt(noise(n) * np.exp(-t_(n) / rng.uniform(0.0012, 0.0022)), 'bp', fc, q=1.3)
-    body = pad_to(dmp(rng.uniform(170, 260), 0.06, rng.uniform(0.010, 0.016)), n) * 0.5
-    body += pad_to(dmp(rng.uniform(650, 950), 0.03, 0.005), n) * 0.25
-    up_t = rng.uniform(0.045, 0.075)
-    up = np.zeros(n); k = n_of(up_t)
-    uc = filt(noise(n - k) * np.exp(-t_(n - k) / 0.0012), 'bp', fc * 1.2, q=1.5) * 0.22
-    up[k:] = uc
-    x = (clk * 1.0 + body + up) * env_attack(n, 0.0003)
-    x = filt(x, 'lp', 9000)
-    return st(x / 3.0, 0.3) * g, rng.uniform(-0.18, 0.18)
-
-
-def s_enter(c):
-    n = n_of(0.3)
-    clk = filt(noise(n) * np.exp(-t_(n) / 0.0025), 'bp', 2600, q=1.1)
-    body = pad_to(dmp(135, 0.12, 0.026), n) * 0.8 + pad_to(dmp(520, 0.05, 0.008), n) * 0.3
-    rat = np.zeros(n); k = n_of(0.011)
-    rat[k:] = filt(noise(n - k) * np.exp(-t_(n - k) / 0.0015), 'bp', 4200, q=2) * 0.35
-    up = np.zeros(n); k = n_of(0.11)
-    up[k:] = filt(noise(n - k) * np.exp(-t_(n - k) / 0.0015), 'bp', 3000, q=1.5) * 0.25
-    x = filt(clk + body + rat + up, 'lp', 8500)
-    return st(x / 2.2, 0.3) * 1.3, 0.0
-
-
-def bell(f, dur, taus=(0.9, 0.45, 0.25, 0.14), parts=(1.0, 2.0, 3.01, 4.17), amps=(1.0, 0.28, 0.11, 0.05), attack=0.0025):
+def bell(f, dur, taus=(1.1, 0.5, 0.25, 0.12), parts=(1.0, 2.0, 2.76, 5.4), amps=(1.0, 0.22, 0.12, 0.04), attack=0.004):
+    """soft glassy bell: few partials, upper ones die first, rounded attack"""
     n = n_of(dur); t = t_(n); x = np.zeros(n)
     for p, a, tau in zip(parts, amps, taus):
-        if f * p < 16000: x += a * np.sin(2 * np.pi * f * p * t) * np.exp(-t / tau)
+        if f * p < 15000: x += a * np.sin(2 * np.pi * f * p * t + 0.3 * p) * np.exp(-t / tau)
     return x * env_attack(n, attack)
 
 
-def s_ping(c, dull=False):
-    """notification: A5 -> D6 soft bell (in D major). dull: low-passed, shorter, smaller"""
-    v = float(c.get('v', 1.0)) if dull else 1.0
-    n = n_of(1.4)
-    tz = (0.5, 0.3, 0.18, 0.1)                   # short enough not to smear into a drone when they come on every beat
-    a = bell(mtof(81), 1.4, taus=tz)
-    b = pad_to(np.concatenate([np.zeros(n_of(0.085)), bell(mtof(86), 1.4 - 0.085, taus=tz)]), n)
-    x = a * 0.75 + b
-    if dull:
-        x = x * np.exp(-t_(n) / (0.25 + 0.25 * v))
-        x = filt(x, 'lp', 650 + 1500 * v, order=2)
-        x *= 0.3 + 0.35 * v
-    return st(x * 0.32, 0.5), 0.12
+def airband(n, lo, hi, seed=None):
+    x = noise(n, seed)
+    return filt(filt(x, 'hp', lo, order=2), 'lp', hi, order=2)
 
 
-def s_check(c):
-    """✓: soft wooden two-note (F#5, A5), marimba-like partial ratio"""
-    n = n_of(0.6)
-    mk = lambda f: bell(f, 0.6, taus=(0.22, 0.06), parts=(1.0, 3.93), amps=(1.0, 0.35), attack=0.0015)
-    x = mk(mtof(78)) * 0.7 + pad_to(np.concatenate([np.zeros(n_of(0.07)), mk(mtof(81))]), n)
-    return st(filt(x, 'lp', 7000) * 0.3, 0.4), 0.0
+# ----------------------------------------------------------------------------- designs  (return stereo, pan)
+def s_tick(c):
+    """element appears: tiny felt tick with a whisper of pitch (a chord tone, high)"""
+    n = n_of(0.12); t = t_(n)
+    pcs, _, _ = harmony(c['t'])
+    k = int(rng.choice(notes_in(pcs, 84, 96) or [86]))
+    clk = filt(noise(n) * np.exp(-t / 0.0014), 'bp', rng.uniform(2600, 3600), q=1.4)
+    ping = np.sin(2 * np.pi * mtof(k) * t) * np.exp(-t / 0.03) * env_attack(n, 0.002) * 0.35
+    body = np.sin(2 * np.pi * 420 * t) * np.exp(-t / 0.006) * 0.3
+    return st(filt(clk + ping + body, 'lp', 8000), 0.3), float(rng.uniform(-0.2, 0.2))
+
+
+def s_pop(c):
+    """emphasis / highlight: soft rounded bubble on a chord tone"""
+    n = n_of(0.3); t = t_(n)
+    pcs, _, _ = harmony(c['t'])
+    f = mtof(int(rng.choice(notes_in(pcs, 74, 81) or [78])))
+    fr = f * (0.82 + 0.18 * (1 - np.exp(-t / 0.018)))
+    y = np.sin(2 * np.pi * np.cumsum(fr) / SR) * np.exp(-t / 0.07) * env_attack(n, 0.004)
+    y += 0.12 * np.sin(4 * np.pi * np.cumsum(fr) / SR) * np.exp(-t / 0.03)
+    air = filt(noise(n) * np.exp(-t / 0.01), 'bp', 2200, q=0.8) * 0.08
+    return st(filt(y + air, 'lp', 5000), 0.4), float(rng.uniform(-0.15, 0.15))
 
 
 def s_whoosh(c):
-    """soft air sweep; dur from the cue"""
-    dur = float(c.get('dur', 1.2)); dur = min(max(dur, 0.3), 6.0)
-    n = n_of(dur + 0.3); t = t_(n); u = np.clip(t / dur, 0, 1)
+    """large move: soft air, band sweeping up then down, drifting L -> R; length from the cue"""
+    dur = float(np.clip(float(c.get('dur', 0.9)), 0.3, 4.0))
+    n = n_of(dur + 0.25); t = t_(n); u = np.clip(t / dur, 0, 1)
     nz = np.stack([noise(n), noise(n)], 1)
-    fc = 250 * (1 + 7 * np.sin(np.pi * u) ** 1.5)
-    x = sweep(nz, 'bp', fc, q=0.9)
-    rum = filt(noise(n), 'lp', 160, order=2) * 1.5
-    e = np.sin(np.pi * np.clip(t / dur, 0, 1) ** 0.8) ** 2
-    x = (x + to_stereo(rum) * 0.5) * e[:, None]
-    p = np.clip(-0.5 + u, -0.5, 0.5)                  # travels L -> R
-    gl, gr = pan_gains(p)
+    fc = 380 * (1 + 4.5 * np.sin(np.pi * u) ** 1.4)
+    x = sweep(nz, 'bp', fc, q=0.8)
+    e = np.sin(np.pi * u ** 0.85) ** 2
+    x = x * e[:, None]
+    gl, gr = pan_gains(np.clip(-0.35 + 0.7 * u, -0.35, 0.35))
     x[:, 0] *= gl; x[:, 1] *= gr
-    x = filt(x, 'lp', 5000)
-    return x * 0.14, None
+    return filt(x, 'lp', 4500), None
 
 
-def s_drop(c):
-    """marker lands: soft low thud + tiny in-key knock (D5)"""
-    n = n_of(0.7); t = t_(n)
-    f = 60 + 45 * np.exp(-t / 0.03)
-    thud = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t / 0.09) * env_attack(n, 0.002)
-    knock = bell(mtof(74), 0.7, taus=(0.3, 0.05), parts=(1.0, 3.93), amps=(1.0, 0.3)) * 0.35
-    tick = filt(noise(n) * np.exp(-t / 0.003), 'bp', 1600, q=1.2) * 0.15
-    return st((thud * 0.8 + knock + tick) * 0.3, 0.3), 0.1
+def s_swish(c):
+    """throw / sweep past: short, downward, brighter than whoosh"""
+    dur = float(np.clip(float(c.get('dur', 0.32)), 0.15, 1.0))
+    n = n_of(dur + 0.1); t = t_(n); u = np.clip(t / dur, 0, 1)
+    fc = 4200 * (900 / 4200) ** u
+    x = sweep(to_stereo(noise(n)), 'bp', fc, q=1.1)[:, 0]
+    e = np.sin(np.pi * u ** 0.6) ** 2
+    return st(filt(x * e, 'lp', 7000), 0.6), float(rng.uniform(-0.25, 0.25))
 
 
-def s_card(c):
-    """card pops in: short soft blip + paper air"""
-    n = n_of(0.35); t = t_(n)
-    f = mtof(83) * (1 + 0.015 * (1 - np.exp(-t / 0.02)))
-    blip = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t / 0.06) * env_attack(n, 0.003)
-    paper = filt(noise(n) * np.exp(-t / 0.025) * env_attack(n, 0.006), 'bp', 3500, q=0.8) * 0.3
-    return st((blip * 0.6 + paper) * 0.14, 0.6), rng.uniform(-0.2, 0.2)
+def s_chime(c):
+    """remember card / conclusion: two soft bell notes from the current chord (5th or 9th, then root/3rd)"""
+    pcs, root, sc = harmony(c['t'] + 0.05)
+    third = [p for p in pcs if (p - root) % 12 in (3, 4)]
+    land = nearest([root] + third, 79)
+    up = [k for k in notes_in(pcs, land + 2, land + 9) if (k - root) % 12 in (7, 2, 11)]
+    first = up[0] if up else land + 7
+    dur = 4.5; n = n_of(dur)
+    a = bell(mtof(first), dur) * 0.55
+    b = pad_to(np.concatenate([np.zeros(n_of(0.22)), bell(mtof(land), dur - 0.22)]), n)
+    x = filt(a + b, 'lp', 6500)
+    return st(x, 0.7), 0.05
 
 
-def s_spark(c):
-    """spark: airy glint (the musical twinkle lives in the score)"""
-    n = n_of(0.9); t = t_(n); x = np.zeros(n)
-    for k, m in enumerate([93, 98, 100, 105]):     # A6, D7, E7, A7 grains
-        d = n_of(0.03 + 0.05 * k)
-        x[d:] += bell(mtof(m), (n - d) / SR, taus=(0.12,), parts=(1.0,), amps=(1.0,)) * (0.5 - 0.08 * k)
-    air = filt(noise(n), 'hp', 5000, order=2) * np.sin(np.pi * np.clip(t / 0.6, 0, 1)) ** 2 * 0.1
-    return st((x + air) * 0.07, 0.8), 0.25
+def s_click(c):
+    """choice / confirm: small soft button, two-part"""
+    n = n_of(0.12); t = t_(n); x = np.zeros(n)
+    for dt, fc, g in ((0.0, 1900, 1.0), (0.028, 3100, 0.55)):
+        i = n_of(dt); m = n - i
+        x[i:] += g * filt(noise(m) * np.exp(-t_(m) / 0.0016), 'bp', fc, q=1.6)
+    x += np.sin(2 * np.pi * 230 * t) * np.exp(-t / 0.012) * env_attack(n, 0.0008) * 0.35
+    return st(filt(x, 'lp', 7500), 0.2), float(rng.uniform(-0.1, 0.1))
 
 
-def s_fizzle(c):
-    n = n_of(0.6); t = t_(n); u = np.clip(t / 0.45, 0, 1)
-    fc = 1800 * (350 / 1800) ** u
-    puff = sweep(to_stereo(noise(n)), 'bp', fc, q=1.0)[:, 0] * np.exp(-t / 0.14) * env_attack(n, 0.01)
-    f = 1100 * (0.5 ** u)
-    tone = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t / 0.1) * 0.25
-    return st((puff + tone) * 0.12, 0.5), 0.2
+def s_thud(c):
+    """impact / failure: soft felt thump on the chord root (low), no click"""
+    n = n_of(0.6); t = t_(n)
+    _, root, _ = harmony(c['t'])
+    f0 = mtof(36 + (root - 36) % 12)          # C2..B2
+    fr = f0 * (1 + 0.5 * np.exp(-t / 0.03))
+    ph = 2 * np.pi * np.cumsum(fr) / SR
+    y = (np.sin(ph) + 0.25 * np.sin(2 * ph)) * np.exp(-t / 0.13) * (1 - np.exp(-t / 0.004))
+    y += filt(noise(n) * np.exp(-t / 0.02), 'lp', 380, order=2) * 0.5
+    return st(filt(y, 'lp', 1400, order=2), 0.2), 0.0
 
 
-def s_alarm(c):
-    """08:00 alarm: two soft double-beeps (A5), rounded square tone, not shrill"""
-    dur = 1.1; n = n_of(dur); x = np.zeros(n)
-    beep_n = n_of(0.085)
-    tb = t_(beep_n)
-    tone = sum((1 / k) * np.sin(2 * np.pi * mtof(81) * k * tb) for k in (1, 3, 5))
-    tone = filt(tone, 'lp', 3000) * np.sin(np.pi * np.clip(tb / 0.085, 0, 1)) ** 0.6
-    for s in (0.0, 0.14, 0.48, 0.62):
-        i = n_of(s); x[i:i + beep_n] += tone[:len(x[i:i + beep_n])]
-    return st(x * 0.1, 0.3), 0.3
+def s_count(c):
+    """number rolling: a quiet run of soft ticks, quick then settling, stepping up the scale"""
+    dur = float(np.clip(float(c.get('dur', 1.0)), 0.2, 5.0))
+    n = n_of(dur + 0.25); x = np.zeros(n)
+    _, _, sc = harmony(c['t'])
+    ks = notes_in(sc, 81, 98) or [86]
+    # tick times: dense at the start, slowing down towards the end (like a counter easing out)
+    m = int(np.clip(dur * 14, 4, 50))
+    u = np.linspace(0, 1, m)
+    ts = dur * (1 - (1 - u) ** 1.8)
+    for j, tt in enumerate(ts):
+        i = n_of(tt); L = n_of(0.05)
+        if i + L > n: break
+        tl_ = t_(L)
+        k = ks[min(len(ks) - 1, j * len(ks) // m)]
+        tk = filt(noise(L) * np.exp(-tl_ / 0.0012), 'bp', 3200, q=1.5) * 0.6
+        tk += np.sin(2 * np.pi * mtof(k) * tl_) * np.exp(-tl_ / 0.012) * 0.25
+        x[i:i + L] += tk * (0.55 + 0.45 * (j == m - 1))
+    return st(filt(x, 'lp', 8000), 0.3), 0.2
 
 
-_win_count = [0]
+def s_chapter(c):
+    """chapter card: a slow airy breath (the page turns) and, very faintly, the new key's fifth high up.
+    Starts PRE['chapter'] s before the cue so the breath peaks just as the card lands."""
+    n = n_of(3.2); t = t_(n)
+    sw = np.clip(t / 0.8, 0, 1); fall = np.exp(-np.maximum(0, t - 0.8) / 0.55)
+    e = np.sin(0.5 * np.pi * sw) ** 2 * fall
+    air = np.stack([airband(n, 350, 2600), airband(n, 350, 2600)], 1) * e[:, None]
+    pcs, root, _ = harmony(c['t'] + 0.2)
+    k = nearest(pcs, 88 + ((root + 7) % 12 - 4))
+    if (k - root) % 12 not in (0, 7, 2): k = nearest([(root + 7) % 12], 88)
+    sh = np.zeros(n); i = n_of(PRE['chapter'] + 0.1)
+    sh[i:] = bell(mtof(k), (n - i) / SR, taus=(1.2, 0.5), parts=(1.0, 2.0), amps=(1.0, 0.15), attack=0.05) * 0.25
+    return air * 0.8 + st(sh, 0.9), None
 
 
-_win_prev = [0]
-
-
-def s_window(c):
-    """AI window(s) open: small pitched pops walking up the D pentatonic as windows multiply.
-    With `n` (total windows after this split) one pop per new window (max 6), spread over ~0.2 s."""
-    PEN = [74, 76, 78, 81, 83, 86, 88, 90, 93]
-    n_tot = int(c.get('n', _win_prev[0] + 1))
-    new = max(1, n_tot - _win_prev[0]); _win_prev[0] = n_tot
-    pops = min(new, 6)
-    dur = 0.3 + 0.2; n = n_of(dur); t = t_(n); x = np.zeros((n, 2))
-    for j in range(pops):
-        k = _win_count[0]; _win_count[0] += 1
-        m = PEN[min(k, len(PEN) - 1)] if pops == 1 else PEN[(k % 5) + 2]
-        d = n_of(0.2 * j / max(1, pops - 1)) if pops > 1 else 0
-        nn = n - d
-        y = bell(mtof(m), nn / SR, taus=(0.07, 0.03), parts=(1.0, 2.0), amps=(1.0, 0.2), attack=0.002)
-        y = y + filt(noise(nn) * np.exp(-t_(nn) / 0.015), 'bp', 5000, q=1.0) * 0.15
-        gl, gr = pan_gains(float(np.clip(rng.normal(0, 0.45), -0.7, 0.7)))
-        x[d:, 0] += y * gl / np.sqrt(pops); x[d:, 1] += y * gr / np.sqrt(pops)
-    return x * 0.09, 0.0
-
-
-def s_tick(c):
-    n = n_of(0.06); t = t_(n)
-    x = filt(noise(n) * np.exp(-t / 0.0015), 'bp', 3800, q=2.0) + dmp(1600, 0.06, 0.004) * 0.3
-    return st(x * 0.12, 0.2), 0.3
-
-
-def s_final(c):
-    """end card: a low, warm breath under the final chord"""
-    n = n_of(3.0); t = t_(n)
-    sub = np.sin(2 * np.pi * mtof(38) * t) * (1 - np.exp(-t / 0.08)) * np.exp(-t / 1.2)
-    air = filt(noise(n), 'bp', 900, q=0.6) * np.sin(np.pi * np.clip(t / 2.2, 0, 1)) ** 2 * 0.15
-    return st(filt((sub * 0.5 + air) * 0.12, 'lp', 2200, order=2), 0.7), 0.0
-
-
-def s_boot(c):
-    """power-on: sub swell rising into D2 with faint mains-like harmonics"""
-    dur = float(c.get('dur', 3.0)); n = n_of(dur + 1.0); t = t_(n)
-    f = 36.7 + (73.4 - 36.7) * (1 - np.exp(-t / 0.5))
-    ph = 2 * np.pi * np.cumsum(f) / SR
-    x = np.sin(ph) + 0.25 * np.sin(2 * ph) + 0.08 * np.sin(3 * ph)
-    e = (1 - np.exp(-t / 0.35)) * np.exp(-np.maximum(0, t - 0.6) / 0.9)
-    hum = filt(noise(n), 'bp', 220, q=3) * 0.2 * e
-    return st(filt((x * e + hum) * 0.2, 'lp', 900, order=2), 0.4), 0.0
+def s_beat(c):
+    """new picture: barely-there breath"""
+    n = n_of(0.5); t = t_(n)
+    e = np.sin(np.pi * np.clip(t / 0.45, 0, 1)) ** 2
+    x = airband(n, 900, 4200) * e
+    return st(x, 0.8), float(rng.uniform(-0.2, 0.2))
 
 
 def s_generic(c):
-    n = n_of(0.25)
-    return st(bell(mtof(81), 0.25, taus=(0.08,), parts=(1.0,), amps=(1.0,)) * 0.06, 0.3), 0.0
+    n = n_of(0.3)
+    pcs, _, _ = harmony(c['t'])
+    return st(bell(mtof(nearest(pcs, 81)), 0.3, taus=(0.08,), parts=(1.0,), amps=(1.0,)), 0.3), 0.0
 
 
-DESIGN = {'key': s_key, 'enter': s_enter, 'check': s_check, 'ping': s_ping, 'ping_dull': lambda c: s_ping(c, True),
-          'whoosh': s_whoosh, 'drop': s_drop, 'card': s_card, 'spark': s_spark, 'fizzle': s_fizzle,
-          'alarm': s_alarm, 'window': s_window, 'tick': s_tick, 'final': s_final, 'boot': s_boot}
+PRE = {'chapter': 0.6}          # seconds a sound starts before its cue (breaths that should peak on the cue)
+DESIGN = {'tick': s_tick, 'pop': s_pop, 'whoosh': s_whoosh, 'swish': s_swish, 'chime': s_chime, 'click': s_click,
+          'thud': s_thud, 'count': s_count, 'chapter': s_chapter, 'beat': s_beat}
+# peak level of each sound in sfx.wav (dBFS, dry). mix.py adds sfx at unity against a voice stem of ~-19 LUFS
+# (voice peaks ~-6 dBFS): everything sits 20-40 dB under the voice.
+TARGET = {'tick': -35, 'pop': -31, 'whoosh': -33, 'swish': -35, 'chime': -27, 'click': -33, 'thud': -28,
+          'count': -38, 'chapter': -31, 'beat': -45}
+SEND = {'tick': 0.15, 'pop': 0.25, 'whoosh': 0.25, 'swish': 0.2, 'chime': 0.55, 'click': 0.12, 'thud': 0.2,
+        'count': 0.15, 'chapter': 0.5, 'beat': 0.3}
 
 # ----------------------------------------------------------------------------- render
-out = buf(D + 4)
-room = make_ir(0.7, bright=0.5, seed=99)
-wet = buf(D + 4)
-SEND = {'ping': 0.35, 'ping_dull': 0.25, 'check': 0.25, 'drop': 0.3, 'spark': 0.5, 'window': 0.3, 'alarm': 0.2,
-        'final': 0.5, 'card': 0.2, 'key': 0.08, 'enter': 0.1, 'whoosh': 0.2, 'fizzle': 0.3, 'tick': 0.1}
-# peak level of each sound in sfx.wav (dBFS). mix.py adds sfx at unity against voice at ~-19 LUFS.
-TARGET = {'key': -31, 'enter': -26, 'check': -25, 'ping': -23, 'ping_dull': -24, 'whoosh': -26, 'drop': -24,
-          'card': -29, 'spark': -30, 'fizzle': -31, 'alarm': -22, 'window': -29, 'tick': -33, 'final': -26,
-          'boot': -17}
-cues = sorted(tl.cues, key=lambda c: c['t'])
-counts = {}
-peaks = {}
-# density compensation for clustered cues of the same type (e.g. 20 windows at once)
+out = np.zeros((n_of(D) + n_of(4), 2))
+wet = np.zeros_like(out)
+room = make_ir(1.1, bright=0.4, seed=99, width=0.9)
+cues = sorted([c for c in tl.cues if 0 <= float(c.get('t', -1)) < D], key=lambda c: float(c['t']))
+counts, peaks, skipped = {}, {}, {}
 times_by_type = {}
 for c in cues: times_by_type.setdefault(c['type'], []).append(float(c['t']))
+all_t = [(float(c['t']), c['type']) for c in cues]
+placed = []
 for c in cues:
     typ = c['type']; t = float(c['t'])
-    fn = DESIGN.get(typ, s_generic)
-    x, pan = fn(c)
-    x = fade(x, 0.0005, 0.01)
-    x = x * (10 ** (TARGET.get(typ, -30) / 20) / max(np.abs(x).max(), 1e-9))     # calibrated peak level
-    v = float(c.get('v', 1.0))
-    g = (0.28 + 0.72 * v) if typ == 'ping_dull' else v
-    if typ == 'key': g *= 10 ** (rng.uniform(-3, 1.5) / 20)
-    if typ in ('window', 'card', 'tick'):
-        near = sum(1 for u in times_by_type[typ] if abs(u - t) < 0.25)
-        g /= np.sqrt(max(1, near))
+    if typ == 'beat':
+        # the runtime emits a beat on every new picture; stay silent when something else already speaks there,
+        # right after a chapter card, or when the voice is running over the cut
+        busy = any(abs(u - t) < 0.25 and ty != 'beat' for u, ty in all_t) or \
+            any(ty == 'chapter' and 0 <= t - u < 4.0 for u, ty in all_t) or tl.voiced(t, 0.1)
+        if busy: skipped[typ] = skipped.get(typ, 0) + 1; continue
+    if any(p[1] == typ and abs(p[0] - t) < 0.03 for p in placed[-8:]):      # exact duplicates
+        skipped[typ] = skipped.get(typ, 0) + 1; continue
+    x, pan = DESIGN.get(typ, s_generic)(dict(c, t=t))
+    x = fade(x, 0.0005, 0.02)
+    x = x * (10 ** (TARGET.get(typ, -34) / 20) / max(np.abs(x).max(), 1e-9))
+    g = float(c.get('v', 1.0))
+    near = sum(1 for u in times_by_type[typ] if abs(u - t) < 0.3)             # clusters stay soft
+    g /= np.sqrt(max(1, near))
+    if typ not in ('chapter', 'beat', 'chime') and tl.voiced(t): g *= 10 ** (-2 / 20)
     p = 0.0 if pan is None else pan
-    place(out, t, x, g, p)
-    place(wet, t, x, g * SEND.get(typ, 0.2), p)
+    t0 = max(0.0, t - PRE.get(typ, 0.0))
+    place(out, t0, x, g, p)
+    place(wet, t0, x, g * SEND.get(typ, 0.2), p)
+    placed.append((t, typ))
     counts[typ] = counts.get(typ, 0) + 1
-    pk = db(np.abs(x).max() * g)
-    peaks[typ] = max(peaks.get(typ, -200), pk)
+    peaks[typ] = max(peaks.get(typ, -200), db(np.abs(x).max() * g))
 out = out + convolve(wet, room)
 out = out[:n_of(D)]
-out = filt(out, 'hp', 35, order=2)
-if np.abs(out).max() > 0.7:
-    out *= 0.7 / np.abs(out).max()
+out = filt(out, 'hp', 40, order=2)
+if np.abs(out).max() > 0.5:
+    out *= 0.5 / np.abs(out).max()
 write(f'{OUT}/sfx.wav', out)
-print('cues:', len(cues), counts)
+print('cues:', len(cues), 'placed', counts, 'skipped', skipped)
 print('peak dBFS per type (dry):', {k: round(v, 1) for k, v in peaks.items()})
 unknown = sorted(set(counts) - set(DESIGN))
 if unknown: print('  (generic blip used for unknown types:', unknown, ')')

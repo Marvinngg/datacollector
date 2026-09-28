@@ -326,6 +326,16 @@ def true_peak_db(x, os_=4):
     return db(np.abs(y).max())
 
 
+def coarse_spec(m, nperseg=4096, max_cols=1600, n_rows=320, fmax=16000):
+    """memory-light spectrogram for long plots: no overlap, time-pooled to <= max_cols, log-spaced rows (dB)"""
+    f, t, S = signal.spectrogram(m.astype(np.float32), SR, nperseg=nperseg, noverlap=0)
+    pool = max(1, int(np.ceil(len(t) / max_cols)))
+    nc = len(t) // pool
+    S = S[:, :nc * pool].reshape(len(f), nc, pool).mean(2); t = t[:nc * pool].reshape(nc, pool).mean(1)
+    rows = np.unique(np.clip(np.round(np.geomspace(3, np.searchsorted(f, fmax), n_rows)).astype(int), 0, len(f) - 1))
+    return t, f[rows], 10 * np.log10(S[rows] + 1e-14)
+
+
 def plot_tracks(tracks, tl, path, title=''):
     """tracks: [(name, stereo array)] -> PNG with RMS envelope (dB) + spectrogram per track and scene/line marks"""
     import matplotlib
@@ -346,8 +356,8 @@ def plot_tracks(tracks, tl, path, title=''):
         ax.plot(tt, 20 * np.log10(rms), lw=0.8, color='C0', label='rms')
         ax.set_ylim(-80, 0); ax.set_ylabel(name + ' dB'); ax.grid(alpha=0.3)
         ax = axes[2 * i + 1]
-        f, t, S = signal.spectrogram(m, SR, nperseg=4096, noverlap=3072)
-        ax.pcolormesh(t, f, 10 * np.log10(S + 1e-14), shading='auto', vmin=-130, vmax=-40, cmap='magma')
+        t, f, S = coarse_spec(m)
+        ax.pcolormesh(t, f, S, shading='auto', vmin=-130, vmax=-40, cmap='magma')
         ax.set_yscale('symlog', linthresh=200); ax.set_ylim(30, 16000); ax.set_ylabel(name + ' Hz')
     for ax in axes:
         for c in tl.chapters:
