@@ -58,3 +58,17 @@ node pipeline/render.mjs cues                     # 导出 cue
 ```
 时间点在 `build/timeline.json` 的 `beats[].start/end` 和 `lines`。用 Read 工具看 PNG，至少迭代 3 轮。
 **试片优先**：第 3 章（c3，约 115–205 秒）先做好，总导演会先出这一章的试片给用户看。
+
+---
+
+# v2：无旁白模式（silent）补充说明
+
+用户决定：**去掉旁白和字幕**。画面上的文字就是内容，由音乐带节奏。参考老板的片子：一屏一句话，关键句之后静止几秒，用**模拟**让人"看见机制在发生"，并加入**问答对加停顿**，让观众先凭直觉选、再看模拟揭晓，走完"进入情境 → 做选择 → 犯错 → 修正"。
+
+- 脚本：`script/v2.json`；时间轴：`python3 pipeline/gen_timeline.py` 按阅读时间生成 `build/timeline.json`（`mode: "silent"`）。
+- 每个 beat 的 `lines` 现在是**屏幕文字**（一句一屏），不再是配音。时长 = 阅读时间（约每秒 4.2 字）；标了 pause 的关键句会额外静止约 3.5 秒。原来模板里 `at` = 第几句的约定不变。
+- **下方主文字（caption）由运行时统一绘制**，位置在 y≈900–1000（原来的字幕区），字号 42，逐字浮现。所以模板仍然把内容放在安全区 150–880 内，**不要在模板里重复这句话**（同一句话不要出现两次）。以下类型不显示 caption，文字由模板自己画：`line remember question breath endcard title knowledge_tree`。
+- 问答 beat 有 `api.phases = {read:[a,b], pause:[a,b], reveal:[a,b]}`（本 beat 内秒数）。
+- `api.silent === true` 表示无旁白模式。
+- 眼睛友好：用户看老板的片子会眼压大。所以运动要**慢**、字要**大**、同时移动的东西要**少**；模拟可以丰富，但节奏要从容，数字计数器要大而清楚。
+- 新增 cue 类型：`question`（出题）、`countdown`（停顿开始）、`reveal`（揭晓）、`tally`（计数结果）。

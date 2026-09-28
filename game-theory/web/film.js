@@ -14,11 +14,12 @@
   // A chain = consecutive beats sharing one visual (beat B has visual.ref = A). Steps of the whole chain are
   // visible to every beat in it, so later beats see earlier steps as already completed (negative local times).
   function makeApi(beat) {
+    // (api.silent is set from the timeline mode once it has loaded)
     const chain = CHAINS[beat.visual.ref || beat.id];
     const t0 = beat.start;
     const steps = chain.steps.map(s => ({ ...s, lt: s.t - t0 }));
     const api = {
-      beat, dur: beat.end - beat.start, layout: LAYOUT, steps,
+      beat, dur: beat.end - beat.start, layout: LAYOUT, steps, phases: beat.visual.phases || null, silent: TL.mode === 'silent',
       chainStart: chain.start - t0,                 // local time the chain's first beat began (<= 0)
       chainEnd: chain.end - t0,
       line(k) { const l = beat.lines[k]; return l ? { start: l.start - t0, end: l.start + l.dur - t0, dur: l.dur } : null; },
@@ -137,6 +138,42 @@
     ctx.restore();
   }
 
+  // ---------- captions (silent mode): the sentence under a visual is the content, not a subtitle ----------
+  // One sentence at a time, revealed softly character by character, held until the next one.
+  function captions(t) {
+    for (const b of TL.beats) {
+      if (!b.visual.caption || t < b.start || t >= b.end) continue;
+      const beatA = Math.min(b._joinPrev ? 1 : ease.out(prog(t, b.start, b.start + FADE)), b._joinNext ? 1 : 1 - ease.in(prog(t, b.end - FADE, b.end)));
+      b.lines.forEach((l, i) => {
+        const next = b.lines[i + 1];
+        const end = next ? next.start : b.end;
+        if (t < l.start || t >= end + 0.4) return;
+        const out = next ? 1 - ease.in(prog(t, end - 0.35, end)) : 1;
+        const str = l.text.replace(/[。]$/, '');
+        const size = 42, o = { size, family: F.sans, weight: 400, spacing: 2 };
+        // wrap at a punctuation mark near the middle if too wide
+        let rows = [str];
+        if (measure(str, o) > 1560) {
+          const mid = str.length / 2; let cut = -1, best = 1e9;
+          for (let k = 0; k < str.length; k++) if ('，；：、。？'.includes(str[k]) && Math.abs(k - mid) < best) { best = Math.abs(k - mid); cut = k + 1; }
+          if (cut < 0) cut = Math.round(mid);
+          rows = [str.slice(0, cut), str.slice(cut)];
+        }
+        const chars = [...rows.join('')].length, reveal = Math.min(1.4, 0.35 + chars * 0.035);
+        let shown = 0;
+        rows.forEach((r, k) => {
+          const y = H - 110 - (rows.length - 1 - k) * 60, w = measure(r, o);
+          let x = W / 2 - w / 2;
+          for (const ch of r) {
+            const a = ease.out(prog(t, l.start + reveal * shown / chars, l.start + reveal * shown / chars + 0.5));
+            text(ch, x, y, { ...o, color: P.ink, alpha: a * out * beatA });
+            x += measure(ch, o); shown++;
+          }
+        });
+      });
+    }
+  }
+
   function missing(type) {
     text(`[template “${type}” not written yet]`, W / 2, H / 2, { size: 32, family: F.mono, color: P.dim, align: 'center' });
   }
@@ -146,8 +183,8 @@
     const lt = t - beat.start, api = makeApi(beat), V = beat.visual;
     const chain = CHAINS[V.ref || beat.id];
     // fade only at the chain's outer edges; inside a chain the visual continues without a flash
-    const fin = beat.start <= chain.start + 1e-6 ? ease.out(prog(t, beat.start, beat.start + FADE)) : 1;
-    const fout = beat.end >= chain.end - 1e-6 ? 1 - ease.in(prog(t, beat.end - FADE, beat.end)) : 1;
+    const fin = beat._joinPrev ? 1 : ease.out(prog(t, beat.start, beat.start + FADE));
+    const fout = beat._joinNext ? 1 : 1 - ease.in(prog(t, beat.end - FADE, beat.end));
     const a = Math.min(fin, fout); if (a <= 0) return;
     ctx.save(); ctx.globalAlpha = a;
     const def = T.templates[V.type];
@@ -163,7 +200,7 @@
     let ending = false;
     for (const b of TL.beats) if (t >= b.start && t < b.end) { drawBeat(b, t); if (b.visual.type === 'endcard') ending = true; }
     if (!ending) progressBar(t);
-    subtitles(t);
+    if (TL.mode === 'silent') captions(t); else subtitles(t);
     post(t);
     const fe = prog(t, TL.duration - 1.2, TL.duration - 0.2);   // the film always ends on pure black
     if (fe > 0) { ctx.globalAlpha = ease.in(fe); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
@@ -179,7 +216,7 @@
       if (def && def.cues) for (const c of def.cues(b.visual, api)) if (c.t >= 0 && c.t < api.dur) out.push({ ...c, t: +(b.start + c.t).toFixed(3), beat: b.id });
     }
     for (const c of TL.chapters) if (c.card) out.push({ t: c.card[0], type: 'chapter', chapter: c.id });
-    for (const b of TL.beats) { const ch = CHAINS[b.visual.ref || b.id]; if (b.start <= ch.start + 1e-6) out.push({ t: b.start, type: 'beat', beat: b.id }); }
+    for (const b of TL.beats) if (!b._joinPrev) out.push({ t: b.start, type: 'beat', beat: b.id, visual: b.visual.type });
     return out.sort((a, b) => a.t - b.t);
   }
 
@@ -192,6 +229,11 @@
       for (const s of b.visual.steps || []) ch.steps.push({ ...s, owner: b.id });
     }
     for (const ch of Object.values(CHAINS)) ch.steps.sort((a, b) => a.t - b.t);
+    TL.beats.forEach((b, i) => {   // neighbours in time that show the same visual continue it without a fade
+      const key = x => x && (x.visual.ref || x.id);
+      b._joinPrev = i > 0 && key(TL.beats[i - 1]) === key(b);
+      b._joinNext = i < TL.beats.length - 1 && key(TL.beats[i + 1]) === key(b);
+    });
     T.TL = TL;
   })();
   window.T = T; window.E = { ready: T.ready };
