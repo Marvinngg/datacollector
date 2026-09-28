@@ -38,7 +38,7 @@
       },
     };
   }
-  const fin = (lt, a, d = 0.6) => ease.out(prog(lt, a, a + d));
+  const fin = (lt, a, d = 0.6) => isFinite(a) ? ease.out(prog(lt, a, a + d)) : (a < 0 ? 1 : 0);
   const fio = (lt, a, b, d = 0.5) => isFinite(b) ? Math.min(fin(lt, a, d), 1 - ease.in(prog(lt, b - d, b))) : fin(lt, a, d);
   function A(ctx, a, fn) { if (a <= 0.001) return; ctx.save(); ctx.globalAlpha *= a; fn(); ctx.restore(); }
   const rise = (a, px = 18) => (1 - a) * px;
@@ -206,7 +206,7 @@
 
       // ---- teal's options, once gold can no longer steer ----
       const gS = posG(tS), tSp = posT(tS);
-      const optA = sil ? fin(lt, tS + 0.3, 0.8) * lerp(1, 0.6, prog(lt, tDodge + dRun - 0.8, tDodge + dRun + 0.4)) : fio(lt, tS + 0.05, tDodge + 1.7, 0.45);
+      const optA = sil ? fin(lt, tS + 0.3, 0.8) * lerp(1, 0.45, prog(lt, tDodge + dRun - 0.8, tDodge + dRun + 0.4)) : fio(lt, tS + 0.05, tDodge + 1.7, 0.45);
       if (optA > 0) A(ctx, optA, () => {
         // straight on: crash
         ctx.strokeStyle = P.red; ctx.lineWidth = 3; ctx.setLineDash([12, 10]);
@@ -255,7 +255,7 @@
         let x, y, r, rot = 0, a = 1;
         const gF = posG(tFly);
         const p0 = { x: gF.x + 12, y: roadY - 14 - 78 };
-        const p2 = { x: gF.x - 250, y: roadY + RH + 95 }, p1 = { x: gF.x - 40, y: roadY - 300 };
+        const p2 = { x: Math.max(230, gF.x - 250), y: roadY + RH + 95 }, p1 = { x: gF.x - 40, y: roadY - 300 };
         const bez = k => ({ x: (1 - k) * (1 - k) * p0.x + 2 * k * (1 - k) * p1.x + k * k * p2.x, y: (1 - k) * (1 - k) * p0.y + 2 * k * (1 - k) * p1.y + k * k * p2.y });
         if (lt < tFly) {
           const g = posG(lt);
@@ -348,6 +348,17 @@
   T.register('adverse', {
     timing(V, api) {
       const Cr = S(api, 'crowd', 0.3), Pr = S(api, 'price', api.dur * 0.4), Lv = S(api, 'leave', api.dur * 0.7);
+      if (api.silent) {
+        // round after round: a batch of healthy people leaves, the price goes up again
+        const nb = V.rounds || 3, go0 = Lv.t + 0.4;
+        const L2 = api.line(2) ? api.line(2).start : Math.max(go0 + 5, api.dur * 0.5);
+        const gap = Math.max(1.6, (L2 - 1.9 - go0) / Math.max(1, nb - 1));
+        const tGoB = b => go0 + b * gap;
+        return {
+          silent: true, nb, tGoB, tUp: j => tGoB(j - 1) + 2.0, L2,
+          tC: Cr.t, tQ: Cr.t + 0.8, tTag: Pr.t, tCheap: Lv.t + 2.4, tGather: L2 + 0.4, tL: L2, tConc: Infinity,
+        };
+      }
       return {
         tC: Cr.t, tQ: Cr.at('比保险公司', 0.55, 4), tP: Pr.t, tTag: Pr.at('中间价', 0.2, 1.2),
         tExp: Pr.at('觉得贵', 0.32, 2.2), tGo: Pr.at('走了', 0.45, 3), tCheap: Pr.at('划算', 0.7, 4.5), tCome: Pr.at('都来了', 0.82, 5.5),
@@ -369,7 +380,17 @@
       const tagA = fin(lt, tm.tTag, 0.5);
       const sw = Math.sin((lt - tm.tTag) * 7) * 0.12 * Math.exp(-Math.max(0, lt - tm.tTag) * 2.6);
       A(ctx, tagA, () => { ctx.strokeStyle = 'rgba(233,228,216,0.5)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bx, btop - 4); ctx.lineTo(bx, btop - 32); ctx.stroke(); });
-      priceTag(ctx, bx, btop - 70, V.price || '中间价', tagA, sw);
+      if (!tm.silent) priceTag(ctx, bx, btop - 70, V.price || '中间价', tagA, sw);
+      else {
+        const labs = V.prices || [V.price || '中间价', '价格 ↑', '价格 ↑↑', '价格 ↑↑↑'];
+        let lev = 0; for (let j = 1; j <= tm.nb && j < labs.length; j++) if (lt >= tm.tUp(j)) lev = j;
+        const f = lev > 0 ? ease.inOut(prog(lt, tm.tUp(lev), tm.tUp(lev) + 0.5)) : 1;
+        if (lev > 0 && f < 1) priceTag(ctx, bx, btop - 70, labs[lev - 1], tagA * (1 - f), 0);
+        const pop = lev > 0 ? 1 + 0.08 * Math.sin(Math.PI * prog(lt, tm.tUp(lev), tm.tUp(lev) + 0.6)) : 1;
+        ctx.save(); ctx.translate(bx, btop - 70); ctx.scale(pop, pop); ctx.translate(-bx, -(btop - 70));
+        priceTag(ctx, bx, btop - 70, labs[lev], tagA * f, lev === 0 ? sw : 0);
+        ctx.restore();
+      }
 
       // people
       const walk = (p, t0, dur, x1, y1) => {
@@ -381,7 +402,13 @@
       for (const p of L.ppl) {
         const a0 = fin(lt, tm.tC + 0.25 + p.i * 0.05, 0.5);
         let q = { x: p.x, y: p.y }, a = a0;
-        if (!p.bad) {
+        if (tm.silent) {
+          if (!p.bad) {
+            const b = Math.floor(p.rank * tm.nb / L.good.length), t0 = tm.tGoB(b) + (p.rank % 4) * 0.15;
+            q = walk(p, t0, 2.6, p.x - 380, p.y + 6);
+            a = a0 * (1 - ease.inOut(prog(lt, t0 + 0.8, t0 + 2.6)));
+          } else q = walk(p, tm.tGather + p.rank * 0.25, 3.4, p.tx, p.ty);
+        } else if (!p.bad) {
           const t0 = tm.tGo + p.rank * 0.12;
           q = walk(p, t0, 2.4, -80, p.y + 10);
         } else {
@@ -390,14 +417,19 @@
         person(ctx, q.x, q.y + rise(a0, 10), 1.05, p.bad ? P.red : P.ok, a);
         // speech: a few of each group
         const say = !p.bad ? (p.rank % 3 === 1 ? (V.goodSay || '太贵') : null) : (p.rank % 3 === 0 ? (V.badSay || '划算') : null);
-        if (say) {
+        if (say && tm.silent) {
+          const b = Math.floor(p.rank * tm.nb / L.good.length);
+          const sa = p.bad ? fio(lt, tm.tCheap + (p.rank % 4) * 0.2, tm.tGather + 0.2, 0.4) : fio(lt, tm.tGoB(b) - 0.8, tm.tGoB(b) + 1.2, 0.4);
+          A(ctx, sa * a, () => text(say, q.x, q.y - 64, { size: 28, weight: 500, color: p.bad ? P.red : P.ok, align: 'center' }));
+        } else if (say) {
           const ts = p.bad ? tm.tCheap : tm.tExp;
           const sa = fio(lt, ts + (p.rank % 4) * 0.08, p.bad ? tm.tL + 0.3 : tm.tGo + p.rank * 0.12 + 1.4, 0.35);
           A(ctx, sa, () => text(say, q.x, q.y - 64, { size: 28, weight: 500, color: p.bad ? P.red : P.ok, align: 'center' }));
         }
       }
 
-      // result
+      // result (in silent mode the caption says it)
+      if (tm.silent) return;
       const la = fin(lt, tm.tL + 0.3, 0.7);
       A(ctx, la, () => text(V.left || '只剩高风险客户', 560, 600 + rise(la, 10), { size: 46, weight: 500, color: P.red, align: 'center' }));
       const ca = fin(lt, tm.tConc, 0.8);
@@ -406,6 +438,11 @@
     cues(V, api) {
       const t = this.timing(V, api), out = [];
       cue(out, t.tC + 0.3, 'tick'); cue(out, t.tTag, 'pop');
+      if (t.silent) {
+        for (let b = 0; b < t.nb; b++) { cue(out, t.tGoB(b), 'whoosh', { dur: 2.6 }); cue(out, t.tUp(b + 1), 'pop'); }
+        cue(out, t.tGather, 'whoosh', { dur: 3.4 });
+        return out;
+      }
       cue(out, t.tGo, 'whoosh', { dur: 2.6 }); cue(out, t.tCome - 0.4, 'whoosh', { dur: 1.8 }); cue(out, t.tConc, 'chime');
       return out;
     },
@@ -415,7 +452,12 @@
   T.register('insurance', {
     timing(V, api) {
       const Pl = S(api, 'plans', api.dur * 0.28), So = S(api, 'sort', api.dur * 0.64);
+      if (api.silent) {
+        const tA = Pl.t + 0.4, L2 = api.line(2) ? api.line(2).start : So.t + 4.5;
+        return { silent: true, tMenu: Infinity, tA, tB: tA + 1.6, tS: So.t, tGoA: So.t + 0.5, tSb: So.t + 2.6, walk: 2.4, stag: 0.2, tDone: L2 + 0.3, tConc: Infinity };
+      }
       return {
+        walk: 1.7, stag: 0.13, tDone: -Infinity,
         tMenu: ph(api, 0, '菜单', 0.6) ?? 1, tA: Pl.t + 0.1, tB: Pl.at('或者', 0.6, 3.5),
         tS: So.t, tSb: So.at('马路杀手', 0.24, 1.5), tConc: So.at('你什么', 0.5, 3.2),
       };
@@ -424,22 +466,22 @@
       const tm = this.timing(V, api);
       const plans = V.plans || [{ name: '方案 A', price: '2000 元/年', terms: '出事先自付 2 万' }, { name: '方案 B', price: '5000 元/年', terms: '出事全赔' }];
       const types = V.types || [{ label: '老司机', color: P.ok, plan: 0 }, { label: '马路杀手', color: P.red, plan: 1 }];
-      titleL(V.title || '筛选：设计一份菜单，让对方自己选', lt, 0.2);
-      A(ctx, fin(lt, 0.9), () => legend(ctx, types.map(t => [t.label, t.color]), 162, 282, { person: true, size: 30 }));
+      if (!tm.silent) titleL(V.title || '筛选：设计一份菜单，让对方自己选', lt, 0.2);
+      A(ctx, fin(lt, tm.silent ? 0.3 : 0.9), () => legend(ctx, types.map(t => [t.label, t.color]), 162, tm.silent ? 240 : 282, { person: true, size: 30 }));
 
       const cw = 540, ch = 240, cy = 330, xs = [960 - 30 - cw, 960 + 30];
       const tIn = [tm.tA, tm.tB];
       const pattern = V.pattern || [0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1];
       const n = pattern.length;
       // drivers: first arrive time per plan (for card highlight)
-      const tGo = [tm.tS + 0.15, tm.tSb];
-      const WALK = 1.7;
+      const tGo = [tm.silent ? tm.tGoA : tm.tS + 0.15, tm.tSb];
+      const WALK = tm.walk;
       for (let j = 0; j < plans.length && j < 2; j++) {
         const x = xs[j], pl = plans[j], a = fin(lt, tIn[j], 0.7), ph0 = fio(lt, tm.tMenu, tIn[j] + 0.3, 0.6);
         // placeholder (the empty menu)
         A(ctx, ph0 * (1 - a), () => { card(ctx, x, cy, cw, ch, { dash: [10, 10], fill: 'rgba(16,21,30,0.4)' }); text('?', x + cw / 2, cy + ch / 2 + 22, { size: 64, family: F.mono, color: P.dim, align: 'center' }); });
         const typ = types.find(t => t.plan === j);
-        const hl = typ ? fin(lt, tGo[j] + WALK * 0.8, 0.6) : 0;
+        const hl = typ ? fin(lt, Math.max(tGo[j] + WALK * 0.8, tm.tDone), 0.6) : 0;
         A(ctx, a, () => {
           const yy = cy + rise(a, 20);
           card(ctx, x, yy, cw, ch, { stroke: hl > 0 ? typ.color : undefined, lw: 2 + 1.5 * hl });
@@ -459,7 +501,7 @@
         const x0 = lerp(rx0, rx1, i / (n - 1));
         const cnt = pattern.filter(v => v === ty).length;
         const tx = xs[pj] + cw / 2 + (r - (cnt - 1) / 2) * 80, tyY = 690;
-        const t0 = tGo[pj] + r * 0.13, k = prog(lt, t0, t0 + WALK), e = ease.inOut(k);
+        const t0 = tGo[pj] + r * tm.stag, k = prog(lt, t0, t0 + WALK), e = ease.inOut(k);
         const x = lerp(x0, tx, e), y = lerp(rowY, tyY, e) - Math.abs(Math.sin(k * WALK * 7)) * 6 * (k > 0 && k < 1);
         const a = fin(lt, tRow + i * 0.06, 0.5);
         person(ctx, x, y + rise(a, 10), 1.05, typ.color, a);
@@ -467,7 +509,7 @@
       // group labels under each cluster
       for (let j = 0; j < 2; j++) {
         const typ = types.find(t => t.plan === j); if (!typ) continue;
-        const a = fin(lt, tGo[j] + WALK * 0.9, 0.6);
+        const a = fin(lt, Math.max(tGo[j] + WALK * 0.9, tm.tDone), 0.6);
         A(ctx, a, () => text(typ.label, xs[j] + cw / 2, 752, { size: 32, weight: 500, color: typ.color, align: 'center' }));
       }
       const ca = fin(lt, tm.tConc, 0.8);
@@ -476,7 +518,8 @@
     cues(V, api) {
       const t = this.timing(V, api), out = [];
       cue(out, t.tMenu, 'tick'); cue(out, t.tA, 'pop'); cue(out, t.tB, 'pop');
-      cue(out, t.tS + 0.15, 'whoosh', { dur: 1.8 }); cue(out, t.tSb, 'whoosh', { dur: 1.8 }); cue(out, t.tConc, 'chime');
+      cue(out, t.silent ? t.tGoA : t.tS + 0.15, 'whoosh', { dur: t.walk + 1 }); cue(out, t.tSb, 'whoosh', { dur: t.walk + 1 }); cue(out, t.tConc, 'chime');
+      if (t.silent) cue(out, t.tDone, 'chime');
       return out;
     },
   });
@@ -520,7 +563,16 @@
   T.register('shops', {
     timing(V, api) {
       const O = S(api, 'oneshot', api.dur * 0.2), R = S(api, 'repeated', api.dur * 0.58);
+      if (api.silent) {
+        const hop = 0.6, tMap = R.t + 1.8;
+        return {
+          silent: true, hop, tTitle: Infinity, tRep: Infinity,
+          tO: O.t, tTags: O.t + 0.9, tOnce: O.t + 2.0, tOLab: O.t + 3.2,
+          tR: R.t, tSame: R.t + 0.9, tMap, tRLab: R.t + 2.0, tFame: tMap + 0.3 + hop * 6 + 0.5,
+        };
+      }
       return {
+        hop: 0.42,
         tTitle: 0.2, tRep: ph(api, 0, '靠重复', 0.7) ?? 1.5,
         tO: O.t, tTags: O.at('又贵', 0.23, 1.4), tOnce: O.at('一辈子', 0.55, 3.2), tOLab: O.at('一次性', 0.8, 5),
         tR: R.t, tSame: R.at('价格', 0.25, 1.6), tMap: R.at('价格', 0.25, 1.6) + 1.0, tRLab: R.at('重复博弈', 0.68, 4.6), tFame: R.at('名声', 0.84, 5.6),
@@ -531,14 +583,14 @@
       const O = V.oneshot || {}, R = V.repeated || {};
       // title
       const ta = fin(lt, tm.tTitle, 0.7), tb = fin(lt, tm.tRep, 0.6);
-      A(ctx, ta, () => {
+      if (!tm.silent) A(ctx, ta, () => {
         const t1 = V.title || '囚徒困境怎么破？', t2 = V.answer || '  靠重复';
         const w1 = measure(t1, { size: 52, family: F.serif, weight: 600 }), w2 = measure(t2, { size: 52, family: F.serif, weight: 600 });
         const x = 960 - (w1 + w2 * tb) / 2;
         text(t1, x, 212 + rise(ta, 10), { size: 52, family: F.serif, weight: 600, color: P.ink });
         text(t2, x + w1, 212, { size: 52, family: F.serif, weight: 600, color: P.ember, alpha: tb });
       });
-      const cy = 268, ch = 540, cw = 760, xl = 960 - 20 - cw, xr = 960 + 20;
+      const cy = tm.silent ? 245 : 268, ch = 540, cw = 760, xl = 960 - 20 - cw, xr = 960 + 20;
       const focusR = fin(lt, tm.tR, 0.8);
       // ---- left: one-shot ----
       const la = fin(lt, tm.tO, 0.7);
@@ -553,7 +605,7 @@
         A(ctx, oa, () => {
           person(ctx, xl + 110, y + 390, 1.7, P.gold);
           text(O.visits || '×1', xl + 190, y + 385, { size: 110, family: F.mono, weight: 700, color: P.ink });
-          text(O.visitNote || '游客一辈子只来一次', xl + 190, y + 440, { size: 32, color: P.dim });
+          if (!tm.silent || O.visitNote) text(O.visitNote || '游客一辈子只来一次', xl + 190, y + 440, { size: 32, color: P.dim });
         });
         const fa = fin(lt, tm.tOLab, 0.6);
         A(ctx, fa, () => { ctx.fillStyle = 'rgba(233,228,216,0.12)'; ctx.fillRect(xl + 44, y + 472, cw - 88, 2); text(O.label || '一次性博弈', xl + 44, y + 522, { size: 42, weight: 700, color: P.red }); });
@@ -565,12 +617,12 @@
         card(ctx, xr, y, cw, ch);
         shopIcon(ctx, xr + 44, y + 128, 'chain', 1);
         text(R.name || '连锁快餐店', xr + 186, y + 104, { size: 48, weight: 700, color: P.ink });
-        pill(ctx, R.desc || '价格、口味和外面一样', xr + 44, y + 196, P.ok, { size: 36, alpha: fin(lt, tm.tSame, 0.5) });
+        pill(ctx, R.desc || (tm.silent ? '价格 · 口味 = 外面' : '价格、口味和外面一样'), xr + 44, y + 196, P.ok, { size: 36, alpha: fin(lt, tm.tSame, 0.5) });
         // map: the same customer keeps meeting the same chain in city after city
         const ma = fin(lt, tm.tMap, 0.6);
         const mcx = xr + 270, mcy = y + 355, cities = V.cities || [[-170, -30], [-95, 50], [-20, -55], [40, 30], [110, -40], [165, 45], [205, -15]];
         mapBlob(ctx, mcx, mcy, 240, 108, 3.1, ma);
-        const hop = 0.42, n = cities.length;
+        const hop = tm.hop, n = cities.length;
         const kk = (lt - tm.tMap - 0.3) / hop;           // hops done
         A(ctx, ma, () => {
           ctx.strokeStyle = 'rgba(216,178,92,0.55)'; ctx.lineWidth = 2.5; ctx.setLineDash([6, 8]);
@@ -606,7 +658,7 @@
     cues(V, api) {
       const t = this.timing(V, api), out = [];
       cue(out, t.tO, 'tick'); cue(out, t.tTags, 'pop'); cue(out, t.tOnce, 'pop');
-      cue(out, t.tR, 'tick'); cue(out, t.tMap + 0.3, 'count', { dur: 0.42 * 6 }); cue(out, t.tFame, 'chime');
+      cue(out, t.tR, 'tick'); cue(out, t.tMap + 0.3, 'count', { dur: t.hop * 6 }); cue(out, t.tFame, 'chime');
       return out;
     },
   });
@@ -619,7 +671,15 @@
       const tNote = ni >= 0 ? api.steps[ni].lt : api.dur * 0.78;
       const tLast = B.at('最后一轮', 0.32, 2.5), t2nd = B.at('倒数第二', 0.48, 4);
       const cs = t2nd + 1.1, ce = Math.max(cs + 1.6, B.end - 0.7);
+      if (api.silent) {
+        const c0 = B.t + 4.0, c1 = Math.max(c0 + 1.8, Km.t - 1.0);
+        return {
+          silent: true, wave: 2.6, tB: B.t, tLast: B.t + 1.6, t2nd: B.t + 3.0, cs: c0, ce: c1, tMath: c1 + 0.2,
+          tK: Km.t, tOne: Km.t + 1.8, tWave: Km.t + 3.5, tNote, note: ni >= 0 ? api.steps[ni].note : null,
+        };
+      }
       return {
+        wave: 1.9,
         tB: B.t, tLast, t2nd, cs, ce, tMath: ce + 0.15,
         tK: Km.t, tOne: Km.at('只要', 0.42, 4), tWave: Km.at('合作就能', 0.7, 6.5) - 0.2, tNote, note: ni >= 0 ? api.steps[ni].note : null,
       };
@@ -633,7 +693,7 @@
         if (m === 1) return tm.tLast; if (m === 2) return tm.t2nd;
         return tm.cs + (tm.ce - tm.cs) * Math.pow((m - 3) / Math.max(1, n - 3), 0.5);
       };
-      const wave = 1.9;
+      const wave = tm.wave, sil = !!tm.silent;
       const tFwd = i => i <= n - keep ? tm.tWave + wave * (i - 1) / Math.max(1, n - keep - 1) : Infinity;
 
       titleL(V.title || `重复博弈：${n} 轮`, lt, tm.tB);
@@ -670,9 +730,14 @@
         A(ctx, frontA, () => {
           if (m < n) arrow(ctx, x1, ry + rh + 30, Math.min(x1 - 40, fx), ry + rh + 30, P.red, { lw: 3, head: 16 });
           if (m <= 2) { ctx.strokeStyle = P.red; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.roundRect(fx - 5, ry - 8, x1 - fx + 10, rh + 16, 6); ctx.stroke(); }
-          const lab = m === 1 ? (V.lastLabel || '最后一轮：背叛') : m === 2 ? (V.secondLabel || '倒数第二轮：也背叛') : (V.backLabel || '一路倒推');
-          const w = measure(lab, { size: 34, weight: 500 });
-          text(lab, clamp(fx + pitch, x0 + w, x1), ry + rh + 82, { size: 34, weight: 500, color: P.red, align: 'right' });
+          if (sil) {   // a big round counter instead of a sentence
+            const lab = `第 ${n - m + 1} 轮`, o = { size: 44, family: F.mono, weight: 700 }, w = measure(lab, o);
+            text(lab, clamp(fx + pitch, x0 + w, x1), ry + rh + 90, { ...o, color: P.red, align: 'right' });
+          } else {
+            const lab = m === 1 ? (V.lastLabel || '最后一轮：背叛') : m === 2 ? (V.secondLabel || '倒数第二轮：也背叛') : (V.backLabel || '一路倒推');
+            const w = measure(lab, { size: 34, weight: 500 });
+            text(lab, clamp(fx + pitch, x0 + w, x1), ry + rh + 82, { size: 34, weight: 500, color: P.red, align: 'right' });
+          }
         });
       }
       // brackets after KMRW
@@ -683,8 +748,8 @@
         ctx.beginPath(); ctx.moveTo(xa, by - 10); ctx.lineTo(xa, by); ctx.lineTo(xb, by); ctx.lineTo(xb, by - 10); ctx.stroke();
         ctx.strokeStyle = P.red;
         ctx.beginPath(); ctx.moveTo(xc, by - 10); ctx.lineTo(xc, by); ctx.lineTo(xd, by); ctx.lineTo(xd, by - 10); ctx.stroke();
-        text(V.mostLabel || '大多数轮次：合作', (xa + xb) / 2, by + 50, { size: 34, weight: 500, color: P.ok, align: 'center' });
-        text(V.endLabel || '最后几轮', xd, by + 50, { size: 30, weight: 500, color: P.red, align: 'right' });
+        text(V.mostLabel || (sil ? `合作 ${n - keep} 轮` : '大多数轮次：合作'), (xa + xb) / 2, by + 50, { size: 34, weight: 500, color: P.ok, align: 'center' });
+        text(V.endLabel || (sil ? `背叛 ${keep} 轮` : '最后几轮'), xd, by + 50, { size: 30, weight: 500, color: P.red, align: 'right' });
       });
       // panels
       const py = 566, ph0 = 204;
@@ -692,8 +757,8 @@
       A(ctx, ma * dimL, () => {
         const y = py + rise(ma, 16);
         card(ctx, 160, y, 760, ph0);
-        text(V.mathHead || '数学：倒推', 200, y + 62, { size: 32, color: P.dim });
-        text(V.math || '从第 1 轮就该背叛', 200, y + 142, { size: 54, family: F.serif, weight: 600, color: P.red });
+        text(V.mathHead || (sil ? '数学倒推' : '数学：倒推'), 200, y + 62, { size: 32, color: P.dim });
+        text(V.math || (sil ? `${n} 轮全背叛` : '从第 1 轮就该背叛'), 200, y + 142, { size: 54, family: F.serif, weight: 600, color: P.red });
       });
       const ka = fin(lt, tm.tK + 0.2, 0.7);
       A(ctx, ka, () => {
@@ -702,8 +767,9 @@
         text(V.kmrw || 'KMRW 1982', 1040, y + 64, { size: 36, family: F.mono, weight: 700, color: P.ember });
         text(V.kmrwSub || '四位学者', 1040 + measure(V.kmrw || 'KMRW 1982', { size: 36, family: F.mono, weight: 700 }) + 20, y + 62, { size: 28, color: P.dim });
         const oa = fin(lt, tm.tOne, 0.6);
-        A(ctx, oa, () => runs([[V.pctPre || '对方有 ', P.ink], [V.pct || '1%', P.ok, { family: F.mono, weight: 700, size: 52 }], [V.pctPost || ' 可能是好人', P.ink]], 1040, y + 140, { size: 42, align: 'left' }));
-        const sa = fin(lt, tm.tWave + 0.8, 0.6);
+        if (sil) A(ctx, oa, () => runs([[V.pct || '1%', P.ok, { family: F.mono, weight: 700, size: 76 }], ['  ' + (V.pctPost || '好人'), P.ink]], 1040, y + 158, { size: 40, align: 'left' }));
+        else A(ctx, oa, () => runs([[V.pctPre || '对方有 ', P.ink], [V.pct || '1%', P.ok, { family: F.mono, weight: 700, size: 52 }], [V.pctPost || ' 可能是好人', P.ink]], 1040, y + 140, { size: 42, align: 'left' }));
+        const sa = sil ? 0 : fin(lt, tm.tWave + 0.8, 0.6);
         A(ctx, sa, () => text(V.kmrwResult || '→ 合作能维持大多数轮次', 1040, y + 180, { size: 30, weight: 500, color: P.ok }));
       });
       // note
@@ -720,7 +786,7 @@
       const t = this.timing(V, api), out = [];
       cue(out, t.tB, 'tick'); cue(out, t.tLast, 'pop'); cue(out, t.t2nd, 'pop');
       cue(out, t.cs, 'count', { dur: +(t.ce - t.cs).toFixed(2) }); cue(out, t.tMath, 'thud');
-      cue(out, t.tK + 0.2, 'tick'); cue(out, t.tOne, 'pop'); cue(out, t.tWave, 'whoosh', { dur: 1.9 }); cue(out, t.tNote, 'chime');
+      cue(out, t.tK + 0.2, 'tick'); cue(out, t.tOne, 'pop'); cue(out, t.tWave, 'whoosh', { dur: t.wave }); cue(out, t.tNote, 'chime');
       return out;
     },
   });
@@ -730,6 +796,15 @@
   T.register('tournament', {
     timing(V, api) {
       const Tt = S(api, 'titfortat', 0.3), Fg = S(api, 'forgive', api.dur * 0.6);
+      if (api.silent) {
+        // tit for tat was explained by the previous beat: build it quickly, then spend the time on the mistake
+        const L0 = api.line(0) ? api.line(0).start : Tt.t, L1 = api.line(1) ? api.line(1).start : Fg.t + 2;
+        return {
+          silent: true, t0: Tt.t, tChamp: Tt.t, tR1: Infinity, tR2: Infinity, tName: Infinity,
+          tF: Fg.t, tMis: Math.min(L0 + 1.2, Fg.t - 0.4), tBetter: Fg.t, tTol: Fg.t + 0.5, tHot: L1 + 0.3,
+          note: Fg.s && Fg.s.note,
+        };
+      }
       return {
         t0: Tt.t, tChamp: Tt.at('冠军', 0.42, 4.5), tR1: Tt.at('第一次合作', 0.6, 6), tR2: Tt.at('之后照抄', 0.7, 7.5), tName: Tt.at('这叫', 0.88, 10),
         tF: Fg.t, tMis: Fg.at('误会', 0.12, 0.8), tBetter: Fg.at('更好的版本', 0.25, 1.8), tTol: Fg.at('宽容', 0.4, 3), tHot: Fg.at('热线', 0.6, 4.2),
@@ -745,14 +820,20 @@
       const cx = i => x0 + i * pitch + (pitch - cw) / 2;
       const forgiving = fin(lt, tm.tBetter, 0.6);
       // titles
-      const tA1 = fio(lt, tm.t0, tm.tName, 0.5), tA2 = fio(lt, tm.tName, tm.tBetter, 0.5), tA3 = fin(lt, tm.tBetter, 0.6);
-      A(ctx, tA1, () => text(V.title || '程序对战：200 轮囚徒困境', 160, 215 + rise(tA1, 10), { size: 50, family: F.serif, weight: 600, color: P.ink }));
-      A(ctx, tA2, () => runs([[V.champ || '冠军策略：', P.ink], [V.name || '以牙还牙', P.ember]], 160, 215 + rise(tA2, 10), { size: 50, family: F.serif, weight: 600, align: 'left' }));
-      A(ctx, tA3, () => runs([[V.better || '更好的版本：', P.ink], [V.betterName || '多宽容一次', P.ok]], 160, 215 + rise(tA3, 10), { size: 50, family: F.serif, weight: 600, align: 'left' }));
+      const sil = !!tm.silent;
+      const tA1 = fio(lt, tm.t0, Math.min(tm.tName, tm.tBetter), 0.5), tA2 = tm.tName < tm.tBetter ? fio(lt, tm.tName, tm.tBetter, 0.5) : 0, tA3 = fin(lt, tm.tBetter, 0.6);
+      if (sil) {   // keywords only: the caption carries the sentence
+        A(ctx, tA1, () => text(V.name || '以牙还牙', 160, 215 + rise(tA1, 10), { size: 50, family: F.serif, weight: 600, color: P.ember }));
+        A(ctx, tA3, () => runs([[V.name || '以牙还牙', P.ink], [' · ', P.dim], [V.fgLabel || '宽容版', P.ok]], 160, 215 + rise(tA3, 10), { size: 50, family: F.serif, weight: 600, align: 'left' }));
+      } else {
+        A(ctx, tA1, () => text(V.title || '程序对战：200 轮囚徒困境', 160, 215 + rise(tA1, 10), { size: 50, family: F.serif, weight: 600, color: P.ink }));
+        A(ctx, tA2, () => runs([[V.champ || '冠军策略：', P.ink], [V.name || '以牙还牙', P.ember]], 160, 215 + rise(tA2, 10), { size: 50, family: F.serif, weight: 600, align: 'left' }));
+        A(ctx, tA3, () => runs([[V.better || '更好的版本：', P.ink], [V.betterName || '多宽容一次', P.ok]], 160, 215 + rise(tA3, 10), { size: 50, family: F.serif, weight: 600, align: 'left' }));
+      }
       // row labels
       A(ctx, fin(lt, tm.t0 + 0.3), () => text(V.oppLabel || '对手', 160, yO + chh / 2 + 1, { size: 38, weight: 700, color: P.teal, baseline: 'middle' }));
       const meA = fin(lt, tm.tChamp, 0.6);
-      A(ctx, meA * (1 - forgiving), () => text(V.meLabel || '冠军', 160, yM + chh / 2 + 1, { size: 38, weight: 700, color: P.gold, baseline: 'middle' }));
+      A(ctx, meA * (1 - forgiving), () => text(V.meLabel || (sil ? '我' : '冠军'), 160, yM + chh / 2 + 1, { size: 38, weight: 700, color: P.gold, baseline: 'middle' }));
       A(ctx, forgiving, () => text(V.fgLabel || '宽容版', 160, yM + chh / 2 + 1, { size: 38, weight: 700, color: P.gold, baseline: 'middle' }));
       // column numbers
       A(ctx, fin(lt, tm.t0 + 0.3) * (1 - 0.7 * fin(lt, tm.tMis, 0.4)), () => {
@@ -764,11 +845,11 @@
         if (sc > 0.5) text(d ? (V.dLabel || '背叛') : (V.cLabel || '合作'), x + cw / 2, y + chh / 2 + 2, { size: 30, weight: 700, color: DARK, align: 'center', baseline: 'middle', alpha: (sc - 0.5) * 2 });
       });
       // opponent row: appears during the first sentence
-      const oStart = tm.t0 + 0.6, oStep = Math.min(0.32, Math.max(0.12, (tm.tChamp - oStart - 0.6) / n));
+      const oStart = tm.t0 + (sil ? 0.1 : 0.6), oStep = sil ? 0.05 : Math.min(0.32, Math.max(0.12, (tm.tChamp - oStart - 0.6) / n));
       for (let i = 0; i < n; i++) cell(cx(i), yO + rise(fin(lt, oStart + i * oStep, 0.4), 12), opp[i], fin(lt, oStart + i * oStep, 0.4));
       // my row: rule ① then rule ② (copy with arrows)
       const mStep = Math.min(0.34, Math.max(0.15, (tm.tName + 0.6 - tm.tR2 - 0.3) / (n - 1)));
-      const tMe = i => i === 0 ? tm.tR1 + 0.2 : tm.tR2 + 0.3 + (i - 1) * mStep;
+      const tMe = i => sil ? tm.t0 + 0.7 + i * 0.05 : i === 0 ? tm.tR1 + 0.2 : tm.tR2 + 0.3 + (i - 1) * mStep;
       const changed = []; for (let i = 0; i < n; i++) if (tft[i] !== fgv[i]) changed.push(i);
       const tChange = i => tm.tTol + 0.45 * changed.indexOf(i);
       const tRet = tm.tTol + 0.45 * changed.length + 0.3;
@@ -818,16 +899,23 @@
           text(V.retLabel || '连续两次才还手', cx(ret) - 4, yM + chh + 46, { size: 30, weight: 500, color: P.red, align: 'left' });
         });
       }
-      // ---- rules ----
+      // ---- rules (silent: the caption says it) ----
       const rX = 380, r1 = fin(lt, tm.tR1, 0.6), r2 = fin(lt, tm.tR2, 0.6), r3 = fin(lt, tm.tTol + 0.2, 0.6);
-      A(ctx, r1, () => runs([['①', P.ember, { family: F.mono }], [' ' + (V.rule1 || '第一次合作'), P.ink]], rX, 690 + rise(r1, 10), { size: 44, align: 'left' }));
-      A(ctx, r2, () => runs([['②', P.ember, { family: F.mono }], [' ' + (V.rule2 || '之后照抄对方上一步'), P.ink]], rX, 764 + rise(r2, 10), { size: 44, align: 'left' }));
-      A(ctx, r3, () => runs([['③', P.ok, { family: F.mono }], [' ' + (V.rule3 || '多宽容一次：连续背叛两次才还手'), P.ok]], rX, 838 + rise(r3, 10), { size: 40, align: 'left' }));
+      if (!sil) A(ctx, r1, () => runs([['①', P.ember, { family: F.mono }], [' ' + (V.rule1 || '第一次合作'), P.ink]], rX, 690 + rise(r1, 10), { size: 44, align: 'left' }));
+      if (!sil) A(ctx, r2, () => runs([['②', P.ember, { family: F.mono }], [' ' + (V.rule2 || '之后照抄对方上一步'), P.ink]], rX, 764 + rise(r2, 10), { size: 44, align: 'left' }));
+      if (!sil) A(ctx, r3, () => runs([['③', P.ok, { family: F.mono }], [' ' + (V.rule3 || '多宽容一次：连续背叛两次才还手'), P.ok]], rX, 838 + rise(r3, 10), { size: 40, align: 'left' }));
       // ---- hotline ----
       const ha = fin(lt, tm.tHot, 0.7);
       if (tm.note || V.hotline) A(ctx, ha, () => {
         const s = tm.note || V.hotline, j = s.indexOf('：');
         const head = j >= 0 ? s.slice(0, j) : '', body = j >= 0 ? s.slice(j + 1) : s;
+        if (sil) {   // icon + keyword only
+          const w = 380, h = 140, x = 960 - w / 2, y = 670 + rise(ha, 14);
+          card(ctx, x, y, w, h, { stroke: 'rgba(255,154,85,0.5)' });
+          phone(ctx, x + 88, y + h / 2, P.ember);
+          text(head || body, x + 176, y + h / 2 + 2, { size: 48, weight: 700, color: P.ember, baseline: 'middle' });
+          return;
+        }
         const x = 1250, y = 640 + rise(ha, 14), w = 510, h = 170;
         card(ctx, x, y, w, h, { stroke: 'rgba(255,154,85,0.5)' });
         phone(ctx, x + 78, y + h / 2, P.ember);
@@ -837,7 +925,8 @@
     },
     cues(V, api) {
       const t = this.timing(V, api), out = [];
-      cue(out, t.t0 + 0.6, 'tick'); cue(out, t.tR1 + 0.2, 'pop'); cue(out, t.tR2 + 0.3, 'count', { dur: 2.4 }); cue(out, t.tName, 'chime');
+      cue(out, t.t0 + 0.6, 'tick');
+      if (!t.silent) { cue(out, t.tR1 + 0.2, 'pop'); cue(out, t.tR2 + 0.3, 'count', { dur: 2.4 }); cue(out, t.tName, 'chime'); }
       cue(out, t.tMis, 'pop'); cue(out, t.tTol, 'click'); cue(out, t.tHot, 'chime');
       return out;
     },
