@@ -194,22 +194,22 @@
         Sf(lab, clamp(fx, x0 + w / 2, x1 - w / 2), ry + rh / 2 + 118, { size: 44, color: RED, glow: 10, alpha: frontA });
       }
       // ---------------- the mathematical conclusion, then KMRW
-      const toK = fin(lt, tm.tK, 1.0);
+      const toK = fin(lt, tm.tK + 0.5, 1.0);             // the conclusion holds a moment into the KMRW screen
       const ma = fin(lt, tm.tMath, 1.2) * (1 - toK);
       if (ma > 0) {
-        Sf(V.mathHead || '数学倒推', W / 2, 660, { size: 32, color: DIM, glow: 0, alpha: ma, reveal: ma });
-        Sf(V.math || `${n} 轮 全背叛`, W / 2, 750, { size: 68, color: RED, glow: 14, alpha: ma, reveal: ma });
+        Sf(V.mathHead || '数学倒推', W / 2, 640, { size: 32, color: DIM, glow: 0, alpha: ma, reveal: ma });
+        Sf(V.math || `${n} 轮 全背叛`, W / 2, 725, { size: 68, color: RED, glow: 14, alpha: ma, reveal: ma });
       }
-      const kr = fin(lt, tm.tK + 0.2, 1.2), ka = kr * (1 - 0.6 * noteK);
-      const kmrw = (V.kmrw || 'KMRW 1982').replace(/\s+(\d{4})$/, ' · $1');
-      Sf(kmrw, W / 2, 640, { size: 30, family: F.mono, color: EMBER, glow: 6, alpha: ka, reveal: kr, spacing: 4 });
+      const kr = fin(lt, tm.tK + 1.0, 1.2), ka = kr * (1 - 0.6 * noteK);
+      const kmrw = (V.kmrw || '1982').replace(/\s+(\d{4})$/, ' · $1');
+      Sf(kmrw, W / 2, 612, { size: 30, family: F.mono, color: EMBER, glow: 6, alpha: ka, reveal: kr, spacing: 4 });
       const or = fin(lt, tm.tOne, 1.4), oa = or * (1 - 0.6 * noteK);
       if (oa > 0) {
         const pct = V.pct || '1%', post = V.pctPost || '好人';
         const wp = L.measureSerif(pct, 140, { family: F.mono }), wq = L.measureSerif(post, 44), gap = 28, x = W / 2 - (wp + gap + wq) / 2;
-        Lt(x + wp / 2, 760, 200, 'rgba(159,224,160,0.16)', oa);
-        Sf(pct, x, 760, { size: 140, family: F.mono, color: OK, glow: 18, alpha: oa, reveal: or, align: 'left', spacing: 0 });
-        Sf(post, x + wp + gap, 782, { size: 44, color: INK, glow: 6, alpha: oa, reveal: prog(lt, tm.tOne + 0.4, tm.tOne + 1.6), align: 'left' });
+        Lt(x + wp / 2, 732, 200, 'rgba(159,224,160,0.16)', oa);
+        Sf(pct, x, 732, { size: 140, family: F.mono, color: OK, glow: 18, alpha: oa, reveal: or, align: 'left', spacing: 0 });
+        Sf(post, x + wp + gap, 754, { size: 44, color: INK, glow: 6, alpha: oa, reveal: prog(lt, tm.tOne + 0.4, tm.tOne + 1.6), align: 'left' });
       }
       // ---------------- after the wave: how many rounds cooperate, how many defect
       const brR = fin(lt, tm.tWave + tm.wave + 0.2, 1.0), brA = brR * (1 - 0.5 * noteK);
@@ -231,7 +231,7 @@
       const t = this.timing(V, api), out = [];
       cue(out, t.tB, 'tick'); cue(out, t.tLast, 'pop'); cue(out, t.t2nd, 'pop');
       cue(out, t.cs, 'count', { dur: +(t.ce - t.cs).toFixed(2) }); cue(out, t.tMath, 'thud');
-      cue(out, t.tK + 0.2, 'tick'); cue(out, t.tOne, 'pop'); cue(out, t.tWave, 'whoosh', { dur: t.wave }); cue(out, t.tNote, 'chime');
+      cue(out, t.tK + 1.0, 'tick'); cue(out, t.tOne, 'pop'); cue(out, t.tWave, 'whoosh', { dur: t.wave }); cue(out, t.tNote, 'chime');
       return out;
     },
   });
