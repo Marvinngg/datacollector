@@ -4,7 +4,8 @@
 #   SKIP_CUES=1 pipeline/audio/build_audio.sh    # use the existing build/cues.json
 #   SKIP_MUSIC=1 ...                             # keep the existing music.wav (only when timeline.json is unchanged)
 #   PLOTS=1 ...                                  # also write self-check plots to build/audio/plots/
-# Every time is read from build/timeline.json at run time: re-run this after every voice pass.
+# Every time is read from build/timeline.json at run time: re-run this after every voice / timeline pass.
+# timeline "mode": "silent" (v2, no narration) -> music_v2.py score, no build/vo, no ducking; otherwise v1.
 set -euo pipefail
 export PYTHONDONTWRITEBYTECODE=1
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

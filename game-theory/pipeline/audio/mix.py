@@ -184,6 +184,7 @@ edit_clicks(mix, edits, 'mix (voice edges + file end)')
 edit_clicks(music, [c['t0'] for c in meta.get('chords', [])], 'music (chord changes)')
 if '--plot' in sys.argv:
     del raw, pre_lim
+    os.makedirs(f'{OUT}/plots', exist_ok=True)
     for k_, x_ in ((() if SILENT else (('voice', vo),)) + (('music_ducked', music_d), ('duck_gain', duck))):
         write(f'{OUT}/stems/{k_}.wav', to_stereo(x_) * (G if k_ != 'duck_gain' else 1.0))
     plot_tracks(([] if SILENT else [('voice', vo)]) + [('music(ducked)', music_d), ('sfx', sfx), ('mix', mix)], tl, f'{OUT}/plots/mix_stems.png',

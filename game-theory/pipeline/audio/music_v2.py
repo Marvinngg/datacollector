@@ -217,6 +217,7 @@ def build_slots():
 
 
 SLOTS = build_slots()
+final_t = next((s['t0'] for s in SLOTS if s['kind'] == 'final'), None)
 CH = [s['t0'] for s in SLOTS]
 
 
@@ -553,6 +554,22 @@ for s in SLOTS:
     auto += [(a - 0.5, 0.0), (a + 0.3, gdb), (b - 0.2, gdb), (b + 0.4, 0.0)]
 auto.sort()
 out *= (10 ** (env_points(N, auto) / 20))[:, None]
+# gentle leveller: the running music may not jump out - 3 s windows more than 2.5 LU over the programme level are
+# pulled back by 60 % of the excess (slow, smoothed; the end card is left alone)
+import pyloudnorm as pyln
+_m = pyln.Meter(SR)
+Lb = lufs(out)
+hop, win = n_of(0.5), n_of(3.0)
+tc, gc = [], []
+for i in range(0, N - win, hop):
+    Lw = _m.integrated_loudness(out[i:i + win]) if np.abs(out[i:i + win]).max() > 1e-5 else -99
+    t = (i + win / 2) / SR
+    ex = Lw - (Lb + 2.5)
+    gc.append(-0.6 * ex if ex > 0 and (final_t is None or t < final_t - 1) else 0.0); tc.append(t)
+if tc:
+    gl = gaussian_filter1d(np.array(gc), 3)
+    out *= (10 ** (np.interp(np.arange(N) / SR, tc, gl) / 20))[:, None]
+    print(f'  leveller: max {-min(gl):.1f} dB, active on {np.mean(np.array(gl) < -0.3) * 100:.0f}% of the programme')
 out = fade(out, 0.3, 2.5)
 out *= 10 ** (-3.0 / 20) / max(np.abs(out).max(), 1e-9)
 write(f'{OUT}/music.wav', out)
