@@ -2,10 +2,13 @@
   "title": "博弈论：看局、解局、改局",
   "credit": "内容整理自李继刚读书会「博弈论」分享",
   "voice": {
-    "engine": "kokoro",
-    "model_dir": "kokoro-multi-lang-v1_0",
-    "voice_sid": 49,
-    "speed": 1.05
+    "engine": "zipvoice",
+    "speed": 0.8,
+    "zipvoice": {
+      "prompt_wav": "assets/voice_refs/yunjian.wav",
+      "prompt_text": "其实这件事也没那么复杂，你先别着急，我们慢慢来。",
+      "num_steps": 8
+    }
   },
   "say": {
     "纳什": "纳实"

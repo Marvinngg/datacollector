@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Download the offline models into models/ (git-ignored). Safe to re-run: existing models are skipped.
-#   bash pipeline/fetch_models.sh          # models needed to build the film
-#   WITH_ASR=1 bash pipeline/fetch_models.sh   # + SenseVoice ASR for pronunciation checks (pipeline/check_vo.py)
-# Everything comes from GitHub releases, so it works where Hugging Face is unreachable.
+#   bash pipeline/fetch_models.sh
+# Everything comes from GitHub releases (works where Hugging Face is unreachable).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+if [ -L models ]; then echo "models/ is a link to $(readlink models); nothing to fetch"; exit 0; fi
 mkdir -p models
 TTS=https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models
 ASR=https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models
+VOC=https://github.com/k2-fsa/sherpa-onnx/releases/download/vocoder-models
 
 fetch() {  # fetch <url> <dir-it-unpacks-to>
   local url=$1 dir=$2
@@ -18,15 +19,15 @@ fetch() {  # fetch <url> <dir-it-unpacks-to>
   echo "ok   models/$dir"
 }
 
-# Voice-over: the film uses Kokoro v1.0, Chinese male voice zm_yunjian (lines.json: model_dir + voice_sid 49)
+# Voice: ZipVoice (natural prosody), timbre from assets/voice_refs/yunjian.wav
+ZV=sherpa-onnx-zipvoice-distill-int8-zh-en-emilia
+fetch "$TTS/$ZV.tar.bz2" "$ZV"
+[ -f "models/$ZV/vocos_24khz.onnx" ] || curl -fL --retry 4 -o "models/$ZV/vocos_24khz.onnx" "$VOC/vocos_24khz.onnx"
+# Kokoro v1.0 (the 云健 voice itself; used to regenerate the timbre reference, and as a fast fallback engine)
 fetch "$TTS/kokoro-multi-lang-v1_0.tar.bz2" kokoro-multi-lang-v1_0
-# other engines tried during casting (optional): kokoro-multi-lang-v1_1, sherpa-onnx-zipvoice-distill-int8-zh-en-emilia, vits-icefall-zh-aishell3
-for m in ${EXTRA_TTS:-}; do fetch "$TTS/$m.tar.bz2" "$m"; done   # e.g. EXTRA_TTS="sherpa-onnx-zipvoice-distill-zh-en-emilia vits-icefall-zh-aishell3"
 
-# Pronunciation check
-if [ "${WITH_ASR:-0}" = "1" ]; then
-  fetch "$ASR/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2" sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17
-fi
+# ASR for the automatic pronunciation check/repair (pipeline/fix_vo.py)
+fetch "$ASR/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2" sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17
 
 # The GM SoundFont used by the music (GeneralUser GS) downloads itself on first music build.
 echo "models ready"
