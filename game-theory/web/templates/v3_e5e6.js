@@ -10,13 +10,12 @@
   const TAU = Math.PI * 2;
 
   // ---------------------------------------------------------------- helpers
-  // The runtime sets ctx.globalAlpha to the beat's fade envelope before draw(); L.glyph / L.light overwrite
-  // globalAlpha, so every draw call here multiplies by ENV explicitly.
-  let ENV = 1;
-  const G = (ch, x, y, size, col, a, o = {}) => L.glyph(ch, x, y, size, col, a * ENV, o);
-  const Sf = (str, x, y, o = {}) => L.serif(str, x, y, { ...o, alpha: (o.alpha == null ? 1 : o.alpha) * ENV });
-  const Lt = (x, y, r, col, a = 1) => L.light(x, y, r, col, a * ENV);
-  const hud = (items, a = 1) => { ctx.globalAlpha = ENV; L.hud(items, { alpha: a }); ctx.globalAlpha = ENV; };
+  // The runtime sets ctx.globalAlpha to the beat's fade envelope before draw(); L.glyph / L.light / K.text
+  // multiply by it, so nothing here touches globalAlpha except inside save()/restore() with *=.
+  const G = (ch, x, y, size, col, a, o = {}) => L.glyph(ch, x, y, size, col, a, o);
+  const Sf = (str, x, y, o = {}) => L.serif(str, x, y, o);
+  const Lt = (x, y, r, col, a = 1) => L.light(x, y, r, col, a);
+  const hud = (items, a = 1) => L.hud(items, { alpha: a });
   const fin = (lt, a, d = 0.8) => isFinite(a) ? ease.out(prog(lt, a, a + d)) : 0;
   const fio = (lt, a, b, d = 0.6) => isFinite(b) ? Math.min(fin(lt, a, d), 1 - ease.in(prog(lt, b - d, b))) : fin(lt, a, d);
   const even = v => Math.max(2, Math.round(v / 2) * 2);
@@ -28,7 +27,7 @@
   // a thin line of light, transparent at both ends ('both') or bright at the end ('head')
   function beam(x1, y1, x2, y2, rgb, a, w = 1.5, mode = 'both') {
     if (a <= 0.003) return;
-    ctx.save(); ctx.globalAlpha = a * ENV;
+    ctx.save(); ctx.globalAlpha *= a;
     const g = ctx.createLinearGradient(x1, y1, x2, y2);
     if (mode === 'head') { g.addColorStop(0, `rgba(${rgb},0)`); g.addColorStop(0.7, `rgba(${rgb},0.55)`); g.addColorStop(1, `rgba(${rgb},1)`); }
     else { g.addColorStop(0, `rgba(${rgb},0)`); g.addColorStop(0.5, `rgba(${rgb},1)`); g.addColorStop(1, `rgba(${rgb},0)`); }
@@ -48,13 +47,18 @@
   // receding into depth, the same customer walking from one to the next.
   T.register('shops', {
     timing(V, api) {
-      const tO = stepT(api, 'oneshot', api.dur * 0.2), tR = stepT(api, 'repeated', api.dur * 0.58), hop = 0.6, tMap = tR + 1.8;
-      return { hop, tO, tTags: tO + 0.9, tOnce: tO + 2.0, tOLab: tO + 3.2, tR, tSame: tR + 0.9, tMap, tRLab: tR + 2.0, tFame: tMap + 0.3 + hop * 6 + 0.5 };
+      const tO = stepT(api, 'oneshot', api.dur * 0.2), tR = stepT(api, 'repeated', api.dur * 0.58), tMap = tR + 1.6;
+      const n = (V.cities || [0, 1, 2, 3, 4, 5, 6]).length;
+      // the customer's walk ends with ~2 s left for "reputation" (0.36–0.6 s a hop)
+      const hop = clamp((api.dur - tMap - 0.6 - 2.4) / Math.max(1, n - 1), 0.36, 0.6);
+      return { hop, n, tO, tTags: tO + 0.9, tOnce: tO + 2.0, tOLab: tO + 3.2, tR, tSame: tR + 0.9, tMap, tRLab: tR + 2.0, tFame: tMap + 0.3 + hop * (n - 1) + 0.3 };
     },
     draw(ctx, V, lt, api) {
-      ENV = ctx.globalAlpha;
       const tm = this.timing(V, api), O = V.oneshot || {}, R = V.repeated || {};
-      L.field(lt, { n: 80, chars: '店', seed: 51, alpha: 0.07 * ENV, color: '#d9c9a8' });
+      // first the dilemma itself drifts in the dark (招 / 默), then the street of 店 takes over
+      const qa = 1 - fin(lt, tm.tO, 1.6);
+      if (qa > 0) L.field(lt, { n: 90, chars: '招默', seed: 21, alpha: 0.13 * qa, color: '#d9c9a8' });
+      L.field(lt, { n: 80, chars: '店', seed: 51, alpha: 0.07 * (1 - qa), color: '#d9c9a8' });
       const pan = ease.inOut(prog(lt, tm.tR, tm.tR + 2.0)), shift = 600 * pan;
       const drift = 6 * Math.sin(lt * 0.12);                      // the whole scene breathes a little
       // ---------------- the lone shop
@@ -88,6 +92,8 @@
         const d = j / Math.max(1, n - 1), e = Math.pow(d, 0.8);
         return { x: lerp(820, 1700, e) + xo, y: lerp(480, 382, d), size: even(lerp(128, 46, d)), blur: Math.round(d * 3), a: lerp(1, 0.55, d) };
       };
+      const ga = fin(lt, tm.tR + 0.3, 1.6);
+      if (ga > 0) { const a = sh(0), b = sh(n - 1); beam(a.x - 200, a.y + a.size * 0.62, b.x + 120, b.y + b.size * 0.62 - 6, RGB.ink, 0.22 * ga, 1.2); }
       const kk = (lt - tm.tMap - 0.3) / tm.hop;                   // hops done
       const onT = j => j === 0 ? tm.tMap : tm.tMap + 0.3 + j * tm.hop;
       for (let j = n - 1; j >= 0; j--) {
@@ -128,7 +134,7 @@
     cues(V, api) {
       const t = this.timing(V, api), out = [];
       cue(out, t.tO, 'tick'); cue(out, t.tTags, 'pop'); cue(out, t.tOnce, 'pop');
-      cue(out, t.tR, 'tick'); cue(out, t.tMap + 0.3, 'count', { dur: t.hop * 6 }); cue(out, t.tFame, 'chime');
+      cue(out, t.tR, 'tick'); cue(out, t.tMap + 0.3, 'count', { dur: +(t.hop * (t.n - 1)).toFixed(2) }); cue(out, t.tFame, 'chime');
       return out;
     },
   });
@@ -147,7 +153,6 @@
       return { wave: 2.6, tB, tLast: tB + 1.6, t2nd: tB + 3.0, cs, ce, tMath: ce + 0.2, tK, tOne: tK + 1.8, tWave: tK + 3.5, tNote, note: ni >= 0 ? api.steps[ni].note : null };
     },
     draw(ctx, V, lt, api) {
-      ENV = ctx.globalAlpha;
       const tm = this.timing(V, api), n = V.n || 100, keep = V.endgame || Math.max(2, Math.round(n * 0.05));
       const x0 = 200, x1 = 1720, pitch = (x1 - x0) / (n - 1), ry = 400, rh = 110;
       const X = i => x0 + (i - 1) * pitch;                         // i = 1..n
@@ -158,7 +163,7 @@
       };
       const tFwd = i => i <= n - keep ? tm.tWave + tm.wave * (i - 1) / Math.max(1, n - keep - 1) : Infinity;
       const noteK = fin(lt, tm.tNote, 1.2);
-      L.field(lt, { n: 70, chars: '合叛', seed: 63, alpha: 0.06 * ENV, color: '#d9c9a8' });
+      L.field(lt, { n: 70, chars: '合叛', seed: 63, alpha: 0.06, color: '#d9c9a8' });
       // ---------------- filaments
       const grow = prog(lt, tm.tB, tm.tB + 1.6);
       for (let i = 1; i <= n; i++) {
@@ -174,7 +179,7 @@
         const flash = Math.max(Math.sin(Math.PI * clamp(fb * 1.0)) * (fb < 1 ? 1 : 0), ff > 0 && ff < 1 ? Math.sin(Math.PI * ff) : 0);
         if (flash > 0.02) Lt(x, ry + wob, 26, ff > 0 ? 'rgba(159,224,160,0.9)' : 'rgba(255,150,120,0.9)', flash * 0.6);
       }
-      const la = fin(lt, tm.tB + 0.5, 1.0) * (1 - 0.6 * noteK);
+      const la = fin(lt, tm.tB + 0.5, 1.0) * (1 - 0.6 * noteK) * (1 - fin(lt, tm.tWave + tm.wave, 0.8));
       Sf('1', X(1), ry - rh / 2 - 34, { size: 26, family: F.mono, color: DIM, glow: 0, alpha: la });
       Sf(String(n), X(n), ry - rh / 2 - 34, { size: 26, family: F.mono, color: DIM, glow: 0, alpha: la });
       // ---------------- backward-induction front: a red spark and the round it has reached
@@ -195,25 +200,25 @@
         Sf(V.mathHead || '数学倒推', W / 2, 660, { size: 32, color: DIM, glow: 0, alpha: ma, reveal: ma });
         Sf(V.math || `${n} 轮 全背叛`, W / 2, 750, { size: 68, color: RED, glow: 14, alpha: ma, reveal: ma });
       }
-      const ka = fin(lt, tm.tK + 0.2, 1.2) * (1 - 0.6 * noteK);
+      const kr = fin(lt, tm.tK + 0.2, 1.2), ka = kr * (1 - 0.6 * noteK);
       const kmrw = (V.kmrw || 'KMRW 1982').replace(/\s+(\d{4})$/, ' · $1');
-      Sf(kmrw, W / 2, 640, { size: 30, family: F.mono, color: EMBER, glow: 6, alpha: ka, reveal: ka, spacing: 4 });
-      const oa = fin(lt, tm.tOne, 1.4) * (1 - 0.6 * noteK);
+      Sf(kmrw, W / 2, 640, { size: 30, family: F.mono, color: EMBER, glow: 6, alpha: ka, reveal: kr, spacing: 4 });
+      const or = fin(lt, tm.tOne, 1.4), oa = or * (1 - 0.6 * noteK);
       if (oa > 0) {
         const pct = V.pct || '1%', post = V.pctPost || '好人';
         const wp = L.measureSerif(pct, 140, { family: F.mono }), wq = L.measureSerif(post, 44), gap = 28, x = W / 2 - (wp + gap + wq) / 2;
         Lt(x + wp / 2, 760, 200, 'rgba(159,224,160,0.16)', oa);
-        Sf(pct, x, 760, { size: 140, family: F.mono, color: OK, glow: 18, alpha: oa, reveal: oa, align: 'left', spacing: 0 });
+        Sf(pct, x, 760, { size: 140, family: F.mono, color: OK, glow: 18, alpha: oa, reveal: or, align: 'left', spacing: 0 });
         Sf(post, x + wp + gap, 782, { size: 44, color: INK, glow: 6, alpha: oa, reveal: prog(lt, tm.tOne + 0.4, tm.tOne + 1.6), align: 'left' });
       }
       // ---------------- after the wave: how many rounds cooperate, how many defect
-      const brA = fin(lt, tm.tWave + tm.wave + 0.2, 1.0) * (1 - 0.5 * noteK);
+      const brR = fin(lt, tm.tWave + tm.wave + 0.2, 1.0), brA = brR * (1 - 0.5 * noteK);
       if (brA > 0) {
         const y = ry - rh / 2 - 36, xa = X(1), xb = X(n - keep) + pitch * 0.4, xc = X(n - keep + 1) - pitch * 0.4, xd = X(n);
         beam(xa - 20, y + 12, xb + 20, y + 12, RGB.ok, brA * 0.7, 1.2);
         beam(xc - 20, y + 12, xd + 20, y + 12, RGB.red, brA * 0.7, 1.2);
-        Sf(V.mostLabel || `合作 ${n - keep} 轮`, (xa + xb) / 2, y - 26, { size: 40, color: OK, glow: 10, alpha: brA, reveal: brA });
-        Sf(V.endLabel || `背叛 ${keep}`, xd, y - 26, { size: 30, color: RED, glow: 6, alpha: brA, reveal: brA, align: 'right' });
+        Sf(V.mostLabel || `合作 ${n - keep} 轮`, (xa + xb) / 2, y - 26, { size: 40, color: OK, glow: 10, alpha: brA, reveal: brR });
+        Sf(V.endLabel || `背叛 ${keep}`, xd, y - 26, { size: 30, color: RED, glow: 6, alpha: brA, reveal: brR, align: 'right' });
       }
       // ---------------- the closing remark: the very first round is where it starts
       if (noteK > 0) {
@@ -221,7 +226,6 @@
         beam(X(1), ry - rh / 2 - 10, X(1), ry + rh / 2 + 10, RGB.gold, noteK, 3);
         Sf(tm.note || V.noteLabel || '第一轮，先合作', X(1) - 10, ry + rh / 2 + 118, { size: 44, color: GOLD, glow: 12, alpha: noteK, reveal: noteK, align: 'left' });
       }
-      ctx.globalAlpha = ENV;
     },
     cues(V, api) {
       const t = this.timing(V, api), out = [];
@@ -298,7 +302,6 @@
       return tournament(keys, V.rounds || 200, V.seed == null ? 7 : V.seed);
     },
     draw(ctx, V, lt, api) {
-      ENV = ctx.globalAlpha;
       const tm = this.timing(V, api), S = this.sim(V), R = S.R, n = S.n;
       const nameOf = k => (V.names && V.names[k]) || STRATS[k].name;
       const roundAt = t => R * ease.sine(prog(t, tm.tS, tm.tE));
@@ -313,7 +316,7 @@
       if (playA > 0 && r > 0) {
         const M = S.all.length, cols = 64, colW = 1760 / cols;
         for (let k = 0; k < M; k++) {
-          const m = S.all[k], y = 178 + k * (700 / (M - 1)), depth = ((k * 7) % 5) / 4;   // 0 far … 1 near
+          const m = S.all[k], depth = ((k * 7) % 5) / 4, y = 176 + k * (700 / (M - 1)) + ((k * 13) % 7 - 3) * 6;   // depth 0 far … 1 near
           const size = even(14 + depth * 10), blur = Math.round(4 - depth * 3), aa = playA * (0.16 + 0.14 * depth);
           for (let c = 0; c < cols; c++) {
             const t = ri - c; if (t < 0) break;
@@ -382,7 +385,6 @@
       rule('01', V.rule1 || '第一次合作', r1, 675);
       rule('02', V.rule2 || '之后照抄对方', r2, 742);
       if (V.note !== '' && wKey === 'tft' && S.wins[S.winner] === 0) Sf(V.note || '单场从没赢过谁，总分却是第一', BX, 822, { size: 30, color: DIM, glow: 0, alpha: nA, reveal: nA });
-      ctx.globalAlpha = ENV;
     },
     cues(V, api) {
       const t = this.timing(V, api), out = [];
@@ -403,7 +405,6 @@
       return { t0, tF, tMis: Math.min(t0 + 1.2, tF - 0.4), tBetter: tF, tTol: tF + 0.5, tHot, note: F0 && F0.note };
     },
     draw(ctx, V, lt, api) {
-      ENV = ctx.globalAlpha;
       const tm = this.timing(V, api);
       const opp = seq(V.opponent || 'CCDCCDDCCC'), n = opp.length;
       const tft = opp.map((_, i) => i === 0 ? false : opp[i - 1]);
@@ -414,7 +415,7 @@
       const cch = cL.length === 1 ? cL : '合', dch = dL.length === 1 ? dL : '叛';
       const forgiving = fin(lt, tm.tBetter, 1.0);
       const hotA = fin(lt, tm.tHot, 1.2);
-      L.field(lt, { n: 60, chars: cch + dch, seed: 71, alpha: 0.06 * ENV, color: '#d9c9a8' });
+      L.field(lt, { n: 60, chars: cch + dch, seed: 71, alpha: 0.06, color: '#d9c9a8' });
       // ---------------- row labels
       const la = fin(lt, tm.t0, 1.0);
       Sf(V.oppLabel || '对手', 300, yO, { size: 42, color: TEAL, glow: 10, alpha: la, reveal: la });
@@ -489,7 +490,6 @@
         }
         Sf(head, W / 2, hy - 64, { size: 52, color: EMBER, glow: 14, alpha: hotA, reveal: hotA, spacing: 10 });
       }
-      ctx.globalAlpha = ENV;
     },
     cues(V, api) {
       const t = this.timing(V, api), out = [];
@@ -539,7 +539,6 @@
       return { tO, tB, tLic, tLock, t5, tN0, tN1, gap, tR0, tR1, tLand, tFin: tLand + 1.5 };
     },
     draw(ctx, V, lt, api) {
-      ENV = ctx.globalAlpha;
       const tm = this.timing(V, api);
       const nInc = V.incumbents || 4, nLic = V.licenses || 5, nBid = V.bidders || 13, nNew = nBid - nInc;
       const fm = /^(\D*?)\s*([\d.]+)\s*(.*)$/.exec(V.final || '约 225 亿英镑') || ['', '约', '225', '亿英镑'];
@@ -549,7 +548,7 @@
       const valAt = t => lerp(S.start, S.final, ease.sine(prog(t, tm.tR0, tm.tR1)));
       const r = S.roundOf(valAt(lt));
       const licCh = V.licGlyph || '牌', incCh = (V.incName || '老')[0], newCh = (V.newName || '新')[0];
-      L.field(lt, { n: 70, chars: licCh + newCh, seed: 81, alpha: 0.06 * ENV, color: '#c8bfe0' });
+      L.field(lt, { n: 70, chars: licCh + newCh, seed: 81, alpha: 0.06, color: '#c8bfe0' });
 
       // ---------------- geometry (left arena)
       const acx = 600, sp = Math.min(160, 760 / Math.max(1, nLic - 1));
@@ -650,7 +649,7 @@
         const cx0 = 1160, cx1 = 1740, cy0 = 640, cy1 = 850;
         const xOf = q => cx0 + (cx1 - cx0) * q / R, yOf = val => cy1 - (cy1 - cy0) * (val - S.start) / (S.final - S.start);
         const N = 80; let px = cx0, py = cy1;
-        ctx.save(); ctx.globalAlpha = ENV * amtA * (1 - 0.5 * finA); ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+        ctx.save(); ctx.globalAlpha *= amtA * (1 - 0.5 * finA); ctx.lineWidth = 1.6; ctx.lineCap = 'round';
         for (let k = 1; k <= N; k++) {
           const q = r * k / N, x = xOf(q), y = yOf(S.total(q));
           ctx.strokeStyle = `rgba(${RGB.gold},${(0.15 + 0.85 * k / N).toFixed(2)})`;
@@ -672,9 +671,8 @@
         hud([{ label: '牌照', value: `${Math.min(nLic, nInc + (lt >= tm.t5 ? 1 : 0))} 张`, color: lt >= tm.t5 ? EMBER : INK },
              { label: '竞标者', value: `${nInc + S.bidders.filter(b => !b.inc && lt >= tEnter(b) + 0.3).length} 家` }], fin(lt, tm.tO, 0.8));
       }
-      const wa = fin(lt, tm.tFin + 0.4, 1.2);
-      Sf(`${nLic} 家拿到牌照`, acx, 870, { size: 32, color: OK, glow: 8, alpha: wa, reveal: wa });
-      ctx.globalAlpha = ENV;
+      const wa = fin(lt, tm.tLand + 1.2, 1.2);
+      Sf(`${nLic} 家拿到牌照`, acx, 860, { size: 32, color: OK, glow: 8, alpha: wa, reveal: wa });
     },
     cues(V, api) {
       const t = this.timing(V, api), out = [];

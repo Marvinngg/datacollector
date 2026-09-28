@@ -48,8 +48,7 @@
   }
   // soft additive light from a cached sprite (same look as L.light, no gradient per call)
   const sparkC = new Map();
-  function spark(x, y, r, color, alpha = 1) {
-    if (alpha <= 0.003 || r <= 0) return;
+  function sparkSprite(color) {
     let c = sparkC.get(color);
     if (!c) {
       c = document.createElement('canvas'); c.width = c.height = 256;
@@ -57,8 +56,22 @@
       gr.addColorStop(0, color); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
       sparkC.set(color, c);
     }
+    return c;
+  }
+  // lights can be collected and drawn in one additive pass (one composite switch instead of one per light)
+  let sparkBatch = null;
+  function spark(x, y, r, color, alpha = 1) {
+    if (alpha <= 0.003 || r <= 0) return;
+    if (sparkBatch) { sparkBatch.push([x, y, r, color, alpha]); return; }
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= Math.min(1, alpha);
-    ctx.drawImage(c, x - r, y - r, r * 2, r * 2); ctx.restore();
+    ctx.drawImage(sparkSprite(color), x - r, y - r, r * 2, r * 2); ctx.restore();
+  }
+  function sparksBegin() { sparkBatch = []; }
+  function sparksFlush() {
+    const list = sparkBatch; sparkBatch = null; if (!list || !list.length) return;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; const a0 = ctx.globalAlpha;
+    for (const [x, y, r, color, alpha] of list) { ctx.globalAlpha = a0 * Math.min(1, alpha); ctx.drawImage(sparkSprite(color), x - r, y - r, r * 2, r * 2); }
+    ctx.restore();
   }
   // split a long string into rows at punctuation near the middle
   function rowsOf(str, size, maxW, fam) {
@@ -401,7 +414,7 @@
       });
       // star dust inside the canopy
       const dust = [];
-      for (let i = 0; i < 90; i++) {
+      for (let i = 0; i < 64; i++) {
         const a = (196 + r() * 148) * Math.PI / 180, rr = 120 + Math.pow(r(), 0.7) * 520;
         dust.push({ x: KT.fork[0] + Math.cos(a) * rr * KT.ax, y: KT.fork[1] + Math.sin(a) * rr, ph: r() * 6.28, s: r() });
       }
@@ -427,6 +440,7 @@
       ctx.save();
       const zs = 1 + 0.002 * lt; ctx.translate(960, 560); ctx.scale(zs, zs); ctx.translate(-960, -560);
       L.field(lt, { n: 80, chars: Lk.field, seed: 5, alpha: 0.055, color: '#d9c9a8' });
+      sparksBegin();
       // warm crown light that grows with the tree
       const grow = ease.out(prog(lt, 0.5, tm.pulse));
       spark(fx, fy - 250, 580, 'rgba(242,201,138,0.09)', (0.3 + 0.7 * grow) * (1 + 0.6 * done));
@@ -469,6 +483,7 @@
         spark(l.x, l.y - 4, 64, rgba(b.col, 0.09), fa * (0.4 + done * 0.6 + flare * 0.5));
         word(l.name, l.x, l.y - 6, { size: 32, color: INK, glow: 6 + Math.round(4 * done), alpha: fa * lerp(0.86, 1, done), reveal: prog(lt, t0 + 0.6, t0 + 1.4) });
       });
+      sparksFlush();
       // branch names last: the twigs behind them sink into a soft shadow, so no line runs through a word
       Lk.branches.forEach((b, i) => {
         const t0 = tm.bt[i], na = ease.out(prog(lt, t0 + 0.8, t0 + 1.6));

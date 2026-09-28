@@ -442,7 +442,7 @@
     const items = V.items || [], n = items.length;
     const rows = n <= 5 ? 1 : 2, perRow = Math.ceil(n / rows);
     const S = Math.min(420, 1480 / Math.max(1, perRow - 1));
-    const longest = Math.max(1, ...items.map(it => measureW(it.title || '', { size: 84 })));
+    const longest = Math.max(1, ...items.map(it => measureW(it.title || '', { size: 92 })));
     const fit = Math.min(1, (S * 0.92) / longest);                        // active word must fit its slot
     const hasDesc = items.some(it => it.desc), hasEn = items.some(it => it.en);
     const y0 = rows === 1 ? (hasDesc ? 450 : 470) : 380;
@@ -497,9 +497,9 @@
             L.glyph(pool[Math.floor(c.c * pool.length) % pool.length], gx, gy, q2(18 + c.d * 20), '#d9bf8c', e * (0.05 + 0.13 * c.d), { blur: 2 + Math.round((1 - c.d) * 4) });
           });
         }
-        const half = 84 * sc * 0.5;
+        const half = 92 * sc * 0.5;
         word(String(i + 1).padStart(2, '0'), p.x, y - half - 34, { size: 26, family: F.mono, color: e > 0.5 ? acc : DIM, alpha: al * lerp(0.6, 1, e), glow: 0, spacing: 4, blur });
-        word(it.title || '', p.x, y, { size: 84, scale: sc, color: INK, alpha: al, glow: 12, blur, reveal: f });
+        word(it.title || '', p.x, y, { size: 92, scale: sc, color: INK, alpha: al, glow: 12, blur, reveal: f });
         let yy = y + half + 38;
         if (it.en) { word(String(it.en).toUpperCase(), p.x, yy, { size: 26, family: F.mono, color: DIM, alpha: al * 0.9, glow: 0, spacing: 6, blur }); yy += 50; }
         if (it.desc) {
@@ -553,7 +553,7 @@
         const cyc = (p.ph + lt * 0.03) % 1;                          // 0 far out → 1 arrived
         const rr = lerp(1.08, 0.36, cyc), ang = p.a + 0.9 * cyc;       // the arm curls in as it nears the centre
         const x = W / 2 + Math.cos(ang) * 880 * rr + p.off * Math.sin(ang), y = cy + Math.sin(ang) * 400 * rr;
-        if (y < 140 || y > 880) return;
+        if (y < 150 || y > 880) return;
         const depth = (0.3 + 0.7 * p.d) * lerp(1, 0.55, cyc);         // smaller and softer as they approach
         const a = Math.pow(Math.sin(Math.PI * cyc), 1.2) * (0.08 + 0.22 * p.d) * ain * (1 - 0.5 * fp);
         L.glyph(pool[Math.floor(p.c * pool.length) % pool.length], x, y, q2(14 + depth * 26), COOL, a, { blur: 1 + Math.round((1 - depth) * 5) });

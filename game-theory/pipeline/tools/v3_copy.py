@@ -98,6 +98,9 @@ for c in out['chapters']:
         if 'right_items' in e: v['right']['items'] = e['right_items']
         n = len(b.get('lines', []))
         for st in v.get('steps', []): assert st.get('at', 0) < max(n, 1), (b['id'], st)
+    for b in c['beats']:   # knowledge tree leaves: no unexplained acronyms
+        if b['visual']['type'] == 'knowledge_tree':
+            b['visual'] = json.loads(json.dumps(b['visual'], ensure_ascii=False).replace('"KMRW"', '"声誉"'))
 assert seen == set(E), set(E) - seen
 json.dump(out, open(f'{ROOT}/script/v3.json', 'w'), ensure_ascii=False, indent=2)
 long = [(b['id'], l if isinstance(l, str) else l['text']) for c in out['chapters'] for b in c['beats'] for l in b.get('lines', [])]
