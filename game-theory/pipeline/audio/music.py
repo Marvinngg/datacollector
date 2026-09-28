@@ -16,6 +16,7 @@ Instruments: GeneralUser GS v2.0.3 SoundFont (S. Christian Collins; free for any
 rendered offline with tinysoundfont; the tape-hiss texture is synthesised here.
 """
 import json
+import os
 import sys
 import numpy as np
 from common import *   # noqa
@@ -557,14 +558,16 @@ del nz, mod
 stems['hiss'] = hs
 
 # ----------------------------------------------------------------------------- 4. balance + section gains
-GAIN = {'piano': 0.0, 'pulse': -5.0, 'spark': -6.0, 'pad': -4.0, 'hiss': None}
+# stem levels are set by loudness relative to the piano (the lead voice); pad / pulse / sparks sit underneath
+REL = {'piano': 0.0, 'pad': -4.5, 'pulse': -7.0, 'spark': -7.0, 'hiss': -42.0}
 ref = lufs(stems['piano'][:N])
+save = os.environ.get('STEMS') == '1'
 for k, x in stems.items():
-    if k == 'hiss':
-        g = 10 ** ((ref - 44 - lufs(x[:N])) / 20)
-    else:
-        g = 10 ** (GAIN[k] / 20)
+    L = lufs(x[:N])
+    g = 10 ** ((ref + REL[k] - L) / 20)
+    print(f'  stem {k:6s} {L:6.1f} LUFS -> {L + db(g):6.1f}')
     out += x * g
+    if save: write(f'{OUT}/stems/{k}.wav', (x * g)[:N] * 0.5)
     stems[k] = None
 
 pts = []

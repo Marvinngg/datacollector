@@ -3,7 +3,9 @@
 """
 import os
 import sys
+import warnings
 import soundfile as sf
+warnings.filterwarnings("ignore")
 from common import *   # noqa
 
 tl = Timeline()
@@ -17,4 +19,4 @@ plot_tracks(list(tr.items()), tl, f'{P}/all_{"_".join(tr)}.png', ' / '.join(tr))
 for c in tl.chapters:
     a, b = max(0, c['start'] - 3), min(tl.duration, c['end'] + 2)
     for k, x in tr.items():
-        plot_range(x, tl, a, b, f'{P}/z_{c["id"]}_{k}.png', f'{k}: {c["id"]} {c["title"]}')
+        plot_range(x, tl, a, b, f'{P}/z_{c["id"]}_{k}.png', f"{k}: {c['id']}")
