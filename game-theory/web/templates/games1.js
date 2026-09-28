@@ -932,7 +932,7 @@
       if (sM) {
         const L = ownLine(sM, api), d = L ? L.end - sM.lt : 7.8;
         const t1 = tM + 0.14 * d, t2 = tM + 0.44 * d, t3 = tM + 0.58 * d, t4 = tM + 0.74 * d;
-        const fade = 1 - 0.7 * kx - 0.3 * (sK ? ep(lt, doughTimes(sK, api).show, 0.8) : 0);
+        const fade = (1 - 0.7 * kx) * (1 - (sK ? ep(lt, doughTimes(sK, api).show - 0.9, 0.8) : 0));
         alpha(ctx, ep(lt, t1 - 0.3, 0.6) * fade, () => {
           const ax = 1110, yTop = 210, yBot = 800, ym = 505, gap = 70;
           ctx.save(); ctx.strokeStyle = 'rgba(233,228,216,0.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ax, yBot); ctx.lineTo(ax, yTop); ctx.stroke(); ctx.restore();

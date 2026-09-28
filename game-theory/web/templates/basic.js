@@ -570,7 +570,7 @@
     const items = V.items || [], n = items.length, cols = n <= 4 ? 2 : 3, rows = Math.ceil(n / cols);
     const gap = 32, w = cols === 2 ? 760 : 520, pad = 46;
     const dO = { size: 32, family: F.sans, weight: 400 };
-    const cells = items.map(it => ({ dl: String(it.desc || '').split(/\s+·\s+/).flatMap(p => wrapNice(p, w - pad * 2, dO)), fn: it.footnote ? wrap(it.footnote, w - pad * 2, { size: 24, family: F.sans }) : [] }));
+    const cells = items.map(it => ({ dl: String(it.desc || '').split(/\s+·\s+/).filter(p => p.trim()).flatMap(p => wrapNice(p, w - pad * 2, dO)), fn: it.footnote ? wrap(it.footnote, w - pad * 2, { size: 24, family: F.sans }) : [] }));
     const top0 = V.title ? 316 : 190, maxH = (870 - top0 - (rows - 1) * gap) / rows;
     const bare = cells.every(c => !c.dl.length && !c.fn.length);   // titles only: bigger type, centred in the cell
     const h = Math.min(maxH, bare ? 230 : Math.max(200, ...cells.map(c => pad + 72 + 26 + c.dl.length * 46 + c.fn.length * 34 + pad - 18)));
