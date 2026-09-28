@@ -208,6 +208,45 @@ def s_beat(c):
     return st(x, 0.8), float(rng.uniform(-0.2, 0.2))
 
 
+def s_question(c):
+    """a question appears: two soft rising bell tones (root -> ninth / fifth), left open"""
+    pcs, root, _ = harmony(c['t'] + 0.05)
+    a = nearest([root], 76)
+    b = next((a + d for d in (14, 7, 9) if (a + d) % 12 in pcs), a + 7)
+    dur = 3.0; n = n_of(dur)
+    x = bell(mtof(a), dur, taus=(0.9, 0.4, 0.2, 0.1)) * 0.6
+    x += pad_to(np.concatenate([np.zeros(n_of(0.3)), bell(mtof(b), dur - 0.3, taus=(1.2, 0.5, 0.25, 0.1))]), n)
+    return st(filt(x, 'lp', 6000), 0.6), -0.05
+
+
+def s_countdown(c):
+    """thinking time: a soft wooden tick each second over dur (or one tick per cue when dur is absent)"""
+    dur = float(c.get('dur', 0) or 0)
+    ts = np.arange(0, dur - 0.05, 1.0) if dur > 0.5 else np.array([0.0])
+    n = n_of((ts[-1] if len(ts) else 0) + 0.3); x = np.zeros(n)
+    for j, tt in enumerate(ts):
+        L = n_of(0.08); i = n_of(tt)
+        if i + L > n: break
+        tl_ = t_(L)
+        tk = filt(noise(L) * np.exp(-tl_ / 0.0018), 'bp', 1500 if j % 2 else 1800, q=1.6)
+        tk += np.sin(2 * np.pi * (620 if j % 2 else 700) * tl_) * np.exp(-tl_ / 0.01) * 0.5
+        x[i:i + L] += tk * (0.75 + 0.25 * (j == len(ts) - 1))
+    return st(filt(x, 'lp', 5000), 0.2), 0.0
+
+
+def s_reveal(c):
+    """the answer is revealed: a soft upward air-swell into a warm bell on the resolved chord's third / root"""
+    n = n_of(3.0); t = t_(n)
+    pcs, root, _ = harmony(c['t'] + 0.3)
+    e = np.sin(0.5 * np.pi * np.clip(t / 0.35, 0, 1)) ** 2 * np.exp(-np.maximum(0, t - 0.35) / 0.35)
+    air = np.stack([airband(n, 1200, 6000), airband(n, 1200, 6000)], 1) * e[:, None] * 0.35
+    third = [p for p in pcs if (p - root) % 12 in (3, 4)] or [root]
+    k = nearest(third, 81)
+    b = np.zeros(n); i = n_of(0.3)
+    b[i:] = bell(mtof(k), (n - i) / SR) + 0.5 * bell(mtof(nearest([root], k - 5)), (n - i) / SR)
+    return air + st(filt(b, 'lp', 6500), 0.7), None
+
+
 def s_generic(c):
     n = n_of(0.3)
     pcs, _, _ = harmony(c['t'])
@@ -216,13 +255,14 @@ def s_generic(c):
 
 PRE = {'chapter': 0.6}          # seconds a sound starts before its cue (breaths that should peak on the cue)
 DESIGN = {'tick': s_tick, 'pop': s_pop, 'whoosh': s_whoosh, 'swish': s_swish, 'chime': s_chime, 'click': s_click,
-          'thud': s_thud, 'count': s_count, 'chapter': s_chapter, 'beat': s_beat}
+          'thud': s_thud, 'count': s_count, 'chapter': s_chapter, 'beat': s_beat,
+          'question': s_question, 'countdown': s_countdown, 'reveal': s_reveal, 'tally': s_count}
 # peak level of each sound in sfx.wav (dBFS, dry). mix.py adds sfx at unity against a voice stem of ~-19 LUFS
 # (voice peaks ~-6 dBFS): everything sits 20-40 dB under the voice.
 TARGET = {'tick': -35, 'pop': -31, 'whoosh': -33, 'swish': -35, 'chime': -27, 'click': -33, 'thud': -28,
-          'count': -38, 'chapter': -31, 'beat': -45}
+          'count': -38, 'chapter': -31, 'beat': -45, 'question': -31, 'countdown': -40, 'reveal': -29, 'tally': -38}
 SEND = {'tick': 0.15, 'pop': 0.25, 'whoosh': 0.25, 'swish': 0.2, 'chime': 0.55, 'click': 0.12, 'thud': 0.2,
-        'count': 0.15, 'chapter': 0.5, 'beat': 0.3}
+        'count': 0.15, 'chapter': 0.5, 'beat': 0.3, 'question': 0.5, 'countdown': 0.12, 'reveal': 0.5, 'tally': 0.15}
 
 # ----------------------------------------------------------------------------- render
 out = np.zeros((n_of(D) + n_of(4), 2))
@@ -248,7 +288,8 @@ for c in cues:
     x, pan = DESIGN.get(typ, s_generic)(dict(c, t=t))
     x = fade(x, 0.0005, 0.02)
     lvl = TARGET.get(typ, -34)
-    if typ == 'chime' and tl.btype(BEAT.get(c.get('beat'), {})) not in ('remember', 'endcard'): lvl -= 3   # the big one is for "remember"
+    if typ == 'chime' and tl.btype(BEAT.get(c.get('beat'), {})) not in ('remember', 'endcard'): lvl -= 3
+    if typ == 'chime' and tl.silent and any(ty == 'reveal' and abs(u - t) < 0.6 for u, ty in all_t): lvl -= 4   # the big one is for "remember"
     x = x * (10 ** (lvl / 20) / max(np.abs(x).max(), 1e-9))
     g = float(c.get('v', 1.0))
     near = sum(1 for u in times_by_type[typ] if abs(u - t) < 0.3)             # clusters stay soft

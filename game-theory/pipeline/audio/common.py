@@ -29,6 +29,9 @@ class Timeline:
         self.beats = sorted(self.d['beats'], key=lambda b: b['start'])
         self.lines = sorted(self.d['lines'], key=lambda l: l['start'])
         self.vo_sr = int(self.d['sample_rate'])
+        # "silent" timelines (v2) have on-screen text lines but no voice: nothing to duck under or avoid
+        self.silent = self.d.get('mode') == 'silent'
+        self.speech = [] if self.silent else self.lines
         p = os.environ.get('GT_CUES') or os.path.join(BUILD, 'cues.json')
         self.cues = json.load(open(p)) if os.path.exists(p) else []
 
@@ -43,12 +46,12 @@ class Timeline:
     def beats_of(self, cid): return [b for b in self.beats if b['chapter'] == cid]
 
     def voiced(self, t, pad=0.0):
-        return any(l['start'] - pad <= t <= l['start'] + l['dur'] + pad for l in self.lines)
+        return any(l['start'] - pad <= t <= l['start'] + l['dur'] + pad for l in self.speech)
 
     def gaps(self, lo, hi, min_len=0.0):
         """voice-free intervals inside [lo, hi]"""
         out, cur = [], lo
-        for l in self.lines:
+        for l in self.speech:
             a, b = l['start'], l['start'] + l['dur']
             if b <= cur: continue
             if a >= hi: break

@@ -21,6 +21,10 @@ import sys
 import numpy as np
 from common import *   # noqa
 
+if Timeline().silent:            # v2: no narration, screen text only -> the music leads (music_v2.py)
+    import music_v2  # noqa: F401  (runs on import)
+    sys.exit(0)
+
 rng = np.random.default_rng(20260928)
 tl = Timeline()
 D = tl.duration
