@@ -133,8 +133,8 @@
       const oRows = opts.map(s => balance(String(s), inner, Q_OPT));
       const maxRows = Math.max(1, ...oRows.map(r => r.length));
       const h = 150 + (maxRows - 1) * 52;
-      const qY = ctxLine ? 408 : 396 - (qRows.length - 1) * 46;
-      return { ctxLine, cRows, qRows, qO, cO, qY, w, h, oRows, n, top: 506 };
+      const qY = ctxLine ? 384 : 372 - (qRows.length - 1) * 46;
+      return { ctxLine, cRows, qRows, qO, cO, qY, w, h, oRows, n, top: 478 };
     });
   }
   function qPhases(api) {
@@ -185,7 +185,7 @@
       // kicker — 问题 03
       const idx = qIndex(api);
       const label = V.label || (idx ? `问题 ${String(idx).padStart(2, '0')}` : '问题');
-      flankLabel(label, cx, Lq.ctxLine ? 238 : 250, ease.out(prog(lt, 0.1, 0.9)), { size: 26, family: F.sans, weight: 500, color: P.gold, spacing: 5 });
+      flankLabel(label, cx, Lq.ctxLine ? 212 : 226, ease.out(prog(lt, 0.1, 0.9)), { size: 26, family: F.sans, weight: 500, color: P.gold, spacing: 5 });
 
       // question: from blur to clear
       const rv = { lt, t0: tQ, per: 0.035, d: 1.5, blur: 14, rise: 0 };
@@ -240,17 +240,17 @@
       // quiet countdown: a thin ring slowly closing, "想一想" at its heart
       const ca = Math.min(ease.out(prog(lt, p0 - 0.2, p0 + 0.9)), 1 - ease.inOut(prog(lt, r0 - 0.1, r0 + 0.5)));
       if (ca > 0) {
-        const ry = Math.min(top + h + 136, 820), R = 58;
+        const R = 90, ry = Math.min(top + h + 34 + R, 872 - R);
         const cp = prog(lt, p0 + 0.3, p1 - 0.15);
         ctx.save(); ctx.globalAlpha *= ca;
         ring(cx, ry, R, P.ink, { lineWidth: 2, alpha: 0.13 });
         if (cp > 0) {
           const a0 = -Math.PI / 2, a1 = a0 + Math.PI * 2 * cp;
-          ctx.save(); ctx.strokeStyle = rgba(P.gold, 0.85); ctx.lineWidth = 3; ctx.lineCap = 'round';
+          ctx.save(); ctx.strokeStyle = rgba(P.gold, 0.85); ctx.lineWidth = 3.5; ctx.lineCap = 'round';
           ctx.beginPath(); ctx.arc(cx, ry, R, a0, a1); ctx.stroke(); ctx.restore();
-          dot(cx + Math.cos(a1) * R, ry + Math.sin(a1) * R, 4.5, P.warm, { glow: 12 });
+          dot(cx + Math.cos(a1) * R, ry + Math.sin(a1) * R, 5.5, P.warm, { glow: 14 });
         }
-        text('想一想', cx + 2, ry + 9, { size: 26, family: F.sans, weight: 400, color: P.ink, align: 'center', spacing: 4, alpha: 0.72 });
+        text('想一想', cx + 3, ry + 11, { size: 32, family: F.sans, weight: 400, color: P.ink, align: 'center', spacing: 6, alpha: 0.75 });
         ctx.restore();
       }
     },
@@ -356,7 +356,8 @@
   // =====================================================================
   // knowledge_tree — 片尾知识树
   // =====================================================================
-  const KT = { rootY: 842, trunkY0: 800, forkY: 704, pillY: 588, pillH: 56, rowGap: 60, leafO: { size: 30, family: F.sans, weight: 400, spacing: 1 } };
+  const KT = { rootY: 842, trunkY0: 800, forkY: 704, pillY: 588, pillH: 56, rowGap: 60, leafO: { size: 32, family: F.sans, weight: 400, spacing: 1 } };
+  const KT_COLORS = ['gold', 'teal', 'blue', 'ember', 'ok'];
   function ktLayout(V) {
     const bs = V.branches || [];
     return memo('kt|' + JSON.stringify(bs), () => {
@@ -373,7 +374,7 @@
           if (side < 0 && x - 40 - w < 130) side = 1;
           return { name, side, w, y: KT.pillY - KT.pillH / 2 - 52 - j * rowGap };
         });
-        return { name: b.name, x, leaves, pw: measure(b.name, nameO) + 56 };
+        return { name: b.name, x, leaves, pw: measure(b.name, nameO) + 56, col: P[b.color] || P[KT_COLORS[i % KT_COLORS.length]] };
       });
       return { branches, nameO, rowGap };
     });
@@ -428,17 +429,19 @@
         const lp = ease.inOut(prog(lt, t0, t0 + 1.0));
         if (lp > 0) {
           ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-          ctx.strokeStyle = rgba(mix(P.ink, P.gold, 0.4), 0.5); ctx.lineWidth = 2.6;
+          const lg = ctx.createLinearGradient(P0[0], P0[1], P3[0], P3[1]);   // trunk colour -> the branch's own colour
+          lg.addColorStop(0, rgba(mix(P.ink, P.gold, 0.4), 0.5)); lg.addColorStop(1, rgba(b.col, 0.7));
+          ctx.strokeStyle = lg; ctx.lineWidth = 2.6;
           strokePartial(pts, lp); ctx.restore();
-          if (lp < 1) { const q = bezPt(P0, P1, P2, P3, lp); dot(q[0], q[1], 3.5, P.warm, { glow: 10, alpha: 0.9 }); }
+          if (lp < 1) { const q = bezPt(P0, P1, P2, P3, lp); dot(q[0], q[1], 3.5, b.col, { glow: 10, alpha: 0.9 }); }
         }
         // branch name
         const pa = ease.out(prog(lt, t0 + 0.8, t0 + 1.4));
         if (pa > 0) {
           const pw = b.pw, ph = KT.pillH;
           ctx.save(); ctx.globalAlpha *= pa;
-          panel(b.x - pw / 2, KT.pillY - ph / 2 + (1 - pa) * 6, pw, ph, { r: ph / 2, fill: 'rgba(16,21,30,0.92)', stroke: rgba(P.gold, 0.5 + 0.2 * done), lineWidth: 1.5 });
-          text(b.name, b.x + Lk.nameO.spacing / 2, KT.pillY + 11 + (1 - pa) * 6, { ...Lk.nameO, color: P.gold, align: 'center' });
+          panel(b.x - pw / 2, KT.pillY - ph / 2 + (1 - pa) * 6, pw, ph, { r: ph / 2, fill: 'rgba(16,21,30,0.92)', stroke: rgba(b.col, 0.6 + 0.2 * done), lineWidth: 1.8 });
+          text(b.name, b.x + Lk.nameO.spacing / 2, KT.pillY + 11 + (1 - pa) * 6, { ...Lk.nameO, color: b.col, align: 'center' });
           ctx.restore();
         }
         // twig rising through the leaves
@@ -447,7 +450,7 @@
         const yTop = b.leaves[nL - 1].y - 14, yBot = KT.pillY - KT.pillH / 2;
         const twp = ease.inOut(prog(lt, tw0, tw0 + twD)), tipY = lerp(yBot, yTop, twp);
         if (twp > 0) {
-          ctx.save(); ctx.strokeStyle = rgba(mix(P.ink, P.gold, 0.4), 0.38); ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+          ctx.save(); ctx.strokeStyle = rgba(b.col, 0.55); ctx.lineWidth = 2; ctx.lineCap = 'round';
           ctx.beginPath(); ctx.moveTo(b.x, yBot); ctx.lineTo(b.x, tipY); ctx.stroke(); ctx.restore();
         }
         b.leaves.forEach((lf, j) => {
@@ -455,11 +458,11 @@
           const tl = tw0 + twD * clamp((yBot - ay) / (yBot - yTop)) * 0.92;
           const f = ease.out(prog(lt, tl, tl + 0.7)); if (f <= 0) return;
           const s = lf.side, dxl = b.x + s * 22 * f, dyl = lf.y + 2;
-          ctx.save(); ctx.strokeStyle = rgba(mix(P.ink, P.gold, 0.4), 0.38 * f); ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+          ctx.save(); ctx.strokeStyle = rgba(b.col, 0.55 * f); ctx.lineWidth = 1.8; ctx.lineCap = 'round';
           ctx.beginPath(); ctx.moveTo(b.x, ay); ctx.quadraticCurveTo(b.x + s * 4, dyl + 4, dxl, dyl); ctx.stroke(); ctx.restore();
           const glowK = 1 - ease.inOut(prog(lt, tl + 0.4, tl + 1.8));          // each fruit flares once as it ripens
-          dot(dxl, dyl, 5.5 * f, P.warm, { glow: 8 + 12 * glowK + 6 * done, alpha: 0.95 });
-          text(lf.name, b.x + s * 38, dyl + 11 + (1 - f) * 6, { ...KT.leafO, color: P.ink, align: s > 0 ? 'left' : 'right', alpha: f * (0.9 + 0.1 * done) });
+          dot(dxl, dyl, 6 * f, b.col, { glow: 8 + 12 * glowK + 6 * done, alpha: 0.95 });
+          text(lf.name, b.x + s * 38, dyl + 12 + (1 - f) * 6, { ...KT.leafO, color: mix(P.ink, b.col, 0.45), align: s > 0 ? 'left' : 'right', alpha: f * (0.9 + 0.1 * done) });
         });
       });
     },

@@ -299,7 +299,7 @@
     // reasoning log for the comparisons
     const firstDom = st.doms.length ? Math.min(...st.doms.map(d => d.lt)) : 1e9;
     const logA = 1 - ep(lt, firstDom, 0.5, ease.inOut);
-    if (st.comps.length && logA > 0) {
+    if (st.comps.length && logA > 0 && api.silent !== true) {
       const c0 = st.comps[0];
       alpha(ctx, logA * ep(lt, c0.s.lt, 0.5), () => text(`站在${c0.col ? M.rp : M.cp}的角度`, sx, G.y0 + 62, { size: 32, weight: 500, color: c0.col ? P.gold : P.teal }));
       st.comps.forEach((cm, k) => {
@@ -508,8 +508,13 @@
       // captions
       const fw = V.forward || '向前展望', bw = V.backward || '向后推理';
       const ca = ep(lt, tb, 0.6), cb = ep(lt, b0, 0.6);
+      if (api.silent === true) {   // the caption already says it: keep only small direction arrows
+        alpha(ctx, ca, () => arrow(ctx, [[160, 214], [160 + 90 * ca, 214]], 1, P.ink, 3, 14));
+        alpha(ctx, cb, () => arrow(ctx, [[250, 262], [250 - 90 * cb, 262]], 1, P.ember, 3, 14));
+      } else {
       alpha(ctx, ca, () => { text(fw, 150, 222, { size: 44, family: F.serif, weight: 600, color: P.ink }); const w = measure(fw, { size: 44, family: F.serif, weight: 600 }); arrow(ctx, [[160 + w, 206], [160 + w + 70 * ca, 206]], 1, P.ink, 3, 14); });
       alpha(ctx, cb, () => { const w = measure(bw, { size: 44, family: F.serif, weight: 600 }); text(bw, 240, 292, { size: 44, family: F.serif, weight: 600, color: P.ember }); arrow(ctx, [[230, 276], [230 - 70 * cb, 276]], 1, P.ember, 3, 14); void w; });
+      }
     },
     cues(V, api) {
       const { tg, tb, best } = treeTimes(V, api), tm = treeModel({ ...V, best }), out = [];
@@ -605,7 +610,7 @@
         const la = ep(lt, te + 1.2 + cells.length * 0.55, 0.6);
         alpha(ctx, la, () => text(V.eqLabel || `${cells.length === 2 ? '两' : cells.length}个均衡`, XG.x0 + XG.cw, XG.y0 + 2 * XG.ch + 62, { size: 40, family: F.serif, weight: 600, color: P.ember, align: 'center' }));
       }
-      alpha(ctx, ep(lt, tq + 0.3, 0.7), () => text(V.question || '到底谁冲？', XG.x0 + XG.cw, XG.y0 + 2 * XG.ch + 160, { size: 60, family: F.serif, weight: 600, color: P.ink, align: 'center' }));
+      if (api.silent !== true) alpha(ctx, ep(lt, tq + 0.3, 0.7), () => text(V.question || '到底谁冲？', XG.x0 + XG.cw, XG.y0 + 2 * XG.ch + 160, { size: 60, family: F.serif, weight: 600, color: P.ink, align: 'center' }));
     },
     cues(V, api) {
       const S = api.steps, out = [];
@@ -732,7 +737,7 @@
       const tt = ep(lt, tc + 4.2, 0.7);
       alpha(ctx, tt, () => {
         text(V.time || '12:00', cx, cy + R + 96, { size: 80, family: F.mono, weight: 700, color: P.ink, align: 'center' });
-        text(V.caption || `大多数人的答案：${V.answer || ''}`, cx, cy + R + 156, { size: 32, weight: 500, color: P.ember, align: 'center' });
+        if (api.silent !== true) text(V.caption || `大多数人的答案：${V.answer || ''}`, cx, cy + R + 156, { size: 32, weight: 500, color: P.ember, align: 'center' });
       });
     },
     cues(V, api) {
@@ -890,7 +895,23 @@
     const rr = qx * qx + qy * qy; qx += fk * rr * Math.cos(fd) * 0.5; qy += fk * rr * Math.sin(fd) * 0.5;
     return [FIX.x + qx, FIX.y + qy];
   }
-  const doughTimes = (s, api) => { const L = ownLine(s, api), d = L ? L.end - s.lt : 11; return { d, show: s.lt + 0.36 * d, go: s.lt + 0.44 * d, fix: s.lt + 0.64 * d, nash: s.lt + 0.86 * d }; };
+  const doughTimes = (s, api) => {
+    const L = ownLine(s, api), d = L ? L.end - s.lt : 11;
+    const L2 = api.silent === true && s.owner === api.beat.id && s.at != null ? api.line(s.at + 1) : null;
+    if (L2) {   // silent: the dough belongs to the next sentence ("揉一团面…")
+      const show = Math.max(s.lt + 0.5, L2.start - 0.6), go = show + 0.8, fix = go + 2.6;
+      return { d, show, go, fix, nash: fix + 2.0, stop: fix + 1.4 };
+    }
+    const T_ = { d, show: s.lt + 0.36 * d, go: s.lt + 0.44 * d, fix: s.lt + 0.64 * d, nash: s.lt + 0.86 * d };
+    T_.stop = T_.nash + 1.2; return T_;
+  };
+  // kneading clock: slow (0.6x), then eases to a halt at `stop` so the eye can rest on the kneaded shape
+  const KNEAD_SPEED = 0.6, KNEAD_DECEL = 1.8;
+  function kneadTau(lt, T_) {
+    const t = Math.max(0, lt - T_.go), s1 = Math.max(0, T_.stop - T_.go);
+    const e = t < s1 ? t : t < s1 + KNEAD_DECEL ? s1 + (t - s1) - (t - s1) ** 2 / (2 * KNEAD_DECEL) : s1 + KNEAD_DECEL / 2;
+    return e * KNEAD_SPEED;
+  }
   T.register('dough', {
     draw(ctx, V, lt, api) {
       const S = api.steps, iM = api.find(s => s.show === 'minimax'), iK = api.find(s => s.show === 'knead');
@@ -940,7 +961,7 @@
       if (sK) {
         const T_ = doughTimes(sK, api), da = ep(lt, T_.show, 0.8);
         if (da > 0) {
-          const amp = ease.inOut(prog(lt, T_.go, T_.go + 1.4)), tau = Math.max(0, lt - T_.go);
+          const amp = 0.7 * ease.inOut(prog(lt, T_.go, T_.go + 1.6)), tau = kneadTau(lt, T_), tauPrev = kneadTau(lt - 0.35, T_);
           const m = (x, y, tt) => doughMap(x, y, tt, amp);
           alpha(ctx, da, () => {
             // body
@@ -957,7 +978,7 @@
               const rr = DC.r * 0.88 * Math.sqrt((k + 0.5) / n), th = k * 2.39996;
               const px = DC.x + Math.cos(th) * rr, py = DC.y + Math.sin(th) * rr * 0.92;
               if (Math.hypot(px - FIX.x, py - FIX.y) < 26) continue;
-              const [x, y] = m(px, py, tau), [x0, y0] = m(px, py, Math.max(0, tau - 0.35));
+              const [x, y] = m(px, py, tau), [x0, y0] = m(px, py, tauPrev);
               if (amp > 0) { ctx.save(); ctx.strokeStyle = rgba(P.ink, 0.25); ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x, y); ctx.stroke(); ctx.restore(); }
               K.dot(x, y, 5.5, P.ink, { alpha: 0.78 });
             }
@@ -967,11 +988,11 @@
             if (fa > 0) {
               K.ring(FIX.x, FIX.y, 20, P.ember, { lineWidth: 3, alpha: fa });
               const pu = prog(lt, T_.fix, T_.fix + 1.4); if (pu < 1) K.ring(FIX.x, FIX.y, 20 + 50 * ease.out(pu), P.ember, { lineWidth: 2, alpha: 0.6 * (1 - pu) });
-              alpha(ctx, fa, () => {
+              if (api.silent !== true) alpha(ctx, fa, () => {
                 ctx.save(); ctx.strokeStyle = rgba(P.ember, 0.55); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(FIX.x + 22, FIX.y - 16); ctx.lineTo(1540, 290); ctx.lineTo(1580, 290); ctx.stroke(); ctx.restore();
                 text(V.fixedLabel || '不动点', 1590, 302, { size: 46, family: F.serif, weight: 600, color: P.ember });
               });
-              alpha(ctx, ep(lt, T_.nash, 0.7), () => text(V.eqLabel || '= 纳什均衡', 1590, 360, { size: 40, family: F.serif, weight: 600, color: P.ink }));
+              if (api.silent !== true) alpha(ctx, ep(lt, T_.nash, 0.7), () => text(V.eqLabel || '= 纳什均衡', 1590, 360, { size: 40, family: F.serif, weight: 600, color: P.ink }));
             }
           });
         }
@@ -984,7 +1005,7 @@
           const L = ownLine(s, api), d = L ? L.end - s.lt : 7.8;
           out.push({ t: s.lt, type: 'tick' }, { t: s.lt + 0.14 * d, type: 'whoosh', dur: 1.8 }, { t: s.lt + 0.74 * d, type: 'pop' });
         }
-        if (s.show === 'knead') { const T_ = doughTimes(s, api); out.push({ t: s.lt, type: 'tick' }, { t: T_.show, type: 'swish' }, { t: T_.fix, type: 'pop' }, { t: T_.nash, type: 'chime' }); }
+        if (s.show === 'knead') { const T_ = doughTimes(s, api); out.push({ t: s.lt, type: 'tick' }, { t: T_.show, type: 'swish' }, { t: T_.fix, type: 'pop' }); if (api.silent !== true) out.push({ t: T_.nash, type: 'chime' }); }
       }
       return out;
     },

@@ -10,7 +10,7 @@
  *                   outcomes?:['都沉默','一招一默','都招供'], steps:[{show:'choose'} {show:'tally'}]}
  *                  grid of pairs (甲 gold left, 乙 teal right) that flip from dots to 默/招 in a slow wave while live
  *                  counters roll; tally lights every "both confess" cell in ember and blows its counter up.
- *   sim_rps        {phase:'habit'|'mixed', habit?:15, mixed?:39, watch?:3, window?:4, names?:['石','剪','布'], seed?,
+ *   sim_rps        {phase:'habit'|'mixed', habit?:15, mixed?:30, watch?:3, window?:4, names?:['石','剪','布'], seed?,
  *                   first?:[1,2,0], habitNote?, oppNote?, mixedNote?, seenLabel?, blindLabel?, switchLabel?}
  *                  repeated rock-paper-scissors against an opponent who counters your most frequent throw.
  *                  Round tiles (you on top, opponent below, border = result), a big win-rate readout, the win-rate
@@ -200,33 +200,34 @@
     const pairs = out.map((o, i) => {
       const row = Math.floor(i / cols), col = i % cols;
       const ch = o === 0 ? [0, 0] : o === 2 ? [1, 1] : (r() < 0.5 ? [0, 1] : [1, 0]);   // 0 = silent, 1 = confess
-      const d = 0.55 * r() + 0.45 * (col + row) / Math.max(1, cols + rows - 2);
-      return { o, ch, row, col, d, ph: r() * TAU };
+      return { o, ch, row, col, ph: r() * TAU };
     });
     const m = { n: out.length, counts: c, pairs, cols, rows };
     PRC.set(key, m); return m;
   }
   function prisonersTimes(V, api) {
     const S = api.steps, ic = api.find(s => s.show === 'choose'), it = api.find(s => s.show === 'tally');
-    const tc = ic >= 0 ? S[ic].lt : 0.4;
-    const tt = it >= 0 ? S[it].lt : (api.line(1) ? api.line(1).start : api.dur * 0.5);
-    const f0 = tc + 0.35, span = Math.max(1.2, Math.min(3.2, tt - 0.35 - f0));
-    return { tc, tt, f0, span };
+    const M = prisonersModel(V), tc = ic >= 0 ? S[ic].lt : 0.4;
+    // one row at a time, left to right; only ~one row is ever in motion
+    const f0 = tc + 0.6, rowSp = clamp((0.56 * api.dur - f0) / M.rows, 0.45, 0.95), colSp = Math.min(0.07, rowSp * 0.09), fd = 0.9;
+    const span = (M.rows - 1) * rowSp + (M.cols - 1) * colSp + fd;
+    const tt = Math.max(it >= 0 ? S[it].lt : 0, f0 + span + 0.7);      // tally only once every pair has chosen
+    return { tc, tt, f0, span, rowSp, colSp, fd };
   }
   T.register('sim_prisoners', {
     draw(ctx, V, lt, api) {
-      const M = prisonersModel(V), { tc, tt, f0, span } = prisonersTimes(V, api);
+      const M = prisonersModel(V), { tc, tt, f0, rowSp, colSp, fd } = prisonersTimes(V, api);
       const lab = V.labels || ['默', '招'], names = V.outcomes || ['都沉默', '一招一默', '都招供'];
       // ---- grid of pairs
       const gx = 188, gy = 216, pw = 86, ph = 64, cw = 74, chh = 52;
-      const ga = ep(lt, tc - 0.4, 0.7), tp = ep(lt, tt, 0.9, ease.inOut);
+      const ga = ep(lt, tc - 0.4, 0.8), tp = ep(lt, tt, 1.4, ease.inOut);
       alpha(ctx, ga, () => {
-        rich([{ t: '每一格 = 一对囚徒：左 ', color: P.dim }, { t: V.rowPlayer || '甲', color: P.gold, weight: 700 }, { t: '  右 ', color: P.dim }, { t: V.colPlayer || '乙', color: P.teal, weight: 700 }], gx, 178, { size: 26, weight: 500 });
+        rich([{ t: '每一格 = 一对囚徒：左 ', color: P.dim }, { t: V.rowPlayer || '甲', color: P.gold, weight: 700 }, { t: '  右 ', color: P.dim }, { t: V.colPlayer || '乙', color: P.teal, weight: 700 }], gx, 178, { size: 28, weight: 500 });
       });
       const counts = [0, 0, 0]; let chosen = 0;
       for (const p of M.pairs) {
         const x = gx + p.col * pw, y = gy + p.row * ph, cx = x + cw / 2, cy = y + chh / 2;
-        const tf = f0 + p.d * span, f = ep(lt, tf, 0.55);
+        const tf = f0 + p.row * rowSp + p.col * colSp, f = ep(lt, tf, fd, ease.inOut);
         if (f > 0.5) { counts[p.o]++; chosen++; }
         const hit = p.o === 2, dimK = hit ? 1 : 1 - 0.62 * tp;
         alpha(ctx, ga * dimK, () => {
@@ -234,9 +235,9 @@
           if (hit && tp > 0) strokeRR(ctx, x, y, cw, chh, 9, rgba(P.ember, 0.38 * tp), 1.5);
           for (let s = 0; s < 2; s++) {
             const sx = cx + (s ? 17 : -17), col = s ? P.teal : P.gold;
-            if (f < 1) K.dot(sx, cy, 4 + 1.2 * Math.sin(lt * 1.2 + p.ph + s), rgba(col, 0.55), { alpha: 1 - f });
+            if (f < 1) K.dot(sx, cy, 4.5, rgba(col, 0.5), { alpha: 1 - f });
             if (f > 0) {
-              const sc = 0.7 + 0.3 * f, silent = p.ch[s] === 0;
+              const sc = 0.85 + 0.15 * f, silent = p.ch[s] === 0;
               alpha(ctx, f, () => {
                 ctx.save(); ctx.translate(sx, cy + 1); ctx.scale(sc, sc);
                 text(lab[p.ch[s]], 0, 0, { size: 30, weight: silent ? 700 : 500, color: col, align: 'center', baseline: 'middle', glow: silent ? 12 : 0 });
@@ -248,7 +249,7 @@
       }
       // ---- counters
       const rx = 1170, rr = 1760, ca = ep(lt, tc, 0.7);
-      const rowsY = [300, 450, 640], big = ease.inOut(prog(lt, tt, tt + 1.1));
+      const rowsY = [300, 450, 640], big = ease.inOut(prog(lt, tt, tt + 1.6));
       const glyphs = [[0, 0], [1, 0], [1, 1]], barC = [P.ok, P.dim, P.ember];
       alpha(ctx, ca, () => {
         for (let o = 0; o < 3; o++) {
@@ -266,7 +267,7 @@
           });
         }
         // progress: how many pairs have chosen
-        const fin = ep(lt, tt + 0.6, 0.8);
+        const fin = ep(lt, tt + 1.2, 1.0);
         text(`已做出选择  ${chosen} / ${M.n}`, rx, 790, { size: 28, family: F.sans, weight: 500, color: P.dim, alpha: 1 - fin });
         alpha(ctx, fin, () => {
           const people = 2 * M.n, conf = M.pairs.reduce((a, p) => a + p.ch[0] + p.ch[1], 0);
@@ -278,7 +279,7 @@
     },
     cues(V, api) {
       const { tc, tt, f0, span } = prisonersTimes(V, api);
-      return [{ t: tc, type: 'tick' }, { t: f0, type: 'count', dur: +(span + 0.5).toFixed(2) }, { t: tt + 0.2, type: 'tally' }, { t: tt + 0.9, type: 'pop' }];
+      return [{ t: tc, type: 'tick' }, { t: f0, type: 'count', dur: +span.toFixed(2) }, { t: tt + 0.2, type: 'tally' }, { t: tt + 1.2, type: 'pop' }];
     },
   });
 
@@ -288,7 +289,7 @@
   const counter = x => (x + 2) % 3;
   const RPC = new Map();
   function rpsModel(V) {
-    const H = V.habit || 15, Mn = V.mixed || 39, W = V.watch == null ? 3 : V.watch, WIN = V.window || 4, key = JSON.stringify([H, Mn, W, WIN, V.seed, V.first]);
+    const H = V.habit || 15, Mn = V.mixed || 30, W = V.watch == null ? 3 : V.watch, WIN = V.window || 4, key = JSON.stringify([H, Mn, W, WIN, V.seed, V.first]);
     if (RPC.has(key)) return RPC.get(key);
     const rounds = [];
     // habit: you always throw rock; the opponent plays some opening throws, then counters your most frequent throw
@@ -332,8 +333,8 @@
   /** local time at which each round lands in this beat (habit rounds are long done in the mixed beat) */
   function rpsTimes(V, api, m) {
     if (V.phase === 'mixed') {
-      const t0 = 1.3, sp = clamp((0.78 * api.dur - t0) / m.M, 0.12, 0.32);
-      return { ts: m.rounds.map((R, i) => (R.ph === 0 ? -100 + i * 0.01 : t0 + (i - m.H) * sp)), sw: 0.55, end: t0 + m.M * sp };
+      const t0 = 1.8, sp = clamp((0.8 * api.dur - t0) / m.M, 0.2, 0.42);
+      return { ts: m.rounds.map((R, i) => (R.ph === 0 ? -100 + i * 0.01 : t0 + (i - m.H) * sp)), sw: 0.6, end: t0 + m.M * sp };
     }
     const k = scaleT(api, 6.15), w0 = 0.6 * k, wsp = 0.62 * k, t1 = w0 + m.W * wsp + 0.1;
     const sp = clamp((0.84 * api.dur - t1) / Math.max(1, m.H - m.W - 1), 0.14, 0.45);
@@ -350,7 +351,7 @@
       const swp = mixed ? ep(lt, sw, 0.8, ease.inOut) : 0;          // switch to random
       // how far the simulation has run: last landed round and its landing progress
       let last = -1; for (let i = 0; i < N; i++) if (lt >= ts[i]) last = i;
-      const land = i => ep(lt, ts[i], 0.35);
+      const land = i => ep(lt, ts[i], 0.55);
       const hRow = Math.ceil(m.H / RG.cols);
       const tilePos = i => {
         const ph = m.rounds[i].ph, j = ph ? i - m.H : i, row = Math.floor(j / RG.cols) + (ph ? hRow : 0);
@@ -358,7 +359,7 @@
       };
       // ---- legend
       alpha(ctx, aIn, () => {
-        let x = RG.x0; const o = { size: 26, weight: 500 };
+        let x = RG.x0; const o = { size: 30, weight: 500 };
         text('上', x, 180, { ...o, color: P.dim }); x += measure('上 ', o);
         text(V.you || '你', x, 180, { ...o, weight: 700, color: P.gold }); x += measure((V.you || '你') + '   ', o);
         text('下', x, 180, { ...o, color: P.dim }); x += measure('下 ', o);
@@ -380,8 +381,8 @@
       if (mixed) alpha(ctx, ep(lt, sw + 0.2, 0.7), () => {
         const y = RG.y0 + hRow * RG.py + RG.gap / 2 - 7;
         ctx.save(); ctx.strokeStyle = rgba(P.ok, 0.55); ctx.lineWidth = 2; ctx.setLineDash([8, 8]);
-        ctx.beginPath(); ctx.moveTo(RG.x0 + 150, y); ctx.lineTo(RG.x0 + RG.cols * RG.px - 10, y); ctx.stroke(); ctx.restore();
-        text(V.switchLabel || '改成随机', RG.x0, y, { size: 26, weight: 700, color: P.ok, baseline: 'middle' });
+        ctx.beginPath(); ctx.moveTo(RG.x0 + 136, y); ctx.lineTo(RG.x0 + RG.cols * RG.px - 10, y); ctx.stroke(); ctx.restore();
+        text(V.switchLabel || '改成随机', RG.x0, y, { size: 28, weight: 700, color: P.ok, baseline: 'middle' });
       });
       // ---- the two strategies, spelled out under the habit rows (they give way to the random rows)
       const noteA = (mixed ? 1 - ep(lt, sw, 0.6) : ep(lt, 0.5, 0.7)) * aIn;
@@ -403,11 +404,11 @@
       const rcol = rate == null ? P.dim : curPh === 0 ? (rate < 0.35 ? P.red : P.ink) : (Math.abs(rate - 0.5) < 0.08 ? P.ok : P.ink);
       alpha(ctx, aIn, () => {
         text(V.rateLabel || '你的胜率', RC.x0, 206, { size: 30, weight: 500, color: P.dim });
-        text('平局记半', RC.x0 + measure(V.rateLabel || '你的胜率', { size: 30, weight: 500 }) + 18, 206, { size: 24, weight: 400, color: P.dim, alpha: 0.8 });
+        text('平局记半', RC.x0 + measure(V.rateLabel || '你的胜率', { size: 30, weight: 500 }) + 18, 206, { size: 26, weight: 400, color: P.dim });
         const numA = mixed ? 1 - bump(lt, sw, 0.9) * 0.8 : 1;
-        const bb = last >= 0 ? bump(lt, ts[last], 0.3) : 0;
+        const bb = last >= 0 ? bump(lt, ts[last], 0.5) : 0;
         text(rate == null ? '—' : `${Math.round(rate * 100)}%`, RC.x0, 330, { size: 112, family: F.mono, weight: 700, color: rcol, alpha: numA, glow: 8 + 10 * bb + 16 * settled });
-        const rn = last >= 0 ? (curPh ? last - m.H + 1 : last + 1) : 0;
+        const rn = last + 1;                                   // one running count across both phases
         text(rn ? `第 ${rn} 局` : '', RC.x1, 330, { size: 40, family: F.sans, weight: 500, color: P.ink, align: 'right', alpha: 0.85 });
       });
       // ---- curve
@@ -416,7 +417,7 @@
         ctx.save(); ctx.strokeStyle = 'rgba(233,228,216,0.14)'; ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.moveTo(RC.x0, RC.y1); ctx.lineTo(RC.x1, RC.y1); ctx.moveTo(RC.x0, RC.y0); ctx.lineTo(RC.x1, RC.y0); ctx.stroke();
         ctx.strokeStyle = 'rgba(233,228,216,0.4)'; ctx.setLineDash([6, 8]); ctx.beginPath(); ctx.moveTo(RC.x0, Y(0.5)); ctx.lineTo(RC.x1, Y(0.5)); ctx.stroke(); ctx.restore();
-        [[1, '100%'], [0.5, '50%'], [0, '0%']].forEach(([v, s]) => text(s, RC.x0 - 14, Y(v), { size: 24, family: F.mono, color: P.dim, align: 'right', baseline: 'middle' }));
+        [[1, '100%'], [0.5, '50%'], [0, '0%']].forEach(([v, s]) => text(s, RC.x0 - 14, Y(v), { size: 26, family: F.mono, color: P.dim, align: 'right', baseline: 'middle' }));
         if (mixed) alpha(ctx, ep(lt, sw + 0.2, 0.7), () => {
           const xd = (X(m.H - 1) + X(m.H)) / 2;
           ctx.save(); ctx.strokeStyle = rgba(P.ok, 0.5); ctx.lineWidth = 2; ctx.setLineDash([5, 7]);
@@ -445,7 +446,7 @@
       // ---- your throw distribution: what the opponent reads
       const dy0 = 690, dys = 52;
       alpha(ctx, aIn, () => {
-        text(V.readLabel || '对手盯着的：你的出拳比例', RC.x0, dy0, { size: 26, weight: 500, color: P.dim });
+        text(V.readLabel || '对手盯着的：你的出拳比例', RC.x0, dy0, { size: 28, weight: 500, color: P.dim });
         // current distribution (tweened between rounds)
         let dist = [0, 0, 0];
         if (last >= 0) {
@@ -469,14 +470,14 @@
         if (!mixed) {
           const a = ep(lt, seen, 0.6);
           alpha(ctx, a, () => {
-            const w = measure(V.readLabel || '对手盯着的：你的出拳比例', { size: 26, weight: 500 });
-            text(V.seenLabel || `→ 看穿了，专出「${names[counter(0)]}」`, RC.x0 + w + 16, dy0, { size: 26, weight: 700, color: P.teal });
+            const w = measure(V.readLabel || '对手盯着的：你的出拳比例', { size: 28, weight: 500 });
+            text(V.seenLabel || `→ 看穿了，专出「${names[counter(0)]}」`, RC.x0 + w + 14, dy0, { size: 28, weight: 700, color: P.teal });
           });
         } else {
           const a = ep(lt, ts[m.H] + 1.0, 0.7);
           alpha(ctx, a, () => {
-            const w = measure(V.readLabel || '对手盯着的：你的出拳比例', { size: 26, weight: 500 });
-            text(V.blindLabel || '→ 怎么针对都没用', RC.x0 + w + 16, dy0, { size: 26, weight: 700, color: P.ok });
+            const w = measure(V.readLabel || '对手盯着的：你的出拳比例', { size: 28, weight: 500 });
+            text(V.blindLabel || '→ 怎么针对都没用', RC.x0 + w + 14, dy0, { size: 28, weight: 700, color: P.ok });
           });
         }
       });

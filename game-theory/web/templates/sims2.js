@@ -102,7 +102,9 @@
     timing(V, api) {
       const tP = step(api, 'play', 0.3), tW = step(api, 'winner', api.dur * 0.42);
       const tS = tP + 0.7;                                          // rounds start
-      const tE = Math.max(tS + 3.2, Math.min(tS + 14, tW + 0.5));   // round 200 reached
+      // round 200 reached: the tournament takes most of the beat (>= 10 s when the beat allows), leaving
+      // ~7 s at the end for the champion and its rules; never earlier than the winner step
+      const tE = Math.max(tW + 0.5, tS + clamp(api.dur - tS - 7, 3.2, 12));
       return { tP, tW, tS, tE, tH: tE + 0.25, tR1: tE + 0.7, tR2: tE + 1.4, tNote: tE + 2.3 };
     },
     sim(V) {
@@ -114,7 +116,7 @@
       const tm = this.timing(V, api), S = this.sim(V), R = S.R, n = S.n;
       const nameOf = k => (V.names && V.names[k]) || STRATS[k].name;
       // round as a function of time: slow at first (you can see who grabs the lead), then faster, settling at the end
-      const roundAt = t => R * ease.inOut(prog(t, tm.tS, tm.tE));
+      const roundAt = t => R * ease.sine(prog(t, tm.tS, tm.tE));
       const r = roundAt(lt), ri = Math.floor(r), rf = r - ri;
       const score = i => ri >= R ? S.cum[i][R] : lerp(S.cum[i][ri], S.cum[i][ri + 1], rf);
       const winA = fin(lt, tm.tH, 0.7);
@@ -167,7 +169,7 @@
         text(V.cLabel || '合作', x0 + 30, ly, { size: 26, color: P.ink });
         ctx.fillStyle = P.red; ctx.beginPath(); ctx.roundRect(x0 + 110, ly - 18, 20, 20, 4); ctx.fill();
         text(V.dLabel || '背叛', x0 + 140, ly, { size: 26, color: P.ink });
-        text(V.payoff || '都合作各得 3 · 背叛者 5、被骗 0 · 都背叛各 1', x0 + 236, ly, { size: 24, color: P.dim });
+        text(V.payoff || '都合作各得 3 · 背叛者 5、被骗 0 · 都背叛各 1', x0 + 236, ly, { size: 26, color: P.dim });
       });
 
       // ---------------- the rules of the winner (left, after the result)
@@ -187,7 +189,7 @@
         // the board re-sorts at a calm, fixed cadence: every Q seconds it glides (over D seconds) to the
         // (hysteresis) ranking it will have when the glide ends — so it is never visibly out of order.
         // A pure function of time.
-        const Q = V.resort || 0.5, D = 0.42;
+        const Q = V.resort || 2.0, D = 0.9;
         const rankAtT = t => S.rankAt[Math.min(R, Math.max(0, Math.floor(roundAt(t))))];
         const kq = Math.floor((lt - tm.tS) / Q), sq = tm.tS + kq * Q;
         const endK = Math.ceil((tm.tE - tm.tS) / Q);
@@ -287,11 +289,11 @@
       const tLic = tO, tLock = tO + 1.0;
       const t5 = tO + clamp(openD * 0.3, 1.6, 3.5);                 // the extra licence
       const tN0 = t5 + 0.9;                                          // newcomers walk in, one by one
-      const gap = clamp((tB - 0.2 - tN0) / Math.max(1, nNew), 0.3, 0.55), tN1 = tN0 + gap * nNew;
+      const gap = clamp((tB + 0.6 - tN0) / Math.max(1, nNew), 0.3, 0.7), tN1 = tN0 + gap * nNew;
       const tR0 = Math.max(tB + 0.5, tN1 + 0.8);                     // the full count holds a moment first
-      const tR1 = Math.max(tR0 + 2.6, Math.min(tR0 + 9, api.dur - 2.3)); // bidding rounds
+      const tR1 = Math.max(tR0 + 2.6, Math.min(tR0 + 10, api.dur - 3.2)); // bidding rounds
       const tLand = tR1 + 0.25;
-      return { tO, tB, tLic, tLock, t5, tN0, tN1, gap, tR0, tR1, tLand, tFin: tLand + 1.2 };
+      return { tO, tB, tLic, tLock, t5, tN0, tN1, gap, tR0, tR1, tLand, tFin: tLand + 1.5 };
     },
     draw(ctx, V, lt, api) {
       const tm = this.timing(V, api);
@@ -356,7 +358,7 @@
         const tIn = isNew ? tm.t5 : tm.tLic + 0.12 * l;
         const a = fin(lt, tIn, 0.8); if (a <= 0) return;
         const own = S.owner[l], ob = S.bidders[own];
-        const tl = tm.tLand + 0.18 * l, k = ease.inOut(prog(lt, tl, tl + 1.1));
+        const tl = tm.tLand + 0.12 * l, k = ease.inOut(prog(lt, tl, tl + 1.0));
         const p0 = { x: slotX(l), y: licY }, op = posOf(ob), p1 = { x: op.x, y: op.y - TR - 50 };
         const x = lerp(p0.x, p1.x, k), y = lerp(p0.y, p1.y, k) + rise(a, 14), s = lerp(1, 0.72, k);
         const w = 128 * s, h = 88 * s;
@@ -368,7 +370,7 @@
             rr(ctx, x - w / 2, y - h / 2, w, h, 14, 'rgba(40,26,16,0.95)', P.ember, 2.5); ctx.restore();
           } else rr(ctx, x - w / 2, y - h / 2, w, h, 14, 'rgba(18,24,34,0.95)', lerp(0, 1, k) > 0.5 ? rgba(oc, 0.8) : 'rgba(233,228,216,0.35)', 2);
           text('3G', x, y - 4 * s, { size: 34 * s, family: F.mono, weight: 700, color: isNew ? P.ember : P.ink, align: 'center', baseline: 'middle' });
-          text(String(l + 1), x, y + 28 * s, { size: 24 * s, family: F.mono, color: P.dim, align: 'center', baseline: 'middle' });
+          text(String(l + 1), x, y + 28 * s, { size: 24, family: F.mono, color: P.dim, align: 'center', baseline: 'middle' });
         });
         if (isNew) A(ctx, fin(lt, tIn + 0.4, 0.7) * (1 - fin(lt, tm.tR0, 0.5)), () => text(V.newLabel || '给新来者', p0.x, licY + 92, { size: 30, weight: 700, color: P.ember, align: 'center' }));
       };
@@ -380,7 +382,7 @@
         const p = posOf(b), x = p.x - (b.inc ? 0 : 70 * (1 - ease.out(prog(lt, te, te + 0.9)))), y = p.y + (b.inc ? rise(a, 14) : 0);
         const col = b.inc ? P.teal : P.blue;
         const to = tOut(b), gone = isFinite(to) ? ease.inOut(prog(lt, to, to + 0.7)) : 0;
-        const own = S.owner.indexOf(i), won = own >= 0 ? fin(lt, tm.tLand + 0.18 * own + 1.0, 0.6) : 0;
+        const own = S.owner.indexOf(i), won = own >= 0 ? fin(lt, tm.tLand + 0.12 * own + 0.9, 0.6) : 0;
         A(ctx, a, () => {
           const c = gone > 0 ? lerpColor(col, '#4a505b', gone) : col;
           ctx.save();
@@ -439,8 +441,8 @@
           runs(done ? [[`${nLic} 家`, P.ok, { family: F.sans, weight: 700 }], [' 拿到牌照', P.ink]] : [['仍在竞价 ', P.dim], [String(active), P.ink, { family: F.mono, weight: 700, size: 34 }], [' 家', P.dim]], cx1, 540, { size: 28, align: 'right' });
         });
         ctx.fillStyle = 'rgba(233,228,216,0.25)'; ctx.fillRect(cx0, cy1, cx1 - cx0, 2);
-        text(V.r0Label || '第 1 轮', cx0, cy1 + 38, { size: 24, color: P.dim });
-        text(V.rNLabel || `第 ${R} 轮`, cx1, cy1 + 38, { size: 24, color: P.dim, align: 'right' });
+        text(V.r0Label || '第 1 轮', cx0, cy1 + 40, { size: 26, color: P.dim });
+        text(V.rNLabel || `第 ${R} 轮`, cx1, cy1 + 40, { size: 26, color: P.dim, align: 'right' });
         // the locked market: flat, near the reserve
         const fl = fin(lt, tm.tLock + 0.3, 0.8);
         A(ctx, fl * lerp(1, 0.55, fin(lt, tm.tR0, 0.6)), () => {
