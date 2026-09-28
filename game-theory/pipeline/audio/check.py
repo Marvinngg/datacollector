@@ -53,7 +53,7 @@ for c in tl.chapters:
             ax1.axvline(ch['t0'], color='C3', lw=0.4, alpha=0.5)
             ax1.text(ch['t0'] + 0.1, -10, ch['name'] + ('*' if ch['kind'] in ('cad', 'final') else ''), fontsize=8, color='C3')
     m = rd(f'{OUT}/mix.wav', a, b)
-    if m is not None:
+    if m is not None and len(m) > 8192:
         t, f, S = coarse_spec(to_stereo(m).mean(1), nperseg=2048, max_cols=1400)
         ax2.pcolormesh(t + a, f, S, shading='auto', vmin=-130, vmax=-40, cmap='magma')
         ax2.set_yscale('symlog', linthresh=200); ax2.set_ylim(30, 16000)
