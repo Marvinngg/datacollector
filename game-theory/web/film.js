@@ -174,6 +174,47 @@
     }
   }
 
+  // ---------- v3 look: episode card and captions in serif light ----------
+  function chapterCard3(c, t) {
+    const [a, b] = c.card, lt = t - a, d = b - a;
+    const al = Math.min(ease.out(prog(lt, 0, 0.8)), 1 - ease.in(prog(lt, d - 0.7, d)));
+    if (al <= 0) return;
+    const acc = L.accent(TL, t);
+    ctx.save();
+    L.serif(c.num, W / 2, 452, { size: 30, color: 'rgba(233,228,216,0.6)', glow: 0, alpha: al, reveal: prog(lt, 0.1, 1.0), spacing: 10 });
+    L.serif(c.title, W / 2, 548, { size: 92, color: '#f2ecdf', glow: 14, alpha: al, reveal: prog(lt, 0.35, 1.8), spacing: 14 });
+    const lw = 280 * ease.inOut(prog(lt, 0.8, 2.0));
+    ctx.globalAlpha = al * 0.7; ctx.fillStyle = acc; ctx.fillRect(W / 2 - lw / 2, 624, lw, 1.5);
+    ctx.restore();
+  }
+  function captions3(t) {
+    for (const b of TL.beats) {
+      if (!b.visual._caption || t < b.start || t >= b.end) continue;
+      const beatA = Math.min(b._joinPrev ? 1 : ease.out(prog(t, b.start, b.start + FADE)), b._joinNext ? 1 : 1 - ease.in(prog(t, b.end - FADE, b.end)));
+      b.lines.forEach((l, i) => {
+        const next = b.lines[i + 1], end = next ? next.start : b.end;
+        if (t < l.start || t >= end + 0.4) return;
+        const out = next ? 1 - ease.in(prog(t, end - 0.45, end)) : 1;
+        const str = l.text.replace(/[。]$/, ''), size = 50;
+        let rows = [str];
+        if (L.measureSerif(str, size) > 1500) {
+          const mid = str.length / 2; let cut = -1, best = 1e9;
+          for (let k = 0; k < str.length; k++) if ('，；：、。？'.includes(str[k]) && Math.abs(k - mid) < best) { best = Math.abs(k - mid); cut = k + 1; }
+          if (cut < 0) cut = Math.round(mid);
+          rows = [str.slice(0, cut), str.slice(cut)];
+        }
+        const n = [...str].length, dur = Math.min(1.6, 0.5 + n * 0.04);
+        let done = 0;
+        rows.forEach((r, k) => {
+          const y = H - 104 - (rows.length - 1 - k) * 66, rn = [...r].length;
+          const rev = clamp((prog(t, l.start, l.start + dur) * n - done) / rn);
+          L.serif(r, W / 2, y, { size, color: '#efe9dc', glow: 8, alpha: out * beatA, reveal: rev });
+          done += rn;
+        });
+      });
+    }
+  }
+
   function missing(type) {
     text(`[template “${type}” not written yet]`, W / 2, H / 2, { size: 32, family: F.mono, color: P.dim, align: 'center' });
   }
@@ -195,12 +236,13 @@
 
   function renderFrame(t) {
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
-    background(t);
-    for (const c of TL.chapters) if (c.card && t >= c.card[0] && t < c.card[1]) chapterCard(c, t);
+    const V3 = TL.mode === 'silent' && window.L;
+    if (V3) L.background(TL, t); else background(t);
+    for (const c of TL.chapters) if (c.card && t >= c.card[0] && t < c.card[1]) (V3 ? chapterCard3 : chapterCard)(c, t);
     let ending = false;
     for (const b of TL.beats) if (t >= b.start && t < b.end) { drawBeat(b, t); if (b.visual.type === 'endcard') ending = true; }
-    if (!ending) progressBar(t);
-    if (TL.mode === 'silent') captions(t); else subtitles(t);
+    if (!ending && !V3) progressBar(t);
+    if (V3) { captions3(t); L.bloom(0.42); } else if (TL.mode === 'silent') captions(t); else subtitles(t);
     post(t);
     const fe = prog(t, TL.duration - 1.2, TL.duration - 0.2);   // the film always ends on pure black
     if (fe > 0) { ctx.globalAlpha = ease.in(fe); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
