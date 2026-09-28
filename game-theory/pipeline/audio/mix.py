@@ -180,7 +180,7 @@ def edit_clicks(x, times, name):
 
 
 edits = [l['start'] for l in tl.speech] + [l['start'] + l['dur'] for l in tl.speech] + [D - 0.01]
-edit_clicks(mix, edits + [c['t'] for c in tl.cues if 0 < c.get('t', -1) < D], 'mix (voice edges + cues)')
+edit_clicks(mix, edits, 'mix (voice edges + file end)')
 edit_clicks(music, [c['t0'] for c in meta.get('chords', [])], 'music (chord changes)')
 if '--plot' in sys.argv:
     del raw, pre_lim

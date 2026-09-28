@@ -142,7 +142,7 @@
   // One sentence at a time, revealed softly character by character, held until the next one.
   function captions(t) {
     for (const b of TL.beats) {
-      if (!b.visual.caption || t < b.start || t >= b.end) continue;
+      if (!b.visual._caption || t < b.start || t >= b.end) continue;
       const beatA = Math.min(b._joinPrev ? 1 : ease.out(prog(t, b.start, b.start + FADE)), b._joinNext ? 1 : 1 - ease.in(prog(t, b.end - FADE, b.end)));
       b.lines.forEach((l, i) => {
         const next = b.lines[i + 1];

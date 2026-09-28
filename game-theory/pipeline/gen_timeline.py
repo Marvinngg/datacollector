@@ -21,6 +21,17 @@ NO_CAPTION = {'line', 'remember', 'question', 'breath', 'endcard', 'title', 'kno
 def chars(t):  # reading load: CJK and letters/digits count, punctuation does not
     return len(re.sub(r'[\s，。、：；？！,.:;?!…—“”「」（）()·≠+\-=]', '', t))
 
+def visual_read(v):
+    """seconds needed to read the text a template draws (card/list items, compare panels)"""
+    txt = []
+    for it in v.get('items', []):
+        txt += [it.get('title', ''), it.get('desc', '')] if isinstance(it, dict) else [str(it)]
+    for side in ('left', 'right'):
+        if side in v: txt += [v[side].get('title', '')] + v[side].get('items', [])
+    n = len([x for x in txt if x])
+    return sum(chars(x) for x in txt) / P['cps'] + 0.5 * n if n else 0
+
+
 def read_time(t):
     return P['base'] + chars(t) / P['cps']
 
@@ -41,7 +52,7 @@ for c in S['chapters']:
             base['ref'] = vis['ref']; vis = base
         b_start = t; blines = []
         if vis['type'] == 'question':
-            r = P['base'] + chars(vis['q']) / P['cps'] + sum(0.8 + chars(o) / P['cps'] for o in vis['options'])
+            r = P['base'] + chars(vis['q']) / P['cps'] + sum(0.5 + chars(o) / P['cps'] for o in vis['options'])
             vis['phases'] = {'read': [0, round(r, 3)], 'pause': [round(r, 3), round(r + P['q_pause'], 3)],
                              'reveal': [round(r + P['q_pause'], 3), round(r + P['q_pause'] + P['q_reveal'], 3)]}
             t += r + P['q_pause'] + P['q_reveal']
@@ -54,9 +65,9 @@ for c in S['chapters']:
                         'pause': bool(ln.get('pause'))}
                 blines.append(item); lines.append(item); t += d
             t += P['tail'] if b['lines'] else 0
-            t = max(t, b_start + b.get('hold', 0))
+            t = max(t, b_start + b.get('hold', 0), b_start + min(20.0, P['lead'] + visual_read(vis) + sum(l['dur'] for l in blines) * 0.35))
         if vis['type'] == 'remember' and 'text' not in vis and blines: vis['text'] = blines[0]['text']
-        vis.setdefault('caption', vis['type'] not in NO_CAPTION)
+        vis['_caption'] = vis['type'] not in NO_CAPTION and vis.get('caption') is not False
         for st in vis.get('steps', []):
             k = st.get('at', 0)
             st['t'] = round((blines[k]['start'] if k < len(blines) else b_start) + st.get('delay', 0), 3)
