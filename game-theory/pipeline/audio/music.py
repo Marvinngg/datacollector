@@ -379,6 +379,16 @@ for l in tl.lines:
         P = pool(s['chord'], *reg)
         if P: add_piano(t, int(rng.choice(P)), m['vel'] - 8); lastt = t
 
+def ostinato(chd):
+    """1-5-9-5 (or 1-5-8-5 / 1-5-10-5 when the chord has no ninth) in the tenor, like a slow felt arpeggio"""
+    r = 48 + (chd['root'] - 48) % 12
+    if r < 47: r += 12
+    pcs = chd['pcs']
+    fifth = r + 7 if (r + 7) % 12 in pcs else (r + 5 if (r + 5) % 12 in pcs else r + 12)
+    top = next((r + d for d in (14, 15, 16, 12) if (r + d) % 12 in pcs), r + 12)
+    return [r, fifth, top, fifth]
+
+
 # 2d. pulse: steady (c3, "reasoning forward") / mixed (c4, randomised like a mixed strategy); heartbeat in 'chicken'
 for c in tl.chapters:
     P = plan(c['id']); pm = P['mood']['pulse']
@@ -398,8 +408,7 @@ for c in tl.chapters:
             v = 25 + 7 * frac
             if pm == 'steady':
                 if not (t < first_end and i % 2):          # first beat: half-time, then every quarter
-                    root = [k for k in pp if k % 12 == s['chord']['root']]
-                    pat = [root[0] if root else pp[0], pp[min(len(pp) - 1, 2)], pp[min(len(pp) - 1, 3)], pp[min(len(pp) - 1, 2)]]
+                    pat = ostinato(s['chord'])
                     add_piano(t, pat[i % 4], v - (3 if i % 2 else 0), bus=pulse_ev)
             else:
                 if rng.random() > 0.32:
@@ -602,6 +611,20 @@ for t, g in pts:
 out *= env_points(NB, pp)[:, None]
 
 out = out[:N]
+# 5. level automation for the voice-free moments. mix.py lifts the music ~11 dB wherever nobody speaks, so the
+# chapter-card "breath" is set a little under the running level of the score (it should feel thinner, not louder)
+# and the end card only slightly above it.
+Lb = lufs(out)
+auto = [(0.0, 0.0)]
+spots = [(c['card'][0] - 0.8, c['card'][1] + 0.4, -2.5) for c in tl.chapters if c.get('card')]
+if final_t is not None: spots.append((final_t - 0.3, D, -1.0))
+for a, b, rel in spots:
+    Lw = lufs(out[n_of(a):n_of(b)])
+    gdb = float(np.clip(Lb + rel - Lw, -8.0, 2.0))
+    auto += [(a - 0.6, 0.0), (a, gdb), (b, gdb), (b + 0.8, 0.0)]
+    print(f'  auto {a:7.2f}-{b:7.2f}: {Lw:6.1f} LUFS -> {gdb:+.1f} dB')
+auto.sort()
+out *= (10 ** (env_points(N, auto) / 20))[:, None]
 out = fade(out, 0.3, 2.5)
 out *= 10 ** (-3.0 / 20) / max(np.abs(out).max(), 1e-9)
 write(f'{OUT}/music.wav', out)

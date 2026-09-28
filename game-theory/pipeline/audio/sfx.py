@@ -135,7 +135,7 @@ def s_chime(c):
     land = nearest([root] + third, 79)
     up = [k for k in notes_in(pcs, land + 2, land + 9) if (k - root) % 12 in (7, 2, 11)]
     first = up[0] if up else land + 7
-    dur = 4.5; n = n_of(dur)
+    dur = 6.0; n = n_of(dur)
     a = bell(mtof(first), dur) * 0.55
     b = pad_to(np.concatenate([np.zeros(n_of(0.22)), bell(mtof(land), dur - 0.22)]), n)
     x = filt(a + b, 'lp', 6500)
@@ -228,6 +228,7 @@ SEND = {'tick': 0.15, 'pop': 0.25, 'whoosh': 0.25, 'swish': 0.2, 'chime': 0.55, 
 out = np.zeros((n_of(D) + n_of(4), 2))
 wet = np.zeros_like(out)
 room = make_ir(1.1, bright=0.4, seed=99, width=0.9)
+BEAT = {b['id']: b for b in tl.beats}
 cues = sorted([c for c in tl.cues if 0 <= float(c.get('t', -1)) < D], key=lambda c: float(c['t']))
 counts, peaks, skipped = {}, {}, {}
 times_by_type = {}
@@ -246,7 +247,9 @@ for c in cues:
         skipped[typ] = skipped.get(typ, 0) + 1; continue
     x, pan = DESIGN.get(typ, s_generic)(dict(c, t=t))
     x = fade(x, 0.0005, 0.02)
-    x = x * (10 ** (TARGET.get(typ, -34) / 20) / max(np.abs(x).max(), 1e-9))
+    lvl = TARGET.get(typ, -34)
+    if typ == 'chime' and tl.btype(BEAT.get(c.get('beat'), {})) not in ('remember', 'endcard'): lvl -= 3   # the big one is for "remember"
+    x = x * (10 ** (lvl / 20) / max(np.abs(x).max(), 1e-9))
     g = float(c.get('v', 1.0))
     near = sum(1 for u in times_by_type[typ] if abs(u - t) < 0.3)             # clusters stay soft
     g /= np.sqrt(max(1, near))
