@@ -180,6 +180,8 @@
     const al = Math.min(ease.out(prog(lt, 0, 0.8)), 1 - ease.in(prog(lt, d - 0.7, d)));
     if (al <= 0) return;
     const acc = L.accent(TL, t);
+    L.field(lt + 40, { n: 90, chars: c.title, seed: 7 + c.title.length, alpha: 0.11 * al, color: '#c9d2da' });
+    L.light(W / 2, 548, 420, 'rgba(233,210,160,0.07)', al * ease.out(prog(lt, 0.3, 2.0)));
     ctx.save();
     L.serif(c.num, W / 2, 452, { size: 30, color: 'rgba(233,228,216,0.6)', glow: 0, alpha: al, reveal: prog(lt, 0.1, 1.0), spacing: 10 });
     L.serif(c.title, W / 2, 548, { size: 92, color: '#f2ecdf', glow: 14, alpha: al, reveal: prog(lt, 0.35, 1.8), spacing: 14 });
