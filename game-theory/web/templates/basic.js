@@ -158,9 +158,10 @@
   /** approximate time the voice speaks `word` (linear within its line), or null */
   function wordTime(api, word, after = -Infinity) {
     if (!word) return null;
+    const w = String(word).replace(/\s+/g, '');
     for (const l of narration(api)) {
-      const i = l.text.indexOf(word); if (i < 0) continue;
-      const t = l.start + (i / Math.max(1, l.text.length)) * l.dur;
+      const tx = l.text.replace(/\s+/g, ''), i = tx.indexOf(w); if (i < 0) continue;
+      const t = l.start + (i / Math.max(1, tx.length)) * l.dur;
       if (t > after) return t;
     }
     return null;
@@ -668,6 +669,7 @@
       const m = n <= 2 ? 560 : n === 3 ? 420 : n === 4 ? 340 : 280, span = 1920 - 2 * m;
       const ay = V.title ? 540 : 490, xa = Math.max(160, m - 170), xb = 1920 - xa;
       const xs = items.map((_, i) => n === 1 ? 960 : m + span * i / (n - 1));
+      const colW = Math.min(400, n > 1 ? span / (n - 1) - 44 : 600);
       // base axis draws in
       const ap = ease.inOut(prog(lt, 0.2, 1.6));
       ctx.save(); ctx.fillStyle = rgba(P.ink, 0.16); ctx.fillRect(xa, ay - 1, (xb - xa) * ap, 2);
@@ -693,7 +695,7 @@
           text(it.name || '', x, ay + 76 - f.dy * 0.4, { size: 42, family: F.sans, weight: 500, color: P.ink, align: 'center' });
           const parts = String(it.desc || '').split(/\s+·\s+/);
           let yy = ay + 132;
-          parts.forEach((p, k) => wrap(p, 380, { size: 30, family: F.sans }).forEach(l => {
+          parts.forEach((p, k) => wrap(p, colW, { size: 30, family: F.sans }).forEach(l => {
             text(l, x, yy, { size: 30, family: F.sans, weight: 400, color: k === 0 ? P.ink : P.dim, alpha: k === 0 ? 0.88 : 1, align: 'center' }); yy += 44;
           }));
           ctx.restore();

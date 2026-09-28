@@ -220,8 +220,7 @@
           if (mine !== s.pick) numA[r][c][cm.col ? 0 : 1] *= 1 - 0.5 * fw * res;
         }
       }
-      const pr = s.pick, pc = cm.col ? s.col : s.pick;
-      const wv = cm.col ? 0 : 1;
+      const pr = s.pick, wv = cm.col ? 0 : 1;
       numS[cm.col ? pr : s.row][cm.col ? s.col : pr][wv] *= 1 + 0.14 * bump(lt, t0 + 1.0, 0.7);
       const ap = ease.inOut(prog(lt, t0 + 0.45, t0 + 1.1));
       const n = cm.col ? nR : nC;
@@ -231,7 +230,6 @@
         const b = cm.col ? numPos(G, s.pick, s.col, 0) : numPos(G, s.row, s.pick, 1);
         arrows.push({ a, b, p: ap, al: fw, color: cm.col ? P.gold : P.teal, col: cm.col });
       }
-      void pc;
     }
     // optimum contrast: dim the cells that are neither equilibrium nor optimum
     for (const o of st.opts) {
@@ -313,7 +311,7 @@
       });
     }
     // dominant labels
-    const labFade = 1 - ep(lt, st.focusT, 0.6, ease.inOut);
+    const labFade = 1 - ep(lt, st.focusT, 0.4, ease.inOut);
     for (const d of st.doms) {
       const a = ep(lt, d.lt + 0.35, 0.6) * labFade; if (a <= 0 || !d.label) continue;
       const col = d.player === 'col', c = col ? P.teal : P.gold, name = col ? M.cols[d.index] : M.rows[d.index];
@@ -339,7 +337,7 @@
         rich([{ t: String(cell[0]), color: P.gold }, { t: '  ·  ', color: P.dim }, { t: String(cell[1]), color: P.teal }], sx + sl + 2, y + 54, { size: 32, weight: 500 });
       });
     };
-    for (const e of st.eqs) if (e.label) tag(e.cell[0], e.cell[1], e.label, P.ember, e.lt + 0.2);
+    for (const e of st.eqs) if (e.label) tag(e.cell[0], e.cell[1], e.label, P.ember, e.lt + 0.45);
     for (const o of st.opts) if (o.label) tag(o.cell[0], o.cell[1], o.label, P.ok, o.lt + 0.3);
     // "≠" between equilibrium and optimum
     const eqL = st.eqs.find(e => e.label);
@@ -359,7 +357,7 @@
       if (st.iC >= 0) for (const row of st.cellT) for (const t of row) out.push({ t, type: 'tick' });
       for (const cm of st.comps) out.push({ t: cm.s.lt + 1.1, type: 'click' });
       for (const d of st.doms) out.push({ t: d.lt + 0.2, type: 'pop' });
-      for (const e of st.eqs) { out.push({ t: e.t, type: 'pop' }); if (e.label && e.lt > e.t + 0.1) out.push({ t: e.lt + 0.2, type: 'chime' }); }
+      for (const e of st.eqs) { out.push({ t: e.t, type: 'pop' }); if (e.label && e.lt > e.t + 0.1) out.push({ t: e.lt + 0.45, type: 'chime' }); }
       for (const o of st.opts) { out.push({ t: o.lt, type: 'pop' }); out.push({ t: o.lt + (o.neqDelay == null ? 3.0 : o.neqDelay), type: 'chime' }); }
       return out;
     },
@@ -627,7 +625,7 @@
   const east = nycAxis.e;
   const uv = (u, v) => [NYC.S[0] + nycAxis.d[0] * u + east[0] * v * NYC.hw, NYC.S[1] + nycAxis.d[1] * u + east[1] * v * NYC.hw];
   const PIN_UV = { '自由女神像': [-0.14, -1.95], '帝国大厦': [0.35, -0.08], '时代广场': [0.45, -0.45], '中央车站': [0.44, 0.45], '中央公园': [0.68, 0], '华尔街': [0.06, 0.1], '布鲁克林大桥': [0.1, 0.9] };
-  const halfW = u => (u < 0.34 ? 0.28 + 0.72 * Math.sin(u / 0.34 * Math.PI / 2) : u < 0.74 ? 1 : 1 - 0.5 * Math.pow((u - 0.74) / 0.26, 1.4));
+  const halfW = u => (u < 0.46 ? 0.22 + 0.78 * Math.pow(Math.sin(u / 0.46 * Math.PI / 2), 1.3) : u < 0.76 ? 1 : 1 - 0.45 * Math.pow((u - 0.76) / 0.24, 1.4));
   let islandCache = null;
   function island() {
     if (islandCache) return islandCache;
@@ -869,9 +867,9 @@
   function presses(px, py, tau) {
     let dx = 0, dy = 0;
     for (let k = 0; k < 3; k++) {
-      const ang = 0.55 * tau * (k % 2 ? -1 : 1) + k * 2.1, cx = DC.x + Math.cos(ang) * 120, cy = DC.y + Math.sin(ang) * 105;
+      const ang = 0.55 * tau * (k % 2 ? -1 : 1) + k * 2.1, cx = DC.x + Math.cos(ang) * 140, cy = DC.y + Math.sin(ang) * 120;
       const g = Math.exp(-((px - cx) ** 2 + (py - cy) ** 2) / (2 * 85 * 85)), dir = ang + Math.PI / 2 + 0.6 * Math.sin(tau * 0.8 + k);
-      const A = 58 * (0.6 + 0.4 * Math.sin(1.3 * tau + k * 1.7));
+      const A = 66 * (0.6 + 0.4 * Math.sin(1.3 * tau + k * 1.7));
       dx += A * g * Math.cos(dir); dy += A * g * Math.sin(dir);
     }
     return [dx, dy];

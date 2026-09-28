@@ -67,7 +67,10 @@
       const f = done ? 1 : isCur ? clamp((t - c.start) / (c.end - c.start)) : 0;
       ctx.fillStyle = isCur ? P.ink : 'rgba(233,228,216,0.45)'; ctx.fillRect(x, y, w * f, 3);
       if (isCur) {
-        text(`${c.num}  ${c.title}`, x, y - 16, { size: 22, family: F.sans, weight: 500, color: P.ink, alpha: 0.9 });
+        const label = `${c.num}  ${c.title}`, lw = measure(label, { size: 22, family: F.sans, weight: 500 });
+        const pw = c.part ? measure(c.part, { size: 20, family: F.sans, weight: 500, spacing: 6 }) + 48 : 0;
+        const lx = Math.min(x, x1 - pw - lw);            // keep the chapter name clear of the part label
+        text(label, lx, y - 16, { size: 22, family: F.sans, weight: 500, color: P.ink, alpha: 0.9 });
         if (c.part) text(c.part, x1, y - 16, { size: 20, family: F.sans, weight: 500, color: P.dim, align: 'right', spacing: 6 });
       }
       x += w + gap;
@@ -157,10 +160,13 @@
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
     background(t);
     for (const c of TL.chapters) if (c.card && t >= c.card[0] && t < c.card[1]) chapterCard(c, t);
-    for (const b of TL.beats) if (t >= b.start && t < b.end) drawBeat(b, t);
-    progressBar(t);
+    let ending = false;
+    for (const b of TL.beats) if (t >= b.start && t < b.end) { drawBeat(b, t); if (b.visual.type === 'endcard') ending = true; }
+    if (!ending) progressBar(t);
     subtitles(t);
     post(t);
+    const fe = prog(t, TL.duration - 1.2, TL.duration - 0.2);   // the film always ends on pure black
+    if (fe > 0) { ctx.globalAlpha = ease.in(fe); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
     ctx.restore();
   }
 
