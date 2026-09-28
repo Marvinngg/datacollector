@@ -10,7 +10,8 @@
  *                   outcomes?:['都沉默','一招一默','都招供'], steps:[{show:'choose'} {show:'tally'}]}
  *                  grid of pairs (甲 gold left, 乙 teal right) that flip from dots to 默/招 in a slow wave while live
  *                  counters roll; tally lights every "both confess" cell in ember and blows its counter up.
- *   sim_rps        {phase:'habit'|'mixed', habit?:15, mixed?:39, watch?:3, names?:['石','剪','布'], seed?}
+ *   sim_rps        {phase:'habit'|'mixed', habit?:15, mixed?:39, watch?:3, window?:4, names?:['石','剪','布'], seed?,
+ *                   first?:[1,2,0], habitNote?, oppNote?, mixedNote?, seenLabel?, blindLabel?, switchLabel?}
  *                  repeated rock-paper-scissors against an opponent who counters your most frequent throw.
  *                  Round tiles (you on top, opponent below, border = result), a big win-rate readout, the win-rate
  *                  curve (draw = half) and your throw distribution (what the opponent reads).
@@ -277,7 +278,7 @@
     },
     cues(V, api) {
       const { tc, tt, f0, span } = prisonersTimes(V, api);
-      return [{ t: tc, type: 'tick' }, { t: f0, type: 'count', dur: span + 0.5 }, { t: tt + 0.2, type: 'tally' }, { t: tt + 0.9, type: 'pop' }];
+      return [{ t: tc, type: 'tick' }, { t: f0, type: 'count', dur: +(span + 0.5).toFixed(2) }, { t: tt + 0.2, type: 'tally' }, { t: tt + 0.9, type: 'pop' }];
     },
   });
 
@@ -433,9 +434,10 @@
             else { const pv = rateAt(i - 1); pts.push([lerp(X(i - 1), X(i), a), Y(lerp(pv, rateAt(i), a))]); }
           }
           alpha(ctx, fade * land(i0), () => {
-            ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-            ctx.shadowColor = col; ctx.shadowBlur = 10;
-            ctx.beginPath(); pts.forEach((p, k) => (k ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.stroke(); ctx.restore();
+            ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+            ctx.beginPath(); pts.forEach((p, k) => (k ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+            ctx.strokeStyle = rgba(col, 0.18); ctx.lineWidth = 12; ctx.stroke();       // soft glow without shadowBlur
+            ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.stroke(); ctx.restore();
             const e = pts[pts.length - 1]; K.dot(e[0], e[1], 7, col, { glow: 16 });
           });
         }
@@ -483,12 +485,12 @@
       const m = rpsModel(V), { ts, sw, seen, end } = rpsTimes(V, api, m), out = [];
       if (V.phase === 'mixed') {
         out.push({ t: sw, type: 'swish' });
-        out.push({ t: ts[m.H], type: 'count', dur: end - ts[m.H] });
+        out.push({ t: ts[m.H], type: 'count', dur: +(end - ts[m.H]).toFixed(2) });
         out.push({ t: end + 0.25, type: 'chime' });
       } else {
         for (let i = 0; i < m.W; i++) out.push({ t: ts[i], type: 'click' });
         out.push({ t: seen, type: 'thud' });
-        out.push({ t: ts[m.W], type: 'count', dur: end - ts[m.W] });
+        out.push({ t: ts[m.W], type: 'count', dur: +(end - ts[m.W]).toFixed(2) });
       }
       return out.filter(c => c.t >= 0);
     },

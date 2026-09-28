@@ -101,7 +101,8 @@
             "type": "sim_levels",
             "phase": "levels",
             "levels": 3
-          }
+          },
+          "hold": 6
         },
         {
           "id": "e1b5",
@@ -415,7 +416,8 @@
                 "show": "tally"
               }
             ]
-          }
+          },
+          "hold": 10
         },
         {
           "id": "e2b5",
@@ -744,7 +746,8 @@
           "visual": {
             "type": "sim_rps",
             "phase": "habit"
-          }
+          },
+          "hold": 9
         },
         {
           "id": "e3b6",
@@ -758,7 +761,8 @@
           "visual": {
             "type": "sim_rps",
             "phase": "mixed"
-          }
+          },
+          "hold": 14
         },
         {
           "id": "e3b7",
