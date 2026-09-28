@@ -163,13 +163,19 @@
       const Ap = S(api, 'approach', 0.3), Th = S(api, 'throw', api.dur * 0.45), Sw = S(api, 'swerve', api.dur * 0.72);
       const tA = Ap.t, tLift = Th.at('拆', 0.42, 1.4), tFly = Th.at('扔', 0.64, 2.3), tLand = tFly + 1.05;
       const tS = Sw.t, tDodge = tS + 0.45, tConc = tS + 1.5;
-      return { tA, tT: Th.t, tLift, tFly, tLand, tS, tDodge, tConc };
+      if (api.silent) {
+        // no narration: the caption appears, then things unfold slowly
+        const lift = Th.t, fly = lift + 1.0, land = fly + 1.5, dodge = tS + 1.2;
+        return { silent: true, tA: 0, tT: Th.t, tLift: lift, tFly: fly, tLand: land, tS, tDodge: dodge, tConc: Infinity, dLat: 2.2, dRun: 3.2, lift: 0.8 };
+      }
+      return { tA, tT: Th.t, tLift, tFly, tLand, tS, tDodge, tConc, dLat: 1.3, dRun: 2.0, lift: 0.6 };
     },
     draw(ctx, V, lt, api) {
       const cx = 960, roadY = 520, RH = 110;
-      const tm = this.timing(V, api), { tA, tLift, tFly, tLand, tS, tDodge, tConc } = tm;
+      const tm = this.timing(V, api), { tA, tLift, tFly, tLand, tS, tDodge, tConc, dLat, dRun } = tm, sil = !!tm.silent;
       // ---- kinematics (pure functions of time) ----
       const D = t => {
+        if (sil) return 1350 - 110 * clamp(t, 0, tDodge + dRun) - 1000 * ease.inOut(prog(t, tDodge, tDodge + dRun));
         let d = lerp(2150, 1060, ease.out(prog(t, tA, tA + 1.8)));
         d -= 270 * prog(t, tA + 1.8, tLand);
         d -= 110 * prog(t, tLand, tDodge);
@@ -178,7 +184,7 @@
       };
       const posG = t => ({ x: cx - D(t) / 2, y: roadY });
       const posT = t => {
-        const k = prog(t, tDodge, tDodge + 1.3);
+        const k = prog(t, tDodge, tDodge + dLat);
         return { x: cx + D(t) / 2, y: roadY - 205 * ease.inOut(k), a: Math.PI + 0.55 * Math.sin(Math.PI * k) * (k < 1 ? 1 : 0) };
       };
       const speed = (f, t) => { const a = f(t - 0.05), b = f(t + 0.05); return Math.hypot(b.x - a.x, b.y - a.y) / 0.1; };
@@ -187,7 +193,7 @@
       A(ctx, fin(lt, tA, 0.7), () => text(V.title || '胆小鬼博弈', cx, 225, { size: 56, family: F.serif, weight: 600, color: P.ink, align: 'center' }));
 
       // ---- road ----
-      const rp = ease.inOut(prog(lt, tA, tA + 0.9));
+      const rp = sil ? 1 : ease.inOut(prog(lt, tA, tA + 0.9));
       if (rp > 0) {
         const half = 1000 * rp;
         ctx.save(); ctx.beginPath(); ctx.rect(cx - half, roadY - RH - 4, half * 2, RH * 2 + 8); ctx.clip();
@@ -200,7 +206,7 @@
 
       // ---- teal's options, once gold can no longer steer ----
       const gS = posG(tS), tSp = posT(tS);
-      const optA = fio(lt, tS + 0.05, tDodge + 1.7, 0.45);
+      const optA = sil ? fin(lt, tS + 0.3, 0.8) * lerp(1, 0.6, prog(lt, tDodge + dRun - 0.8, tDodge + dRun + 0.4)) : fio(lt, tS + 0.05, tDodge + 1.7, 0.45);
       if (optA > 0) A(ctx, optA, () => {
         // straight on: crash
         ctx.strokeStyle = P.red; ctx.lineWidth = 3; ctx.setLineDash([12, 10]);
@@ -212,16 +218,16 @@
         // swerve: the actual path it will take
         ctx.strokeStyle = P.ok; ctx.lineWidth = 3; ctx.setLineDash([12, 10]);
         ctx.beginPath();
-        const pS = posT(tDodge), pe = posT(tDodge + 2.0);
+        const pS = posT(tDodge), pe = posT(tDodge + dRun);
         ctx.moveTo(pS.x - CAR_L / 2 - 14, pS.y);
-        for (let k = 1; k <= 30; k++) { const p = posT(tDodge + 2.0 * k / 30); ctx.lineTo(p.x - CAR_L / 2 - 14, p.y); }
+        for (let k = 1; k <= 30; k++) { const p = posT(tDodge + dRun * k / 30); ctx.lineTo(p.x - CAR_L / 2 - 14, p.y); }
         ctx.stroke(); ctx.setLineDash([]);
         arrow(ctx, pe.x - CAR_L / 2 + 10, pe.y, pe.x - CAR_L / 2 - 24, pe.y, P.ok, { lw: 3, head: 16 });
         text(V.dodge || '转向：躲', pe.x - CAR_L / 2 - 40, pe.y + 11, { size: 32, weight: 500, color: P.ok, align: 'right' });
       });
 
       // ---- gold's locked path ----
-      const lockA = fio(lt, tLand - 0.1, tDodge + 1.8, 0.5);
+      const lockA = sil ? fin(lt, tLand - 0.1, 0.6) : fio(lt, tLand - 0.1, tDodge + 1.8, 0.5);
       if (lockA > 0) {
         const g = posG(lt), x0 = g.x + CAR_L / 2 + 14;
         const len = 200 * ease.out(prog(lt, tLand - 0.1, tLand + 0.6));
@@ -229,11 +235,11 @@
       }
 
       // ---- cars ----
-      const appear = fin(lt, tA, 0.2);
+      const appear = sil ? 1 : fin(lt, tA, 0.2);
       A(ctx, appear, () => {
         const g = posG(lt), t = posT(lt);
         const vg = clamp(speed(posG, lt) / 60), vt = clamp(speed(posT, lt) / 60);
-        const drive = 1 - prog(lt, tDodge + 1.7, tDodge + 2.3);
+        const drive = 1 - prog(lt, tDodge + dRun - 0.5, tDodge + dRun + 0.2);
         streaks(ctx, g.x, g.y, 0, lt, Math.max(vg, 0.55) * drive, 0.1);
         streaks(ctx, t.x, t.y, t.a, lt, Math.max(vt, 0.55) * drive, 0.6);
         car(ctx, g.x, g.y, 0, P.gold, { wheel: lt < tLift });
@@ -245,7 +251,7 @@
 
       // ---- the steering wheel ----
       if (lt >= tLift) {
-        const kL = ease.out(prog(lt, tLift, tLift + 0.6));
+        const kL = ease.out(prog(lt, tLift, tLift + tm.lift));
         let x, y, r, rot = 0, a = 1;
         const gF = posG(tFly);
         const p0 = { x: gF.x + 12, y: roadY - 14 - 78 };
@@ -273,7 +279,8 @@
         A(ctx, fio(lt, tLand + 0.1, Infinity) * 0.9, () => text(V.wheelLabel || '方向盘', p2.x, p2.y + 58, { size: 28, color: P.dim, align: 'center' }));
       }
 
-      // ---- captions (one at a time) ----
+      // ---- captions (one at a time); in silent mode the runtime's caption says it ----
+      if (sil) return;
       const capY = 800;
       const c1 = fio(lt, tA + 1.4, tLand, 0.5), c2 = fio(lt, tLand + 0.1, tConc, 0.5), c3 = fin(lt, tConc, 0.7);
       A(ctx, c1, () => runs([[V.caption || '谁先转向，谁就是胆小鬼', P.ink]], cx, capY + rise(c1, 10), { size: 46 }));
@@ -285,9 +292,9 @@
     },
     cues(V, api) {
       const t = this.timing(V, api), out = [];
-      cue(out, t.tA + 0.1, 'whoosh', { dur: 1.6 });
+      if (!t.silent) cue(out, t.tA + 0.1, 'whoosh', { dur: 1.6 });
       cue(out, t.tLift, 'pop'); cue(out, t.tFly, 'swish');
-      cue(out, t.tS + 0.1, 'tick'); cue(out, t.tDodge, 'whoosh', { dur: 1.8 }); cue(out, t.tConc, 'chime');
+      cue(out, t.tS + 0.1, 'tick'); cue(out, t.tDodge, 'whoosh', { dur: t.dRun }); cue(out, t.tConc, 'chime');
       return out;
     },
   });
