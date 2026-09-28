@@ -1,0 +1,11 @@
+# Python deps for the voice-over + audio pipeline (tested with Python 3.11).
+# tinysoundfont is installed separately with --no-deps by setup.sh (skips its optional pyaudio playback dep).
+sherpa-onnx==1.13.8
+numpy>=2.0
+scipy>=1.13
+soundfile>=0.12
+pyloudnorm==0.2.0
+pedalboard>=0.9
+matplotlib>=3.8
+imageio-ffmpeg>=0.5     # bundled static ffmpeg (libx264 + aac), used when no system ffmpeg
+pypinyin>=0.50          # pronunciation check (pipeline/check_vo.py)
