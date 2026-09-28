@@ -13,7 +13,7 @@ SR = 48000
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))          # game-theory/
 BUILD = os.path.join(ROOT, 'build')
-OUT = os.path.join(BUILD, 'audio')
+OUT = os.environ.get('GT_OUT') or os.path.join(BUILD, 'audio')   # GT_OUT: robustness tests only
 SF2_PATH = os.path.join(ROOT, 'models', 'sf2', 'GeneralUser-GS.sf2')
 SF2_URL = 'https://raw.githubusercontent.com/mrbumpy409/GeneralUser-GS/main/GeneralUser-GS.sf2'
 

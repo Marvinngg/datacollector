@@ -48,8 +48,10 @@ vo = np.zeros(N + SR)
 missing = []
 for ln in tl.lines:
     p = os.path.join(BUILD, 'vo', ln['id'] + '.wav')
-    if not os.path.exists(p): missing.append(ln['id']); continue
-    x = load48(p).mean(1)
+    try:
+        x = load48(p).mean(1)
+    except Exception as ex:                           # missing / half-written take: leave a hole, say so
+        missing.append(ln['id']); continue
     x = fade(x, 0.004, 0.02)                          # no clicks at the edges of each take
     i = n_of(ln['start'])
     vo[i:i + len(x)] += x[:len(vo) - i]
