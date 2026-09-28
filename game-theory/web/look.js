@@ -4,7 +4,7 @@
  * - Colour: one grade per episode (background light + tint)
  * - Type: serif display text with a blur-to-sharp reveal; a small mono HUD line for live numbers
  * No panels, no cards, no rounded boxes: if something needs a frame, it is an object in the scene.
- * All functions are deterministic (pure in t). */
+ * All functions are deterministic (pure in t) and multiply into the current ctx.globalAlpha (the beat fade). */
 (function () {
   const { W, H, ctx, canvas, P, F, clamp, lerp, prog, ease, rng, fbm, vnoise } = K;
   const mk = (w, h) => Object.assign(document.createElement('canvas'), { width: Math.ceil(w), height: Math.ceil(h) });
@@ -69,9 +69,10 @@
     if (alpha <= 0.003) return;
     const s = sprite(ch, size, color, o);
     const sc = o.scale || 1;
-    ctx.globalAlpha = alpha;
+    const a0 = ctx.globalAlpha;                 // inherit the beat's fade
+    ctx.globalAlpha = a0 * alpha;
     ctx.drawImage(s.c, x - s.w * sc / 2, y - s.h * sc / 2, s.w * sc, s.h * sc);
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = a0;
   }
 
   // ---------- serif display text with blur-to-sharp reveal ----------
@@ -139,7 +140,7 @@
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, color); g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalAlpha = alpha; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.globalAlpha *= alpha; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   }
 
   // ---------- full-frame bloom ----------
