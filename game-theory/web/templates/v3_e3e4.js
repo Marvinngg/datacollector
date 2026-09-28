@@ -23,14 +23,15 @@
   const TAU = Math.PI * 2;
 
   // ---------------------------------------------------------------- helpers
-  // L.glyph / L.light set ctx.globalAlpha absolutely, so the runtime's beat envelope has to be multiplied in by hand.
+  // L.glyph / L.light / L.serif / L.field inherit the beat's fade from ctx.globalAlpha themselves. ENV keeps that
+  // envelope for the few places below that draw on the context directly and set globalAlpha absolutely.
   let ENV = 1;
   const begin = () => { ENV = ctx.globalAlpha; };
-  const G = (ch, x, y, s, c, a = 1, o) => L.glyph(ch, x, y, s, c, a * ENV, o);
-  const SF = (str, x, y, o = {}) => L.serif(str, x, y, { ...o, alpha: (o.alpha == null ? 1 : o.alpha) * ENV });
-  const LI = (x, y, r, c, a = 1) => L.light(x, y, r, c, a * ENV);
-  const HUD = (items, a = 1) => { ctx.globalAlpha = 1; L.hud(items, { alpha: a * ENV }); };
-  const FIELD = (t, o) => L.field(t, { ...o, alpha: o.alpha * ENV });
+  const G = (ch, x, y, s, c, a = 1, o) => L.glyph(ch, x, y, s, c, a, o);
+  const SF = (str, x, y, o = {}) => L.serif(str, x, y, o);
+  const LI = (x, y, r, c, a = 1) => L.light(x, y, r, c, a);
+  const HUD = (items, a = 1) => L.hud(items, { alpha: a });
+  const FIELD = (t, o) => L.field(t, o);
   const ep = (t, a, d = 0.6, e = ease.out) => (isFinite(a) ? e(prog(t, a, a + d)) : (a < 0 ? 1 : 0));
   const fio = (t, a, b, d = 0.5) => (isFinite(b) ? Math.min(ep(t, a, d), 1 - ease.in(prog(t, b - d, b))) : ep(t, a, d));
   const bump = (t, a, d) => { const k = prog(t, a, a + d); return k > 0 && k < 1 ? Math.sin(Math.PI * k) : 0; };

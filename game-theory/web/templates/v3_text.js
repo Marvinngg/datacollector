@@ -11,8 +11,7 @@
  *   statement  {text, highlight?[], label?, steps?:[{note}|{final}], finalMode?}
  *                                                                  one phrase at the focal point of drifting glyphs
  *
- * Note: L.glyph / L.light set ctx.globalAlpha absolutely, so the runtime's beat fade (ctx.globalAlpha on entry)
- * would be lost. Every template here reads it once (G) and multiplies it into every alpha it draws. */
+ * Alphas multiply into ctx.globalAlpha (the runtime's beat fade), as L.glyph / L.light do. */
 (function () {
   const { W, H, ctx, F, clamp, lerp, prog, ease, rng } = K;
   const INK = '#efe9dc', DIM = 'rgba(239,233,220,0.45)', GOLD = '#e9c47a', TEAL = '#7fd8cb', EMBER = '#ff9f5a';
@@ -83,21 +82,21 @@
   // ---------------- light lines (1–1.5 px, both ends fade to 0) ----------------
   function vLine(x, y0, y1, a, rgb = '239,233,220', w = 1.2) {
     if (a <= 0.003 || y1 <= y0) return;
-    ctx.save(); ctx.globalAlpha = a;
+    ctx.save(); ctx.globalAlpha *= a;
     const g = ctx.createLinearGradient(0, y0, 0, y1);
     g.addColorStop(0, `rgba(${rgb},0)`); g.addColorStop(0.5, `rgba(${rgb},1)`); g.addColorStop(1, `rgba(${rgb},0)`);
     ctx.fillStyle = g; ctx.fillRect(x - w / 2, y0, w, y1 - y0); ctx.restore();
   }
   function hLine(x0, x1, y, a, rgb = '239,233,220', w = 1.2) {
     if (a <= 0.003 || x1 <= x0) return;
-    ctx.save(); ctx.globalAlpha = a;
+    ctx.save(); ctx.globalAlpha *= a;
     const g = ctx.createLinearGradient(x0, 0, x1, 0);
     g.addColorStop(0, `rgba(${rgb},0)`); g.addColorStop(0.5, `rgba(${rgb},1)`); g.addColorStop(1, `rgba(${rgb},0)`);
     ctx.fillStyle = g; ctx.fillRect(x0, y - w / 2, x1 - x0, w); ctx.restore();
   }
   function segLine(x0, y0, x1, y1, a, rgb, w = 1.2) {   // a straight light line between two points, ends faded
     if (a <= 0.003) return;
-    ctx.save(); ctx.globalAlpha = a;
+    ctx.save(); ctx.globalAlpha *= a;
     const g = ctx.createLinearGradient(x0, y0, x1, y1);
     g.addColorStop(0, `rgba(${rgb},0)`); g.addColorStop(0.5, `rgba(${rgb},1)`); g.addColorStop(1, `rgba(${rgb},0)`);
     ctx.strokeStyle = g; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.restore();
@@ -162,8 +161,8 @@
     return out;
   }
   const noteCues = api => api.steps.filter(s => s.note != null && s.owner === api.beat.id).map(s => ({ t: s.lt, type: 'pop' }));
-  function drawNotes(api, lt, y, G) {
-    for (const nt of notes(api, lt)) word(trimEnd(nt.text), W / 2, y + (1 - nt.a) * 10, { size: 38, color: INK, alpha: 0.78 * nt.a * G, glow: 4, reveal: nt.a });
+  function drawNotes(api, lt, y, k = 1) {
+    for (const nt of notes(api, lt)) word(trimEnd(nt.text), W / 2, y + (1 - nt.a) * 10, { size: 38, color: INK, alpha: 0.78 * nt.a * k, glow: 4, reveal: nt.a });
   }
 
   // =====================================================================
@@ -220,7 +219,6 @@
 
   T.register('lens', {
     draw(ctx_, V, lt, api) {
-      const G = ctx.globalAlpha;
       const S = lensScene(), plan = lensPlan(V, api), u = lensU(plan, lt);
       const settleP = ease.inOut(prog(lt, plan.settle + 0.1, plan.settle + 1.6));
       const base = V.glyph || chars(V.x || '事').pop() || '事', see = V.see || '人';
@@ -243,28 +241,28 @@
         const k = pk.focus * (0.35 + 0.65 * settleP) * pk.la;
         S.edges.forEach(([a, b], n) => {
           const A = S.hex[a], B = S.hex[b], rgb = n >= 6 ? '239,233,220' : '233,196,122';
-          segLine(LCX + A.x, LCY + A.y, LCX + B.x, LCY + B.y, G * k * (n >= 6 ? 0.22 : 0.4), rgb, 1.2);
+          segLine(LCX + A.x, LCY + A.y, LCX + B.x, LCY + B.y, k * (n >= 6 ? 0.22 : 0.4), rgb, 1.2);
         });
       }
       // background glyphs: far, soft; sharpen when a lens passes over them
       S.bg.forEach(p => {
         const x = LCX + p.x + Math.sin(lt * 0.22 + p.ph) * 7, y = LCY + p.y + Math.cos(lt * 0.18 + p.ph) * 5;
         const s = inLens(x, y), sz = q2(18 + p.d * 16), a = (0.1 + 0.2 * p.d) * appear;
-        if (s < 1) L.glyph(base, x, y, sz, COOL, G * a * (1 - s), { blur: 2 + Math.round((1 - p.d) * 4) });
-        if (s > 0) L.glyph(base, x, y, sz + 4, INK, G * (0.35 + 0.35 * p.d) * s * appear, { glow: 0 });
+        if (s < 1) L.glyph(base, x, y, sz, COOL, a * (1 - s), { blur: 2 + Math.round((1 - p.d) * 4) });
+        if (s > 0) L.glyph(base, x, y, sz + 4, INK, (0.35 + 0.35 * p.d) * s * appear, { glow: 0 });
       });
       // lens bodies: a soft disc of light and a thin rim
       Ls.forEach(l => {
         if (l.la <= 0.003) return;
-        L.light(l.x, LCY, l.R * 1.05, 'rgba(150,170,215,0.10)', G * l.la);
-        if (l.pick) L.light(l.x, LCY, l.R * 1.5, 'rgba(233,196,122,0.16)', G * l.la * settleP);
-        ctx.save(); ctx.globalAlpha = G * l.la * 0.26; ctx.strokeStyle = l.pick && settleP > 0.5 ? GOLD : INK; ctx.lineWidth = 1.2;
+        L.light(l.x, LCY, l.R * 1.05, 'rgba(150,170,215,0.10)', l.la);
+        if (l.pick) L.light(l.x, LCY, l.R * 1.5, 'rgba(233,196,122,0.16)', l.la * settleP);
+        const a0 = ctx.globalAlpha; ctx.save(); ctx.globalAlpha = a0 * l.la * 0.26; ctx.strokeStyle = l.pick && settleP > 0.5 ? GOLD : INK; ctx.lineWidth = 1.2;
         ctx.beginPath(); ctx.arc(l.x, LCY, l.R, 0, Math.PI * 2); ctx.stroke();
-        ctx.globalAlpha = G * l.la * 0.55; ctx.lineWidth = 1.5; ctx.strokeStyle = INK;           // specular arc
+        ctx.globalAlpha = a0 * l.la * 0.55; ctx.lineWidth = 1.5; ctx.strokeStyle = INK;           // specular arc
         ctx.beginPath(); ctx.arc(l.x, LCY, l.R - 14, Math.PI * 1.08, Math.PI * 1.36); ctx.stroke();
         ctx.restore();
         // the discipline's name, under its lens
-        const na = G * l.la * (0.35 + 0.65 * l.focus), ny = LCY + l.R + 74;
+        const na = l.la * (0.35 + 0.65 * l.focus), ny = LCY + l.R + 74;
         if (l.pick && settleP > 0) {
           word(l.name, l.x, ny, { size: 52, color: INK, alpha: na * (1 - settleP), glow: 8, spacing: 12 });
           word(l.name, l.x, ny, { size: 52, color: GOLD, alpha: na * settleP, glow: 14, spacing: 12 });
@@ -288,20 +286,20 @@
         });
         const a = appear * (0.55 + 0.35 * p.d);
         const s = Math.max(sharp, inLens(x, y) * 0.8);
-        if (s < 1) L.glyph(base, x, y, 32, COOL, G * a * 0.8 * (1 - s), { blur: 3 });
+        if (s < 1) L.glyph(base, x, y, 32, COOL, a * 0.8 * (1 - s), { blur: 3 });
         if (s > 0) {
           const cf = ch2 ? ease.inOut(prog(s, 0.35, 0.8)) : 0;
-          if (cf < 1) L.glyph(base, x, y, 32, col === TEAL || col === INK ? col : INK, G * a * s * (1 - cf), { glow: 4 });
-          if (cf > 0) L.glyph(ch2, x, y, size2, col, G * s * cf, { glow: glow2 });
+          if (cf < 1) L.glyph(base, x, y, 32, col === TEAL || col === INK ? col : INK, a * s * (1 - cf), { glow: 4 });
+          if (cf > 0) L.glyph(ch2, x, y, size2, col, s * cf, { glow: glow2 });
         }
       });
       ctx.restore();
       // the event, above: small spaced serif with two short lines of light
       if (V.x) {
         const f = ease.out(prog(lt, 0.3, 1.4)), ty = LCY - LR - 70;
-        const tw = word(V.x, LCX, ty, { size: 32, color: DIM, alpha: G * f, glow: 0, spacing: 12, reveal: f });
-        hLine(LCX - tw / 2 - 150, LCX - tw / 2 - 30, ty, G * f * 0.5);
-        hLine(LCX + tw / 2 + 30, LCX + tw / 2 + 150, ty, G * f * 0.5);
+        const tw = word(V.x, LCX, ty, { size: 32, color: DIM, alpha: f, glow: 0, spacing: 12, reveal: f });
+        hLine(LCX - tw / 2 - 150, LCX - tw / 2 - 30, ty, f * 0.5);
+        hLine(LCX + tw / 2 + 30, LCX + tw / 2 + 150, ty, f * 0.5);
       }
     },
     cues(V, api) {
@@ -346,7 +344,7 @@
   function titleParts(t) { return String(t).split(/\s*↔\s*/); }
   T.register('compare', {
     draw(ctx_, V, lt, api) {
-      const G = ctx.globalAlpha, tm = compareTimes(api), t = api.beat.start + lt;
+      const tm = compareTimes(api), t = api.beat.start + lt;
       const acc = L.accent(T.TL, t);
       let join = V.join;
       if (!join) join = /第一|之前|过去|before|旧|^1/i.test(String((V.left || {}).title)) ? 'arrow' : 'vs';
@@ -355,7 +353,7 @@
       const jn = tm.join != null ? ease.inOut(prog(lt, tm.join, tm.join + 1.6)) : 0;
       const nearL = lerp(lerp(1, 0, toR), 0.8, jn), nearR = lerp(1, 0.8, jn);
       const words = [V.left, V.right].flatMap(c => [(c || {}).title || '', ...((c || {}).items || [])]).join('');
-      L.field(lt, { n: 90, chars: chars(words.replace(/[\s·↔“”，、：:]/g, '')).join('') || '局', seed: 7 + api.beat.id.length, alpha: 0.07 * G, color: COOL });
+      L.field(lt, { n: 90, chars: chars(words.replace(/[\s·↔“”，、：:]/g, '')).join('') || '局', seed: 7 + api.beat.id.length, alpha: 0.07, color: COOL });
       ctx.save(); camera(lt, api, W / 2, 500, 0.01, lerp(0, -22, toR * (1 - jn)) + lerp(22, 0, aR) * aL);
       // each side stands in a shallow cloud of its own glyphs (texture + depth), fading with its focus
       const cl = compareCloud();
@@ -366,31 +364,31 @@
         cl.forEach(p => {
           const x = x0 + p.x + Math.sin(lt * 0.2 + p.ph) * 8, y = KY + 70 + p.y + Math.cos(lt * 0.17 + p.ph) * 6;
           if (Math.abs(x - W / 2) < 60) return;
-          const al = G * a * (0.04 + 0.12 * p.d) * (0.35 + 0.65 * near);
+          const al = a * (0.04 + 0.12 * p.d) * (0.35 + 0.65 * near);
           L.glyph(pool[Math.floor(p.c * pool.length) % pool.length], x, y, q2(18 + p.d * 20), col, al, { blur: 2 + Math.round((1 - p.d) * 4) });
         });
       });
       // the centre line of light
       const la = ease.inOut(prog(lt, Math.min(0.1, tm.left - 0.2), Math.min(0.1, tm.left - 0.2) + 1.6));
       const CY = KY + 50, half = 320 * la;
-      vLine(W / 2, CY - half, CY + half, G * (0.35 + 0.25 * jn), '239,233,220', 1.2);
+      vLine(W / 2, CY - half, CY + half, (0.35 + 0.25 * jn), '239,233,220', 1.2);
       if (jn > 0) {
-        vLine(W / 2, CY - half * 1.05, CY + half * 1.05, G * jn * 0.7, '255,159,90', 1.5);
-        L.light(W / 2, CY, 280, 'rgba(255,159,90,0.16)', G * jn);
+        vLine(W / 2, CY - half * 1.05, CY + half * 1.05, jn * 0.7, '255,159,90', 1.5);
+        L.light(W / 2, CY, 280, 'rgba(255,159,90,0.16)', jn);
       }
       // "arrow" join: one spark crosses from the first layer to the second, leaving nothing behind
       if (join === 'arrow' && aR > 0) {
         const k = ease.inOut(prog(lt, tm.right - 0.2, tm.right + 1.8)), env = Math.sin(Math.PI * k);
         const sx = lerp(W / 2 - 200, W / 2 + 200, k);
-        hLine(sx - 160, sx + 20, KY, G * 0.55 * env, '233,196,122', 1.2);
-        L.light(sx, KY, 18, 'rgba(255,220,150,0.9)', G * env);
+        hLine(sx - 160, sx + 20, KY, 0.55 * env, '233,196,122', 1.2);
+        L.light(sx, KY, 18, 'rgba(255,220,150,0.9)', env);
       }
       [['left', V.left || {}, aL, nearL, -1], ['right', V.right || {}, aR, nearR, 1]].forEach(([side, c, a, near, sgn]) => {
         if (a <= 0) return;
         const x = W / 2 + sgn * CX_OFF, kt = splitKicker(c.title);
-        const blur = Math.round((1 - near) * 3), sc = lerp(0.9, 1, near), al = G * a * lerp(0.36, 1, near);
+        const blur = Math.round((1 - near) * 3), sc = lerp(0.9, 1, near), al = a * lerp(0.36, 1, near);
         const tint = side === 'left' ? 'rgba(127,216,203,0.13)' : 'rgba(233,196,122,0.15)';
-        L.light(x, KY + 40, 360, tint, G * a * near * near);
+        L.light(x, KY + 40, 360, tint, a * near * near);
         ctx.save(); ctx.translate(x, KY); ctx.scale(sc, sc); ctx.translate(-x, -KY);
         if (kt.kicker) word(kt.kicker, x, KY - 92, { size: 30, color: side === 'left' ? TEAL : acc, alpha: al * 0.9, glow: 0, spacing: 10, blur, reveal: a });
         // title: "A ↔ B" becomes two words joined by a line of light with a shuttling spark
@@ -416,7 +414,7 @@
         ctx.restore();
       });
       ctx.restore();
-      drawNotes(api, lt, 820, G);
+      drawNotes(api, lt, 820, 1);
     },
     cues(V, api) {
       const out = [];
@@ -457,18 +455,18 @@
   }
   T.register('list', {
     draw(ctx_, V, lt, api) {
-      const G = ctx.globalAlpha, t = api.beat.start + lt, acc = L.accent(T.TL, t);
+      const t = api.beat.start + lt, acc = L.accent(T.TL, t);
       const items = V.items || [], ts = listTimes(V, api), Lo = listLayout(V);
       const fin = ts.filter(isFinite), last = fin.length ? Math.max(...fin) : 0;
       const allShown = fin.length === items.length;
       const sum = allShown ? ease.inOut(prog(lt, last + 3.4, last + 4.8)) : 0;   // everything comes back together
-      L.field(lt, { n: 80, chars: items.map(it => it.title || '').join('') || '局', seed: 17 + api.beat.id.length, alpha: 0.07 * G, color: COOL });
+      L.field(lt, { n: 80, chars: items.map(it => it.title || '').join('') || '局', seed: 17 + api.beat.id.length, alpha: 0.07, color: COOL });
       // title: a small spaced label, not a header
       if (V.title) {
         const f = ease.out(prog(lt, 0.1, 1.3));
-        const tw = word(V.title, 960, 214, { size: 30, color: acc, alpha: G * f * 0.85, glow: 0, spacing: 14, reveal: f });
-        hLine(960 - tw / 2 - 30 - 120 * f, 960 - tw / 2 - 30, 214, G * f * 0.35);
-        hLine(960 + tw / 2 + 30, 960 + tw / 2 + 30 + 120 * f, 214, G * f * 0.35);
+        const tw = word(V.title, 960, 214, { size: 30, color: acc, alpha: f * 0.85, glow: 0, spacing: 14, reveal: f });
+        hLine(960 - tw / 2 - 30 - 120 * f, 960 - tw / 2 - 30, 214, f * 0.35);
+        hLine(960 + tw / 2 + 30, 960 + tw / 2 + 30 + 120 * f, 214, f * 0.35);
       }
       // camera leans toward whatever is lit
       let lean = 0, wsum = 0;
@@ -481,22 +479,22 @@
         // before its turn: a point of light marks the place (the structure is visible first)
         const ghostIn = ease.out(prog(lt, 0.3 + i * 0.35, 1.5 + i * 0.35)) * (1 - f);
         if (ghostIn > 0) {
-          L.light(p.x, p.y, 22, 'rgba(239,233,220,0.5)', G * ghostIn * 0.7);
-          word(String(i + 1).padStart(2, '0'), p.x, p.y - 64, { size: 26, family: F.mono, color: DIM, alpha: G * ghostIn * 0.6, glow: 0, spacing: 4 });
+          L.light(p.x, p.y, 22, 'rgba(239,233,220,0.5)', ghostIn * 0.7);
+          word(String(i + 1).padStart(2, '0'), p.x, p.y - 64, { size: 26, family: F.mono, color: DIM, alpha: ghostIn * 0.6, glow: 0, spacing: 4 });
         }
         if (f <= 0) return;
         const sc = Lo.fit * lerp(lerp(0.56, 0.76, sum), 1, e);
         const past = 1 - e;                                               // shown and not lit → far away
         const blur = Math.round(3 * past * (1 - sum));
         const y = p.y - 30 * past * (1 - sum);
-        const al = G * f * lerp(lerp(0.34, 0.9, sum), 1, e);
+        const al = f * lerp(lerp(0.34, 0.9, sum), 1, e);
         if (e > 0) {
-          L.light(p.x, y, 340, 'rgba(255,190,120,0.2)', G * e);
+          L.light(p.x, y, 340, 'rgba(255,190,120,0.2)', e);
           // the lit word stands in a shallow cloud of its own glyphs
           const pool = chars(String(it.title || '').replace(/[\s·]/g, ''));
           if (pool.length) compareCloud().forEach(c => {
             const gx = p.x + c.x * 0.8 + Math.sin(lt * 0.2 + c.ph) * 8, gy = y + 40 + c.y * 0.7 + Math.cos(lt * 0.17 + c.ph) * 6;
-            L.glyph(pool[Math.floor(c.c * pool.length) % pool.length], gx, gy, q2(18 + c.d * 20), '#d9bf8c', G * e * (0.05 + 0.13 * c.d), { blur: 2 + Math.round((1 - c.d) * 4) });
+            L.glyph(pool[Math.floor(c.c * pool.length) % pool.length], gx, gy, q2(18 + c.d * 20), '#d9bf8c', e * (0.05 + 0.13 * c.d), { blur: 2 + Math.round((1 - c.d) * 4) });
           });
         }
         const half = 84 * sc * 0.5;
@@ -508,7 +506,7 @@
           const k = Math.max(e, sum);
           const rows = split2(trimEnd(it.desc), Lo.S * (e > sum ? 1.7 : 0.95), { size: 38 });
           const dsz = e > sum ? 38 : 30;
-          rows.forEach((r, j) => word(r, p.x, yy + 14 + j * dsz * 1.45, { size: dsz, color: INK, alpha: G * k * 0.62, glow: 0, reveal: ease.out(prog(lt, ti + 0.5, ti + 1.8)) }));
+          rows.forEach((r, j) => word(r, p.x, yy + 14 + j * dsz * 1.45, { size: dsz, color: INK, alpha: k * 0.62, glow: 0, reveal: ease.out(prog(lt, ti + 0.5, ti + 1.8)) }));
         }
       });
       ctx.restore();
@@ -529,15 +527,18 @@
     return { tText, rd, tDone, tHl };
   }
   let ST = null;
-  function inflow() {
+  function inflow() {                      // spiral streams: glyphs flow along a few arms toward the centre
     if (ST) return ST;
-    const r = rng(93), ps = [];
-    for (let i = 0; i < 110; i++) ps.push({ a: r() * Math.PI * 2, ph: r(), d: r(), c: r(), sp: 0.7 + r() * 0.6 });
+    const r = rng(93), ps = [], arms = 9;
+    for (let k = 0; k < arms; k++) {
+      const a0 = k / arms * Math.PI * 2 + (r() - 0.5) * 0.4;
+      for (let j = 0; j < 13; j++) ps.push({ a: a0 + (r() - 0.5) * 0.12, ph: (j + r() * 0.6) / 13, d: r(), c: r(), off: (r() - 0.5) * 40 });
+    }
     return (ST = ps);
   }
   T.register('statement', {
     draw(ctx_, V, lt, api) {
-      const G = ctx.globalAlpha, t = api.beat.start + lt, acc = L.accent(T.TL, t);
+      const t = api.beat.start + lt, acc = L.accent(T.TL, t);
       const { tText, rd, tHl } = stmtTimes(V, api);
       const str = trimEnd(V.text), n = chars(str).length;
       const size = V.size || (n <= 6 ? 92 : n <= 14 ? 76 : 64);
@@ -549,36 +550,37 @@
       const pool = chars(str.replace(/[\s，。、：；？！]/g, '')) || ['点'];
       const ain = ease.out(prog(lt, 0, 1.5));
       inflow().forEach(p => {
-        const cyc = (p.ph + lt * 0.035 * p.sp) % 1;                  // 0 far out → 1 arrived
-        const rr = lerp(1.05, 0.42, cyc);
-        const x = W / 2 + Math.cos(p.a) * 900 * rr, y = cy + Math.sin(p.a) * 420 * rr;
-        const depth = 0.3 + 0.7 * p.d, a = Math.pow(Math.sin(Math.PI * cyc), 1.5) * (0.08 + 0.2 * depth) * ain * (1 - 0.5 * fp);
-        if (y < 140 || y > 900) return;
-        L.glyph(pool[Math.floor(p.c * pool.length) % pool.length], x, y, q2(16 + depth * 22), COOL, G * a, { blur: 1 + Math.round((1 - depth) * 5) });
+        const cyc = (p.ph + lt * 0.03) % 1;                          // 0 far out → 1 arrived
+        const rr = lerp(1.08, 0.36, cyc), ang = p.a + 0.9 * cyc;       // the arm curls in as it nears the centre
+        const x = W / 2 + Math.cos(ang) * 880 * rr + p.off * Math.sin(ang), y = cy + Math.sin(ang) * 400 * rr;
+        if (y < 140 || y > 880) return;
+        const depth = (0.3 + 0.7 * p.d) * lerp(1, 0.55, cyc);         // smaller and softer as they approach
+        const a = Math.pow(Math.sin(Math.PI * cyc), 1.2) * (0.08 + 0.22 * p.d) * ain * (1 - 0.5 * fp);
+        L.glyph(pool[Math.floor(p.c * pool.length) % pool.length], x, y, q2(14 + depth * 26), COOL, a, { blur: 1 + Math.round((1 - depth) * 5) });
       });
-      L.light(W / 2, cy, 420, 'rgba(255,170,100,0.10)', G * hk);
+      L.light(W / 2, cy, 460, 'rgba(255,170,100,0.15)', hk);
       ctx.save(); camera(lt, api, W / 2, cy, 0.014);
       const mainA = replace ? 1 - fp : lerp(1, 0.5, fp), mainS = replace ? 1 : lerp(1, 0.8, fp), mainB = replace ? 0 : Math.round(fp * 2);
       const lh = size * 1.4, top = cy - (lines.length - 1) * lh / 2;
       if (V.label) {
         const f = ease.out(prog(lt, tText - 0.2, tText + 1.0));
-        word(String(V.label).toUpperCase(), W / 2, top - size * 0.5 * mainS - 58, { size: 26, family: F.mono, color: acc, alpha: G * f * mainA * 0.9, glow: 0, spacing: 10, reveal: f });
+        word(String(V.label).toUpperCase(), W / 2, top - size * 0.5 * mainS - 58, { size: 26, family: F.mono, color: acc, alpha: f * mainA * 0.9, glow: 0, spacing: 10, reveal: f });
       }
       let done = 0;
       lines.forEach((l, k) => {
         const rn = chars(l).length, rev = clamp((prog(lt, tText, tText + rd) * n - done) / rn);
-        word(l, W / 2, top + k * lh * mainS, { size, scale: mainS, color: INK, alpha: G * mainA, glow: 14, blur: mainB, reveal: rev, hi: V.highlight, hiK: hk, hiColor: EMBER });
+        word(l, W / 2, top + k * lh * mainS, { size, scale: mainS, color: INK, alpha: mainA, glow: 14, blur: mainB, reveal: rev, hi: V.highlight, hiK: hk, hiColor: EMBER });
         done += rn;
       });
       // a line of light settles under the phrase once it is read
       const ul = ease.inOut(prog(lt, tHl + 0.3, tHl + 1.8)), uy = top + (lines.length - 1) * lh * mainS + size * 0.78 * mainS;
-      hLine(W / 2 - 240 * ul, W / 2 + 240 * ul, uy, G * ul * 0.7 * mainA, '255,180,110', 1.5);
+      hLine(W / 2 - 240 * ul, W / 2 + 240 * ul, uy, ul * 0.7 * mainA, '255,180,110', 1.5);
       ctx.restore();
-      drawNotes(api, lt, uy + 90, G * lerp(1, 0.7, fp));
+      drawNotes(api, lt, uy + 90, lerp(1, 0.7, fp));
       if (fs && fp > 0) {
         const fl = split2(trimEnd(fs.final), 1440, { size: 62 }), f = ease.out(prog(lt, fs.lt + 0.3, fs.lt + 1.8));
         const fy = replace ? cy : 560;
-        fl.forEach((l, k) => word(l, W / 2, fy + (k - (fl.length - 1) / 2) * 88, { size: 62, color: INK, alpha: G * f, glow: 12, reveal: f }));
+        fl.forEach((l, k) => word(l, W / 2, fy + (k - (fl.length - 1) / 2) * 88, { size: 62, color: INK, alpha: f, glow: 12, reveal: f }));
       }
     },
     cues(V, api) {
