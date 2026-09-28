@@ -1,537 +1,599 @@
-"""Score for 《地球 Online》 -> build/audio/music.wav (48 kHz stereo float).
+"""Score for 《博弈论：看局、解局、改局》 -> build/audio/music.wav (48 kHz stereo float) + music_meta.json.
 
-Key: D major throughout. Tempi: s1 88 BPM, s3 90 BPM, s5 96 BPM; s0/s2/s4/s6 are free-time and
-anchored to voice-over lines / picture cues. All times are read from build/timeline.json (+ cues.json when
-present), nothing is hard-coded in seconds except musical durations and small offsets.
+Quiet, "thinking" underscore: pedalled low-velocity felt piano over warm pads, open/suspended harmony
+(add9 / sus / maj7 / quartal), a gentle cadence on every "remember" card, a thinner "breath" with a new
+harmonic colour on every chapter card, and a full final chord on the end card.
 
-Instruments: GeneralUser GS SoundFont (marimba, music box, grand piano, tine EP, pads, strings, celesta)
-rendered offline with tinysoundfont, plus in-house additive synths (kick, hats, bass, pluck arps, sub drone).
-Every section is rendered to its own bus with its own synthetic convolution reverb, then gated.
+Tonal plan (one key area per chapter, pivoting on the chapter cards):
+  c0 D  -> c1 D -> c2 G -> c3 E minor (soft pulse) -> c4 C (irregular pulse) -> c5 D minor (tension)
+  -> c6 F -> c7 B-flat -> c8 D (chromatic-mediant "new table") -> c9 D (c0's "lens" voicing returns) -> D add9.
+
+Nothing is timed in absolute seconds: every event is derived from build/timeline.json at run time
+(chapters, chapter cards, beats + visual.type, voice lines).  Piano phrases go into the gaps between
+voice lines; under a line only a rare single note sounds.
+
+Instruments: GeneralUser GS v2.0.3 SoundFont (S. Christian Collins; free for any use, see models/sf2/LICENSE.txt),
+rendered offline with tinysoundfont; the tape-hiss texture is synthesised here.
 """
+import json
 import sys
 import numpy as np
 from common import *   # noqa
 
-rng = np.random.default_rng(20260925)
+rng = np.random.default_rng(20260928)
 tl = Timeline()
 D = tl.duration
 N = n_of(D)
-PAD = 7.0          # buffers run past the end so reverb tails never wrap
+PAD_S = 8.0
+NB = N + n_of(PAD_S)
 if not ensure_sf2():
     sys.exit('SoundFont missing: ' + SF2_PATH)
 sf2 = SF2()
 
-# GM programs (bank, preset)
-MARIMBA, MBOX, PIANO, EP, EPC = (0, 12), (0, 10), (0, 0), (0, 4), (8, 4)
-WPAD, HALO, GLASS, STR, CELESTA, SYNSTR = (0, 89), (0, 94), (0, 92), (0, 49), (0, 8), (0, 50)
-
-
-class Bus:
-    """a section bus covering [lo, hi] (+ reverb pad) of the absolute timeline"""
-    def __init__(self, name, lo, hi, rt60=2.2, send=0.25, bright=0.45, width=0.8, seed=1):
-        self.name, self.send = name, send
-        self.lo = max(0.0, lo)
-        self.dry, self.wet = buf(hi - self.lo + PAD), buf(hi - self.lo + PAD)
-        self.ir = make_ir(rt60, bright=bright, width=width, seed=seed)
-        self.pre = None      # optional fn(stereo) applied to dry & wet before reverb
-
-    def times(self):
-        return self.lo + np.arange(len(self.dry)) / SR
-
-    def add(self, t, x, gain=1.0, pan=0.0, send=None):
-        place(self.dry, t - self.lo, x, gain, pan)
-        s = self.send if send is None else send
-        if s > 0: place(self.wet, t - self.lo, x, gain * s, pan)
-
-    def render(self):
-        d, w = self.dry, self.wet
-        if self.pre: d, w = self.pre(d), self.pre(w)
-        return d + convolve(w, self.ir)
-
-
-def hum_t(sd=0.006): return float(rng.normal(0, sd))
-def hum_v(v, sd=5): return int(np.clip(v + rng.normal(0, sd), 1, 127))
-
-
-def gm(bus, t, prog, key, vel, dur, gain=1.0, pan=0.0, send=None, tail=4.0):
-    bus.add(t, sf2.note(prog[0], prog[1], key, vel, dur, tail), gain, pan, send)
-
-
-def roll(bus, t, prog, keys, vel, dur, gain=1.0, spread=0.035, pan_w=0.3, send=None, human=True, tail=4.0):
-    """rolled chord, low -> high, slight pan spread across the voicing"""
-    for i, k in enumerate(keys):
-        p = (i / max(1, len(keys) - 1) - 0.5) * 2 * pan_w
-        dt = i * spread + (hum_t(0.008) if human else 0)
-        gm(bus, t + dt, prog, k, hum_v(vel - 4 * (i == 0), 4) if human else vel, dur - dt, gain, p, send, tail)
-
-
-# ----------------------------------------------------------------------------- in-house synths
-_cache = {}
-
-
-def kick(soft=1.0):
-    k = ('kick', soft)
-    if k in _cache: return _cache[k]
-    n = n_of(0.45); t = np.arange(n) / SR
-    f = 46 + 70 * np.exp(-t / 0.035)
-    ph = 2 * np.pi * np.cumsum(f) / SR
-    body = np.sin(ph) * np.exp(-t / 0.16) * (1 - np.exp(-t / 0.002))
-    click = filt(np.random.default_rng(3).standard_normal(n) * np.exp(-t / 0.004), 'lp', 1800) * 0.25
-    x = np.tanh(1.3 * (body + click * soft)) / np.tanh(1.3)
-    _cache[k] = fade(x, 0, 0.05); return _cache[k]
-
-
-def hat(var=0, dur=0.05, tone=7500):
-    k = ('hat', var, dur, tone)
-    if k in _cache: return _cache[k]
-    n = n_of(dur + 0.03); t = np.arange(n) / SR
-    nz = np.random.default_rng(100 + var).standard_normal((n, 2))
-    nz = filt(nz, 'hp', tone, order=2)
-    nz = filt(nz, 'lp', 11000)
-    x = nz * np.exp(-t / (dur / 3))[:, None] * (1 - np.exp(-t / 0.0006))[:, None]
-    x /= np.abs(x).max()
-    _cache[k] = x; return x
-
-
-def shaker(var=0):
-    k = ('shk', var)
-    if k in _cache: return _cache[k]
-    n = n_of(0.12); t = np.arange(n) / SR
-    nz = np.random.default_rng(300 + var).standard_normal((n, 2))
-    nz = filt(filt(nz, 'hp', 4500, order=2), 'lp', 9000)
-    e = (t / 0.03) ** 2 * np.exp(-t / 0.025)
-    x = nz * (e / e.max())[:, None]
-    _cache[k] = x / np.abs(x).max(); return _cache[k]
-
-
-def bass(m, dur, cutoff_h=6.0):
-    k = ('bass', m, round(dur, 3), cutoff_h)
-    if k in _cache: return _cache[k]
-    f = mtof(m); n = n_of(dur + 0.08)
-    x = np.zeros(n)
-    for dc in (-6, 6):
-        x += additive(f, n, saw_amps(30, 1.0, cutoff_h), detune_cents=dc) * 0.35
-    x += additive(f, n, [1.0]) * 0.8          # sub
-    e = adsr(n, 0.004, 0.18, 0.55, 0.06)
-    x = np.tanh(1.5 * x * e) / 1.5
-    _cache[k] = fade(x, 0.001, 0.02); return _cache[k]
-
-
-def pluck(m, dur=0.45, bright=9.0, decay=0.32):
-    k = ('pluck', m, dur, bright, decay)
-    if k in _cache: return _cache[k]
-    f = mtof(m)
-    a = pluck_additive(f * 2 ** (-7 / 1200), dur, bright, decay, tilt=1.0)
-    b = pluck_additive(f * 2 ** (7 / 1200), dur, bright, decay, tilt=1.0)
-    x = np.stack([a * 0.85 + b * 0.3, b * 0.85 + a * 0.3], 1) * 0.5
-    _cache[k] = fade(x, 0.0005, 0.03); return _cache[k]
-
-
-def sub_drone(m, dur, beat_hz=0.18):
-    n = n_of(dur); f = mtof(m)
-    x = additive(f, n, [1.0, 0.25, 0.08]) + additive(f + beat_hz, n, [1.0, 0.2, 0.05])
-    return x * 0.5
-
-
-def noise_riser(dur, f0=300, f1=5000):
-    n = n_of(dur)
-    nz = np.random.default_rng(7).standard_normal((n, 2))
-    fc = f0 * (f1 / f0) ** (np.arange(n) / n)
-    y = sweep(nz, 'bp', fc, q=1.2)
-    e = (np.arange(n) / n) ** 2.2
-    return y * e[:, None]
-
+PIANO, WPAD, STR, HALO, GLASS = (0, 0), (0, 89), (0, 49), (0, 94), (0, 92)
+CELESTA, VIBES, HARP, NYLON = (0, 8), (0, 11), (0, 46), (0, 24)
+SPARK = {'celesta': CELESTA, 'vibes': VIBES, 'harp': HARP, 'nylon': NYLON}
+BPM = 66.0
+Q = 60.0 / BPM
 
 # ----------------------------------------------------------------------------- harmony
-CH = {  # voicings (MIDI). D major.
-    'D':      [62, 66, 69, 74], 'Bm': [59, 62, 66, 71], 'G': [59, 62, 67, 71], 'A': [57, 61, 64, 69],
-    'Gadd9':  [43, 50, 59, 62, 69], 'D/F#': [42, 50, 57, 64, 66], 'Em9': [40, 50, 54, 55, 59],
-    'Bm9':    [47, 54, 57, 61, 62], 'Gmaj9': [43, 50, 54, 57, 59], 'Asus4': [45, 52, 57, 62, 64],
-    'A7sus':  [45, 52, 55, 62, 64], 'Aadd9': [45, 52, 57, 59, 61], 'Dadd9': [38, 50, 57, 62, 64, 66, 69],
+PCN = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}
+
+
+def nm(s):
+    """'F#3' / 'Bb1' -> MIDI"""
+    pc = PCN[s[0]]; i = 1
+    while s[i] in '#b':
+        pc += 1 if s[i] == '#' else -1; i += 1
+    return pc + 12 * (int(s[i:]) + 1)
+
+
+def ch(name, spec):
+    lo, hi = spec.split('|')
+    bass = [nm(x) for x in lo.split()]; pad = [nm(x) for x in hi.split()]
+    return dict(name=name, bass=bass, pad=pad, pcs=sorted({k % 12 for k in bass + pad}), root=bass[0] % 12)
+
+
+def scale(root, mode='major'):
+    steps = {'major': [0, 2, 4, 5, 7, 9, 11], 'minor': [0, 2, 3, 5, 7, 8, 10]}[mode]
+    r = PCN[root[0]] + (1 if '#' in root else -1 if 'b' in root[1:] else 0)
+    return [(r + s) % 12 for s in steps]
+
+
+LENS = [ch('Dadd9', 'D2 A2|D3 A3 E4 F#4'), ch('Bm11', 'B1 F#2|D3 A3 E4 F#4'),
+        ch('G6/9maj7', 'G1 D2|D3 A3 E4 F#4'), ch('A6sus4', 'A1 E2|D3 A3 E4 F#4')]   # one voicing, four basses
+
+# mood keys: pad=[(program, gain dB, octave)], pv=pad velocity, cut=pad low-pass Hz, reg=piano melodic range,
+# vel=piano velocity, gap=prob. of a note in a short gap, inl=notes/s under a voice line, spark=(inst, prob),
+# pulse=None|'steady'|'mixed', gain=section gain dB
+PLAN = {
+    'c0': dict(key='D', mode='major', prog=LENS, card=None, pre=None, cad=None,
+               mood=dict(pad=[(WPAD, -2, 0)], pv=34, cut=1700, reg=(62, 81), vel=34, gap=0.8, inl=0.12,
+                         spark=('celesta', 0.6), pulse=None, gain=-1.0)),
+    'c1': dict(key='D', mode='major',
+               prog=[ch('Dmaj9', 'D2 A2|F#3 C#4 E4 A4'), ch('Bm9', 'B1 F#2|D3 A3 C#4 F#4'),
+                     ch('Gmaj9', 'G1 D2|B3 D4 F#4 A4'), ch('Em11', 'E2 B2|D3 G3 A3 F#4')],
+               card=ch('Gmaj9', 'G1 D2|B3 F#4 A4'), pre=ch('A9sus4', 'A1 E2|D3 G3 B3 E4'),
+               cad=ch('Dadd9', 'D2 A2|F#3 D4 E4 A4'),
+               mood=dict(pad=[(WPAD, 0, 0)], pv=38, cut=2000, reg=(59, 81), vel=36, gap=0.75, inl=0.14,
+                         spark=('celesta', 0.35), pulse=None, gain=0.0)),
+    'c2': dict(key='G', mode='major',
+               prog=[ch('Gmaj9', 'G1 D2|D3 A3 B3 F#4'), ch('Em9', 'E2 B2|D3 G3 B3 F#4'),
+                     ch('Cmaj9', 'C2 G2|E3 B3 D4 G4'), ch('D9sus4', 'D2 A2|G3 C4 E4 A4')],
+               card=ch('Cmaj7#11', 'C2 G2|E3 B3 F#4'), pre=ch('D9sus4', 'D2 A2|G3 C4 E4 A4'),
+               cad=ch('Gadd9', 'G1 D2|D3 G3 B3 A4'),
+               mood=dict(pad=[(WPAD, 0, 0), (HALO, -9, 1)], pv=38, cut=2200, reg=(60, 83), vel=36, gap=0.8,
+                         inl=0.16, spark=('harp', 0.4), pulse=None, gain=0.0)),
+    'c3': dict(key='E', mode='minor',
+               prog=[ch('Em9', 'E2 B2|D3 G3 B3 F#4'), ch('Cmaj9', 'C2 G2|D3 G3 B3 E4'),
+                     ch('Am9', 'A1 E2|G3 B3 C4 E4'), ch('Dadd9', 'D2 A2|D3 F#3 A3 E4')],
+               card=ch('Cmaj7', 'C2 G2|E3 B3'), pre=ch('B7sus4', 'B1 F#2|E3 A3 B3 F#4'),
+               cad=ch('Em(add9)', 'E2 B2|G3 B3 F#4'),
+               mood=dict(pad=[(WPAD, -1, 0), (STR, -5, 0)], pv=38, cut=1600, reg=(57, 78), vel=34, gap=0.6,
+                         inl=0.08, spark=None, pulse='steady', gain=0.5)),
+    'c4': dict(key='C', mode='major',
+               prog=[ch('Cmaj9', 'C2 G2|E3 B3 D4 G4'), ch('Am11', 'A1 E2|G3 C4 D4 E4'),
+                     ch('Fmaj7#11', 'F1 C2|A3 B3 E4'), ch('G9sus4', 'G1 D2|F3 A3 C4 D4')],
+               card=ch('Fmaj9', 'F2 C3|A3 E4 G4'), pre=ch('G9sus4', 'G1 D2|F3 A3 C4 D4'),
+               cad=ch('Cadd9', 'C2 G2|E3 G3 D4'),
+               mood=dict(pad=[(WPAD, -1, 0), (HALO, -7, 1)], pv=36, cut=2200, reg=(60, 84), vel=35, gap=0.7,
+                         inl=0.10, spark=('celesta', 0.45), pulse='mixed', gain=0.5)),
+    'c5': dict(key='D', mode='minor',
+               prog=[ch('Dm(add9)', 'D2 A2|F3 A3 E4'), ch('Bbmaj7#11', 'Bb1 F2|D3 A3 E4'),
+                     ch('Gm9', 'G1 D2|Bb3 F4 A4'), ch('A7sus4b9', 'A1 E2|D3 G3 Bb3')],
+               card=ch('Bbmaj7#11', 'Bb1 F2|D3 A3 E4'), pre=ch('A7sus4b9', 'A1 E2|D3 G3 Bb3'),
+               cad=ch('Dm(add9)', 'D2 A2|F3 A3 E4'),
+               mood=dict(pad=[(STR, 0, 0), (WPAD, -4, 0), (GLASS, -8, 1)], pv=40, cut=1400, reg=(52, 74),
+                         vel=33, gap=0.55, inl=0.07, spark=None, pulse=None, gain=1.0)),
+    'c6': dict(key='F', mode='major',
+               prog=[ch('Fmaj9', 'F1 C2|A3 E4 G4'), ch('Dm9', 'D2 A2|F3 C4 E4'),
+                     ch('Bbmaj9', 'Bb1 F2|D3 A3 C4'), ch('C9sus4', 'C2 G2|Bb3 D4 F4')],
+               card=ch('Bbmaj9', 'Bb1 F2|D3 A3 C4'), pre=ch('C9sus4', 'C2 G2|Bb3 D4 F4'),
+               cad=ch('Fadd9', 'F1 C2|A3 C4 G4'),
+               mood=dict(pad=[(WPAD, 0, 0), (STR, -4, 0)], pv=38, cut=2400, reg=(57, 79), vel=36, gap=0.75,
+                         inl=0.15, spark=('vibes', 0.35), pulse=None, gain=0.0)),
+    'c7': dict(key='Bb', mode='major',
+               prog=[ch('Bbmaj9', 'Bb1 F2|D3 A3 C4'), ch('Gm9', 'G1 D2|Bb3 F4 A4'),
+                     ch('Ebmaj9', 'Eb2 Bb2|G3 D4 F4'), ch('F9sus4', 'F1 C2|Eb3 G3 Bb3')],
+               card=ch('Ebmaj9', 'Eb2 Bb2|G3 D4 F4'), pre=ch('F9sus4', 'F1 C2|Eb3 G3 Bb3'),
+               cad=ch('Bbadd9', 'Bb1 F2|D3 F3 C4'),
+               mood=dict(pad=[(STR, -1, 0), (WPAD, -2, 0)], pv=38, cut=2400, reg=(57, 79), vel=36, gap=0.75,
+                         inl=0.13, spark=('nylon', 0.6), pulse=None, gain=0.0)),
+    'c8': dict(key='D', mode='major',
+               prog=[ch('Dmaj9', 'D2 A2|F#3 E4 A4 C#5'), ch('Em11', 'E2 B2|D3 A3 G4 D5'),
+                     ch('Gmaj9', 'G1 D2|B3 F#4 A4 D5'), ch('A13sus4', 'A1 E2|D3 G3 B3 F#4')],
+               card=ch('Dsus2', 'D2 A2|E4 A4'), pre=ch('A13sus4', 'A1 E2|D3 G3 B3 F#4'),
+               cad=ch('Dadd9', 'D2 A2|F#3 A3 E4 D5'),
+               mood=dict(pad=[(STR, 0, 0), (HALO, -5, 1), (WPAD, -4, 0)], pv=40, cut=3000, reg=(62, 88), vel=36,
+                         gap=0.8, inl=0.13, spark=('celesta', 0.45), pulse=None, gain=1.0)),
+    'c9': dict(key='D', mode='major', prog=LENS,
+               card=ch('Gmaj9', 'G1 D2|B3 F#4 A4'), pre=ch('Gmaj9', 'G1 D2|B3 D4 F#4 A4'),
+               cad=ch('Dadd9', 'D2 A2|F#3 D4 E4 A4'),
+               final=ch('Dadd9', 'D1 D2 A2|D3 F#3 A3 E4 F#4 A4 D5'),
+               mood=dict(pad=[(STR, -1, 0), (WPAD, -2, 0), (HALO, -8, 1)], pv=36, cut=2400, reg=(57, 84), vel=34,
+                         gap=0.7, inl=0.09, spark=('harp', 0.35), pulse=None, gain=0.0)),
 }
-BROOT = {'D': 38, 'Bm': 35, 'G': 43, 'A': 45, 'A/C#': 37, 'Dsus2': 38}
-PENTA = [62, 64, 66, 69, 71, 74, 76, 78, 81, 83, 86]   # D major pentatonic D4..D6
-
-def fit_tempo(interval, pref=88.0, lo=80.0, hi=96.0):
-    """BPM such that `interval` is a whole number of beats; prefer lo..hi, closest to pref"""
-    for a, b in ((lo, hi), (72.0, 104.0)):
-        c = [60.0 * k / interval for k in range(1, 9) if a <= 60.0 * k / interval <= b]
-        if c: return min(c, key=lambda v: abs(v - pref))
-    return pref
+DEFAULT = PLAN['c1']
+for k, p in PLAN.items():
+    p['scale'] = scale(p['key'], p['mode'])
 
 
-def clusters(ts, gap):
+def plan(cid): return PLAN.get(cid, DEFAULT)
+
+
+# ----------------------------------------------------------------------------- 1. harmonic slots
+ORDERS = [[0, 1, 2, 3], [0, 3, 1, 2], [0, 2, 1, 3], [0, 1, 3, 2]]
+
+
+def cyc(prog, k):
+    """k-th chord of the chapter: the 4-chord cycle is re-ordered on each pass so it never loops verbatim"""
+    n = len(prog)
+    if n != 4: return prog[k % n]
+    return prog[ORDERS[(k // 4) % len(ORDERS)][k % 4]]
+
+
+def build_slots():
+    """[(t0, t1, chord, kind, chapter id, beat)] covering [0, D]"""
+    slots = []
+    beats_all = tl.beats
+    final_beat = next((b for b in beats_all if tl.btype(b) == 'endcard'), None)
+    for ci, c in enumerate(tl.chapters):
+        P = plan(c['id'])
+        bs = tl.beats_of(c['id'])
+        if c.get('card') and P['card']:
+            slots.append(dict(t0=c['start'], t1=c['card'][1], chord=P['card'], kind='card', cid=c['id'], beat=None))
+        body = []   # (t0, beat, kind)
+        for b in bs:
+            ty = tl.btype(b)
+            if ty == 'endcard':
+                body.append((b['start'], b, 'final')); continue
+            if ty == 'remember' and P['cad']:
+                body.append((b['start'], b, 'cad')); continue
+            body.append((b['start'], b, 'body'))
+            ls = sorted(b['lines'], key=lambda l: l['start'])
+            for j, l in enumerate(ls):
+                t = l['start'] - 0.3
+                if j == 0 and t - b['start'] < 1.5: continue
+                if t - body[-1][0] < 2.5: continue
+                kind = 'thin' if (ty == 'chicken' and j == 1) else 'body'
+                body.append((t, b, kind))
+            # very long single lines get a mid-line change so harmony keeps breathing
+        exp = []
+        for i, (t0, b, kind) in enumerate(body):
+            t1 = body[i + 1][0] if i + 1 < len(body) else (tl.chapters[ci + 1]['start'] if ci + 1 < len(tl.chapters) else D)
+            if kind in ('body', 'thin') and t1 - t0 > 11:
+                m = t0 + (t1 - t0) / 2
+                exp += [(t0, m, b, kind), (m, t1, b, kind)]
+            else:
+                exp.append((t0, t1, b, kind))
+        k = 0
+        prev = slots[-1]['chord']['name'] if slots else None
+        for i, (t0, t1, b, kind) in enumerate(exp):
+            nxt = exp[i + 1][3] if i + 1 < len(exp) else None
+            if kind == 'final':
+                chd = P.get('final') or P['cad'] or P['prog'][0]
+            elif kind == 'cad':
+                chd = P['cad']
+            elif nxt in ('cad', 'final') and P['pre']:
+                chd = P['pre']
+            else:
+                chd = cyc(P['prog'], k); k += 1
+                if chd['name'] == prev or (nxt in ('cad', 'final') and P['pre'] and chd['name'] == P['pre']['name']):
+                    chd = cyc(P['prog'], k); k += 1
+            slots.append(dict(t0=t0, t1=t1, chord=chd, kind=kind, cid=c['id'], beat=b))
+            prev = chd['name']
+    slots.sort(key=lambda s: s['t0'])
+    # no chord twice in a row (e.g. the cycle landing on the pre-cadence chord just before it)
+    for i, s in enumerate(slots):
+        if s['kind'] not in ('body', 'thin'): continue
+        nb = {slots[j]['chord']['name'] for j in (i - 1, i + 1) if 0 <= j < len(slots)}
+        if s['chord']['name'] in nb:
+            alt = [c for c in plan(s['cid'])['prog'] if c['name'] not in nb]
+            if alt: s['chord'] = alt[int(rng.integers(0, len(alt)))]
+    slots[0]['t0'] = 0.0
+    for a, b in zip(slots[:-1], slots[1:]): a['t1'] = b['t0']
+    slots[-1]['t1'] = D
+    return slots
+
+
+SLOTS = build_slots()
+CHANGES = [s['t0'] for s in SLOTS]
+
+
+def slot_at(t):
+    i = int(np.searchsorted(CHANGES, t, side='right')) - 1
+    return SLOTS[max(0, min(i, len(SLOTS) - 1))]
+
+
+def mood_at(t): return plan(slot_at(t)['cid'])['mood']
+
+
+def pool(chd, lo, hi):
+    return [k for k in range(lo, hi + 1) if k % 12 in chd['pcs']]
+
+
+# ----------------------------------------------------------------------------- 2. note events
+piano_ev, pulse_ev, spark_ev, pad_ev = [], [], [], []   # dicts
+last_note = [66]
+
+
+def hv(v, sd=3): return int(np.clip(round(v + rng.normal(0, sd)), 12, 100))
+
+
+def add_piano(t, key, vel, bus=None, kind='mel'):
+    (bus if bus is not None else piano_ev).append(dict(t=t + float(rng.normal(0, 0.006)), key=int(key), vel=hv(vel), kind=kind))
+
+
+def pick_walk(chd, reg, prev, shape='walk'):
+    P = pool(chd, *reg)
+    if not P: return prev
+    P = np.array(P)
+    if shape == 'up':
+        cand = P[(P > prev) & (P <= prev + 7)]
+    elif shape == 'down':
+        cand = P[(P < prev) & (P >= prev - 7)]
+    else:
+        cand = P[(np.abs(P - prev) <= 5) & (P != prev)]
+    if len(cand) == 0:
+        cand = P[np.argsort(np.abs(P - prev))[:3]]
+    w = 1.0 / (1 + np.abs(cand - prev))
+    return int(rng.choice(cand, p=w / w.sum()))
+
+
+def phrase(t0, t_end, n, shape, vel, allow_over=0.5):
+    """n notes from t0, spaced on the 66 BPM grid (8th / dotted 8th / quarter), each on the chord sounding then"""
+    t = t0
+    for i in range(n):
+        if t > t_end + allow_over: break
+        s = slot_at(t); m = plan(s['cid'])['mood']
+        reg = m['reg']
+        prev = last_note[0]
+        if not (reg[0] <= prev <= reg[1]): prev = int(np.clip(prev, reg[0] + 4, reg[1] - 4))
+        if shape == 'answer' and i == n - 1:
+            # land on the root or third of the chord, nearest below
+            tgt = [k for k in pool(s['chord'], reg[0], prev) if k % 12 in (s['chord']['root'], (s['chord']['root'] + (3 if plan(s['cid'])['mode'] == 'minor' else 4)) % 12)]
+            k = max(tgt) if tgt else pick_walk(s['chord'], reg, prev, 'down')
+        else:
+            k = pick_walk(s['chord'], reg, prev, {'question': 'up', 'answer': 'down'}.get(shape, 'walk'))
+        v = vel - 3 * i if shape == 'answer' else vel - (2 if i == n - 1 else 0)
+        add_piano(t, k, v)
+        last_note[0] = k
+        t += Q * float(rng.choice([0.5, 0.75, 1.0], p=[0.35, 0.3, 0.35]))
+
+
+def spark(t, inst, reg_hi=False):
+    s = slot_at(t)
+    prog = SPARK[inst]
+    if inst in ('harp', 'nylon'):
+        P = pool(s['chord'], 55, 79)
+        st = int(rng.integers(0, max(1, len(P) - 4)))
+        ks = P[st:st + int(rng.integers(3, 5))]
+        dt = float(rng.uniform(0.13, 0.2))
+        for i, k in enumerate(ks):
+            spark_ev.append(dict(t=t + i * dt, key=k, vel=hv(34 - 2 * i), prog=prog, pan=-0.3 + 0.2 * i))
+    else:
+        lo, hi = (72, 91) if inst == 'celesta' else (65, 84)
+        P = pool(s['chord'], lo, hi)
+        k = int(rng.choice(P))
+        spark_ev.append(dict(t=t, key=k, vel=hv(30), prog=prog, pan=float(rng.uniform(-0.5, 0.5))))
+        if rng.random() < 0.5:
+            P2 = [x for x in P if 2 <= abs(x - k) <= 7]
+            if P2: spark_ev.append(dict(t=t + Q * 0.5, key=int(rng.choice(P2)), vel=hv(26), prog=prog, pan=float(rng.uniform(-0.5, 0.5))))
+
+
+# 2a. bass + chord colour at every harmonic change
+for s in SLOTS:
+    m = plan(s['cid'])['mood']; chd = s['chord']
+    t0 = s['t0']
+    v = m['vel'] - (5 if tl.voiced(t0) else 0)
+    if s['kind'] == 'thin': continue
+    if s['kind'] == 'final':
+        keys = chd['bass'] + [k for k in chd['pad'] if k >= 50]
+        for i, k in enumerate(keys):
+            piano_ev.append(dict(t=t0 + 0.07 * i, key=k, vel=hv(40 - i, 2), kind='final'))
+        continue
+    add_piano(t0, chd['bass'][0] + (12 if chd['bass'][0] < 31 else 0), v - 2, kind='bass')
+    if s['kind'] == 'cad':
+        # gentle landing: rolled tonic
+        up = sorted(chd['pad'])[-3:]
+        for i, k in enumerate(up): add_piano(t0 + 0.09 * (i + 1), k, v - 1 - i, kind='chord')
+        last_note[0] = up[-1]
+    elif s['kind'] == 'card':
+        add_piano(t0 + 0.05, max(chd['pad']), v - 4)
+
+# 2b. voice-free gaps: short melodic cells ("question" after a chapter card, "answer" after a remember card)
+rem_line_ends = []
+for b in tl.beats:
+    if tl.btype(b) == 'remember' and b['lines']:
+        rem_line_ends.append(max(l['start'] + l['dur'] for l in b['lines']))
+card_starts = [c['start'] for c in tl.chapters if c.get('card')]
+final_t = next((b['start'] for b in tl.beats if tl.btype(b) == 'endcard'), None)
+
+for a, b in tl.gaps(0.0, D):
+    g = b - a
+    if final_t is not None and a >= final_t - 0.2: continue
+    m = mood_at(a + 0.05)
+    cs = [c for c in card_starts if a - 0.05 <= c <= b]
+    after_rem = any(abs(a - e) < 0.05 for e in rem_line_ends)
+    if final_t is not None and a < final_t <= b:
+        b = final_t - 0.1; g = b - a
+    if cs:
+        c0 = cs[0]
+        if after_rem and c0 - a > 0.5:
+            phrase(a + 0.12, c0 - 0.1, 2, 'answer', m['vel'] - 2, allow_over=0.0)
+        mm = mood_at(c0 + 0.1)
+        phrase(c0 + 0.75, b - 0.1, int(rng.integers(2, 4)), 'question', mm['vel'] - 3, allow_over=0.2)
+        if mm['spark'] and rng.random() < mm['spark'][1] + 0.2:
+            spark(c0 + 1.9, mm['spark'][0])
+        continue
+    if after_rem:
+        phrase(a + 0.1, b, 2 if g > 0.8 else 1, 'answer', m['vel'] - 2, allow_over=0.0)
+        continue
+    if g >= 1.6:
+        phrase(a + 0.1, b, int(rng.integers(2, 5)), 'walk', m['vel'])
+        if m['spark'] and rng.random() < m['spark'][1]: spark(a + 0.1 + Q, m['spark'][0])
+    elif g >= 0.6:
+        phrase(a + 0.08, b, 1 + int(rng.random() < 0.35), 'walk', m['vel'] - 1, allow_over=0.3)
+        if m['spark'] and rng.random() < m['spark'][1] * 0.5: spark(a + 0.35, m['spark'][0])
+    elif g >= 0.25 and rng.random() < m['gap']:
+        phrase(a + 0.06, b, 1, 'walk', m['vel'] - 3, allow_over=0.3)
+
+# 2c. under a voice line: only a rare, soft single note (high or low, away from the voice's centre)
+for l in tl.lines:
+    m = mood_at(l['start'] + 0.5)
+    a, b = l['start'] + 0.8, l['start'] + l['dur'] - 0.4
+    if b <= a: continue
+    n = rng.poisson((b - a) * m['inl'])
+    ts = np.sort(rng.uniform(a, b, n)) if n else []
+    lastt = -9
+    for t in ts:
+        if t - lastt < 1.8: continue
+        s = slot_at(t)
+        if s['kind'] in ('thin', 'final'): continue
+        hi = rng.random() < 0.6
+        reg = (max(m['reg'][1] - 9, 70), m['reg'][1] + 3) if hi else (m['reg'][0] - 5, m['reg'][0] + 4)
+        P = pool(s['chord'], *reg)
+        if P: add_piano(t, int(rng.choice(P)), m['vel'] - 8); lastt = t
+
+# 2d. pulse: steady (c3, "reasoning forward") / mixed (c4, randomised like a mixed strategy); heartbeat in 'chicken'
+for c in tl.chapters:
+    P = plan(c['id']); pm = P['mood']['pulse']
+    if not pm: continue
+    bs = [b for b in tl.beats_of(c['id']) if tl.btype(b) not in ('remember', 'endcard')]
+    if not bs: continue
+    t_a = bs[0]['start'] + 0.2
+    rem = [b for b in tl.beats_of(c['id']) if tl.btype(b) == 'remember']
+    t_b = (rem[0]['start'] - 0.25) if rem else c['end'] - 0.5
+    t = t_a; i = 0
+    first_end = bs[0]['end']
+    while t < t_b:
+        s = slot_at(t)
+        pp = pool(s['chord'], 50, 66)
+        if pp:
+            frac = (t - t_a) / max(1, t_b - t_a)
+            v = 25 + 7 * frac
+            if pm == 'steady':
+                if not (t < first_end and i % 2):          # first beat: half-time, then every quarter
+                    root = [k for k in pp if k % 12 == s['chord']['root']]
+                    pat = [root[0] if root else pp[0], pp[min(len(pp) - 1, 2)], pp[min(len(pp) - 1, 3)], pp[min(len(pp) - 1, 2)]]
+                    add_piano(t, pat[i % 4], v - (3 if i % 2 else 0), bus=pulse_ev)
+            else:
+                if rng.random() > 0.32:
+                    add_piano(t + (Q * 0.5 if rng.random() < 0.15 else 0), int(rng.choice(pp)), v - float(rng.uniform(0, 4)), bus=pulse_ev)
+        t += Q; i += 1
+
+for b in tl.beats:
+    if tl.btype(b) != 'chicken' or not b['lines']: continue
+    ls = sorted(b['lines'], key=lambda l: l['start'])
+    t, t_b = b['start'] + 0.2, (ls[1]['start'] - 0.35) if len(ls) > 1 else b['end']
+    root = slot_at(t)['chord']['bass'][0]
+    root = root + 12 if root < 26 else root
+    per = 60 / 50.0; j = 0
+    while t < t_b - 0.3:
+        v = 38 + 8 * (t - b['start']) / max(1, t_b - b['start'])
+        pulse_ev.append(dict(t=t, key=root, vel=hv(v, 1), kind='hb'))
+        pulse_ev.append(dict(t=t + 0.27, key=root, vel=hv(v - 10, 1), kind='hb'))
+        t += per; j += 1
+
+# 2e. pads (ties across slots when a pitch continues)
+for s in SLOTS:
+    m = plan(s['cid'])['mood']; chd = s['chord']
+    layers = m['pad']
+    t_on, t_off = s['t0'] - 0.35, s['t1'] + 0.25
+    if s['kind'] == 'final':
+        t_off = min(s['t1'], D) - 3.2
+    for li, (prog, gdb, octv) in enumerate(layers):
+        keys = sorted(chd['pad'])
+        if s['kind'] == 'thin': keys = keys[-2:]
+        elif s['kind'] == 'card': keys = keys[-3:]
+        keys = [k + 12 * octv for k in keys]
+        if octv: keys = keys[-2:]           # the high shimmer layer only doubles the top
+        gain = gdb - (4 if s['kind'] in ('card', 'thin') else 0)
+        for i, k in enumerate(keys):
+            pan = (i / max(1, len(keys) - 1) - 0.5) * 0.7 * (-1 if li % 2 else 1)
+            pad_ev.append(dict(t=t_on, off=t_off, key=k, vel=m['pv'], prog=prog, g=gain, pan=pan, layer=li))
+    # string bass under everything (octave above if very low) - warm floor, not a bass line
+    if s['kind'] not in ('thin',):
+        bk = chd['bass'][0]; bk = bk + 12 if bk < 34 else bk
+        pad_ev.append(dict(t=t_on, off=t_off, key=bk, vel=m['pv'] - 2, prog=STR, g=-5 - (3 if s['kind'] == 'card' else 0), pan=-0.1, layer=9))
+
+
+def tie(evs):
+    evs = sorted(evs, key=lambda e: (e['prog'], e['layer'], e['key'], e['t']))
     out = []
-    for t in sorted(ts):
-        if not out or t - out[-1][-1] > gap: out.append([t])
-        else: out[-1].append(t)
+    for e in evs:
+        p = out[-1] if out else None
+        if p and (p['prog'], p['layer'], p['key']) == (e['prog'], e['layer'], e['key']) and e['t'] <= p['off'] + 0.05 \
+                and abs(p['g'] - e['g']) < 0.5:
+            p['off'] = max(p['off'], e['off'])
+        else:
+            out.append(dict(e))
     return out
 
 
-buses = []
-gates = {}
-BUS_DB = {'s0': -5.0, 's2': -2.0, 's3': -3.0, 's3k': -3.5}      # section trims (dB)
+pad_ev = tie(pad_ev)
 
 
-def section_bus(name, lo, hi, **kw):
-    b = Bus(name, lo, hi, **kw); buses.append(b); return b
+# piano "pedal": a note rings until the harmony moves away from its pitch class (or it is struck again)
+def pedal(evs, cap=9.0, damp=0.18):
+    evs.sort(key=lambda e: e['t'])
+    for i, e in enumerate(evs):
+        off = e['t'] + cap
+        for s in SLOTS:
+            if s['t0'] > e['t'] + 0.05 and e['key'] % 12 not in s['chord']['pcs']:
+                off = min(off, s['t0'] + damp); break
+        for f in evs[i + 1:]:
+            if f['t'] > off: break
+            if f['key'] == e['key']:
+                off = min(off, f['t'] + 0.01); break
+        if e.get('kind') == 'final': off = D - 1.2
+        e['off'] = max(e['t'] + 0.25, min(off, D - 0.3))
+    return evs
 
 
-# ============================================================================= s0_boot
-s0, s1s = tl.s('s0_boot'), tl.s('s1_school')
-drone_end = s1s + 5.0
-b0 = section_bus('s0', s0, drone_end + 1, rt60=3.5, send=0.35, bright=0.3, seed=10)
-gm(b0, s0 + 0.05, WPAD, 38, 64, drone_end - s0, gain=0.6, tail=3)
-gm(b0, s0 + 0.35, WPAD, 45, 54, drone_end - s0 - 0.3, gain=0.45, tail=3)
-gm(b0, s0 + 1.2, HALO, 57, 40, drone_end - s0 - 1.2, gain=0.35, tail=3)
-b0.add(s0, sub_drone(26, drone_end - s0 + 1), gain=0.09, send=0.0)     # D1 sub, slow beating
-b0.pre = lambda x: filt(x, 'lp', 2400, order=2)
-gates['s0'] = [(s0, 0.0), (s0 + 3.2, 1.0), (s1s + 1.0, 1.0), (drone_end, 0.0)]
-
-# ============================================================================= s1_school  (~88-92 BPM, 4/4)
-s1e = tl.e('s1_school')
-b1 = section_bus('s1', s1s - 0.5, s1e + 1, rt60=2.0, send=0.22, bright=0.5, seed=11)
-b1long = section_bus('s1strike', s1s, s1e + 10, rt60=5.5, send=0.6, bright=0.35, width=0.8, seed=12)   # the ✓ chord rings into s2
-# tempo & phase from the picture: each log row starts typing on a beat (key-cue clusters)
-rows = [c_[0] for c_ in clusters(tl.cue_times('key', 's1_school', lo=s1s, hi=tl.le('L02')), 0.4)]
-bpm1 = fit_tempo(float(np.median(np.diff(rows)))) if len(rows) >= 2 else 88.0
-beat = 60 / bpm1; bar = 4 * beat; e8 = beat / 2
-t0 = rows[0] - beat * np.floor((rows[0] - s1s + 0.05) / beat) if rows else s1s
-n_full = max(1, int((s1e - t0 - 0.4) // bar))
-prog1 = ['D', 'Bm', 'G', 'A']
-MEL1 = {'D': [78, 81], 'Bm': [78, 74], 'G': [74, 71], 'A': [73, 76]}
-pat = [0, 1, 2, 3, 2, 1, 2, 3]
-for i in range(n_full):
-    c = prog1[i % 4]; tb = t0 + i * bar; notes = CH[c]
-    for j, p in enumerate(pat):
-        acc = 78 if j % 4 == 0 else (64 if j % 2 == 0 else 56)          # strict, schedule-like accents
-        gm(b1, tb + j * e8 + hum_t(0.002), MARIMBA, notes[p], hum_v(acc, 2), e8 * 0.9, gain=1.5,
-           pan=(p - 1.5) * 0.18, tail=1.5)
-    gm(b1, tb, PIANO, BROOT[c] + 12, 52, bar * 0.95, gain=0.9, pan=-0.1, tail=2)             # soft bass
-    if i >= 1:
-        for k, m in enumerate(MEL1[c]):
-            gm(b1, tb + k * 2 * beat, MBOX, m, 44, beat * 1.5, gain=0.33, pan=0.25, tail=2.5)
-strike = t0 + n_full * bar
-roll(b1long, strike, MARIMBA, [62, 66, 69, 74], 80, 0.5, gain=1.4, spread=0.0, human=False, tail=2)
-gm(b1long, strike, MBOX, 86, 46, 1.0, gain=0.35, pan=0.2, tail=3)
-gm(b1long, strike, PIANO, 50, 50, 3.5, gain=0.8, tail=3)
-gm(b1long, strike, PIANO, 38, 46, 3.5, gain=0.7, tail=3)
-gates['s1'] = [(s1s - 0.01, 1.0), (s1e + 6, 1.0)]
-
-# ============================================================================= s2_empty (almost nothing)
-s2s, s2e = tl.s('s2_empty'), tl.e('s2_empty')
-s3s, s3e = tl.s('s3_money'), tl.e('s3_money')
-b2 = section_bus('s2', s2s - 0.5, tl.e('s3_money'), rt60=6.0, send=0.9, bright=0.25, width=0.85, seed=13)
-# the only things left: a far-away pad fifth that barely moves, and a lone piano note or two
-enter_t, _ = tl.first_cue('enter', 's3_money', tl.le('L07') - 0.15, lo=s3s, hi=tl.le('L08'))
-gm(b2, s2s + 0.6, HALO, 50, 34, enter_t - s2s - 0.6, gain=0.17, pan=-0.2, tail=4)
-gm(b2, s2s + 1.4, GLASS, 57, 30, enter_t - s2s - 1.4, gain=0.11, pan=0.25, tail=4)
-lone1 = tl.le('L04') + 0.35
-gm(b2, lone1, PIANO, 69, 34, 3.0, gain=0.9, pan=0.15, tail=5)             # A4, alone
-lone2 = min(tl.le('L06') + 0.45, s2e - 0.2)
-gm(b2, lone2, PIANO, 64, 30, 3.0, gain=0.8, pan=-0.1, tail=5)             # E4, unresolved
-b2.pre = lambda x: filt(x, 'lp', 3500)
-gates['s2'] = [(s2s, 1.0), (enter_t - 0.5, 1.0), (enter_t + 1.2, 0.0)]
-
-# ============================================================================= s3_money (90 BPM groove)
-b3 = section_bus('s3', s3s, s3e + 1, rt60=1.4, send=0.14, bright=0.5, seed=14)
-b3k = section_bus('s3k', s3s, s3e + 1, rt60=0.8, send=0.03, seed=15)
-# the notifications land on the beat: tempo from their spacing, first downbeat right after 'enter'
-pings = tl.cue_times('ping', 's3_money') + tl.cue_times('ping_dull', 's3_money')
-pings = sorted(pings)
-if len(pings) >= 3:
-    bpm3 = fit_tempo(float(np.median(np.diff(pings))), pref=84)
-    beat = 60 / bpm3
-    g0 = pings[0] - beat * np.floor((pings[0] - enter_t + 0.02) / beat)
-else:
-    bpm3 = 90.0; beat = 60 / bpm3; g0 = enter_t
-bar = 4 * beat; e8 = beat / 2; e16 = beat / 4
-freeze_from = tl.ls('L09')
-f_end = tl.le('L10')
-prog3 = ['D', 'A/C#', 'Bm', 'G']
-EP3 = {'D': [57, 62, 66, 69], 'A/C#': [57, 61, 64, 69], 'Bm': [57, 62, 66, 71], 'G': [59, 62, 67, 71], 'Dsus2': [57, 62, 64, 69]}
-PL3 = {'D': [78, 81, 74, 81], 'A/C#': [76, 81, 73, 81], 'Bm': [78, 74, 71, 74], 'G': [74, 79, 71, 79]}
-i = 0
-while True:
-    tb = g0 + i * bar
-    if tb >= s3e - 0.05: break
-    frozen = tb >= freeze_from - 0.35 * bar
-    c = 'Dsus2' if frozen else prog3[i % 4]
-    hv = (lambda v, sd=4: v) if frozen else hum_v            # frozen = identical loop, no humanisation
-    ht = (lambda sd=0: 0.0) if frozen else hum_t
-    r = BROOT[c]
-    for b in range(4):
-        tt = tb + b * beat
-        if tt < s3e - 0.02: b3k.add(tt, kick(), gain=0.32)
-    for j in range(8):
-        tt = tb + j * e8
-        if tt >= s3e - 0.02: continue
-        m = [r, r, r + 12, r, r + 7, r, r + 12, r + 7][j]
-        b3.add(tt + ht(0.003), bass(m, e8 * 0.8), gain=0.2 * (1.0 if j % 2 == 0 else 0.8), pan=0, send=0.02)
-        if j % 2 == 1 and i >= 1:
-            b3.add(tt + ht(0.004), hat(j % 3, 0.045), gain=0.05 * (hv(100, 10) / 100), pan=0.3)
-        if bpm3 < 84 and i >= 1 and not frozen:          # slow tempo: light 16th ghost hats keep it moving
-            b3.add(tt + e16 + ht(0.004), hat(3 + j % 2, 0.03), gain=0.022, pan=0.35)
-    # EP stabs: 1 (long), 2&, 4
-    for off, du, v in [(0, 1.4 * beat, 66), (1.5 * beat, 0.4 * beat, 56), (3 * beat, 0.6 * beat, 58)]:
-        tt = tb + off
-        if tt >= s3e - 0.05: continue
-        for k, m in enumerate(EP3[c]):
-            gm(b3, tt + ht(0.006) + 0.006 * k, EP, m, hv(v, 4), du, gain=0.8, pan=(k - 1.5) * 0.2, tail=1.5)
-    # pluck counter-line on offbeats: the "numbers going up" -- disappears when it freezes
-    if not frozen and i >= 1:
-        for q in range(4):
-            tt = tb + q * beat + e8
-            if tt < s3e - 0.05:
-                b3.add(tt + ht(0.003), pluck(PL3[c][q], 0.4, 7, 0.22), gain=0.07, pan=0.35 * (-1) ** q, send=0.3)
-    i += 1
-# filter slowly closing from L09 to the end of L10; hats & top fade with it
-tt = b3.times()
-u = np.clip((tt - freeze_from) / max(0.5, f_end - freeze_from), 0, 1)
-lp_curve = 16000 * (420 / 16000) ** (u ** 0.8)
-b3.pre = lambda x: sweep(x, 'lp', lp_curve, q=0.8)
-lp_k = 16000 * (900 / 16000) ** u
-b3k.pre = lambda x: sweep(x, 'lp', lp_k, q=0.7)
-gates['s3'] = [(g0 - 0.01, 1.0), (s3e - 0.14, 1.0), (s3e, 0.0)]
-gates['s3k'] = gates['s3']
-
-# ============================================================================= s4_others (free time, warm)
-s4s, s4e = tl.s('s4_others'), tl.e('s4_others')
-b4 = section_bus('s4', s4s, s4e + 3, rt60=3.2, send=0.32, bright=0.45, width=0.8, seed=16)
-b4p = section_bus('s4pad', s4s, s4e + 3, rt60=4.0, send=0.4, bright=0.35, width=0.85, seed=17)
-b4f = section_bus('s4felt', s4s, s4e + 3, rt60=3.0, send=0.4, bright=0.3, seed=18)
-wh, _ = tl.first_cue('whoosh', 's4_others', s4s + 2.0, lo=s4s + 0.8, hi=tl.ls('L11'))
-open_t = max(wh, s4s + 1.9)
-spark_t, _ = tl.first_cue('spark', 's4_others', tl.ls('L14') + 0.4, lo=open_t)
-alarm_t, _ = tl.first_cue('alarm', 's4_others', max(spark_t + 1.6, tl.ls('L16') + tl.ln['L16']['dur'] * 0.45), lo=spark_t)
-fall = alarm_t + 0.25
-
-ev4 = [(open_t, 'Gadd9'), (tl.ls('L12') - 0.35, 'D/F#'), (tl.ls('L13') - 0.35, 'Em9'), (tl.ls('L14') - 0.35, 'Bm9')]
-if spark_t < fall: ev4.append((spark_t, 'Gmaj9'))
-ev4 = sorted([e for e in ev4 if e[0] < fall - 0.3])
-for k, (t, c) in enumerate(ev4):
-    t_next = ev4[k + 1][0] if k + 1 < len(ev4) else fall
-    d = t_next - t + 0.25
-    keys = CH[c]
-    roll(b4, t, EPC, keys[1:], 60 if k else 66, d, gain=0.95, spread=0.05, pan_w=0.35)
-    gm(b4, t, PIANO, keys[0], 44, d, gain=0.9, pan=-0.1, tail=3)                  # low root, felt
-    pad_keys = [keys[1] + 12, keys[2] + 12, keys[-1] + 12]
-    for j, m in enumerate(pad_keys):
-        gm(b4p, t - 0.05, WPAD, m, 50, d + 0.4, gain=0.42, pan=(j - 1) * 0.5, tail=3)
-# the opening: the pad's filter opens with the view
-tt = b4p.times()
-uo = np.clip((tt - open_t) / 2.8, 0, 1)
-fc4 = 350 * (7000 / 350) ** (0.5 - 0.5 * np.cos(np.pi * uo))
-b4p.pre = lambda x: sweep(x, 'lp', fc4, q=0.8)
-b4f.pre = lambda x: filt(x, 'lp', 2600, order=2)       # felt-piano
-# three cards: warm little felt-piano motifs
-cards = tl.cue_times('card', 's4_others', lo=open_t, hi=spark_t)
-if not cards:
-    a, b_ = tl.le('L11') + 0.2, tl.le('L13') - 0.6
-    cards = list(np.linspace(a, b_, 3))
-MOT = [[74, 76, 78], [81, 78, 74, 76], [76, 78, 81, 83]]
-for k, t in enumerate(cards[:6]):
-    mot = MOT[k % 3]
-    for j, m in enumerate(mot):
-        gm(b4f, t + j * 0.21 + hum_t(0.012), PIANO, m, hum_v(40 - 3 * j, 3), 0.9, gain=0.9, pan=0.2 * (k - 1), tail=3)
-# spark: a small bright twinkle (celesta)
-for j, m in enumerate([78, 81, 86, 90]):
-    gm(b4, spark_t + j * 0.07, CELESTA, m, 56 - 5 * j, 0.5, gain=0.7, pan=0.3 + 0.05 * j, send=0.6, tail=3)
-# after the alarm: fall back to a thin, low pad that carries into s5
-gm(b4p, fall + 0.1, HALO, 50, 36, s4e - fall + 1.2, gain=0.35, pan=-0.15, tail=3)
-gm(b4p, fall + 0.3, HALO, 57, 30, s4e - fall + 1.0, gain=0.25, pan=0.2, tail=3)
-gates['s4'] = [(open_t - 0.02, 0.0), (open_t, 1.0), (fall - 0.3, 1.0), (fall + 0.6, 0.35), (s4e + 1.0, 0.0)]
-gates['s4pad'] = [(open_t - 0.02, 0.0), (open_t, 1.0), (fall - 0.2, 1.0), (fall + 0.9, 0.55), (s4e, 0.5), (s4e + 1.5, 0.0)]
-gates['s4felt'] = [(open_t - 0.02, 0.0), (open_t, 1.0), (s4e + 1.0, 1.0), (s4e + 3, 0.0)]
-
-# ============================================================================= s5_team (96 BPM, layering up)
-s5s, s5e = tl.s('s5_team'), tl.e('s5_team')
-cut = tl.ls('L20')
-s6s, s6e = tl.s('s6_loop'), tl.e('s6_loop')
-b5 = section_bus('s5', s5s - 0.5, cut + 1, rt60=1.8, send=0.2, bright=0.5, width=0.8, seed=19)
-b5d = section_bus('s5drums', s5s - 0.5, cut + 1, rt60=0.9, send=0.05, seed=20)
-beat = 60 / 96; bar = 4 * beat; e8 = beat / 2; e16 = beat / 4
-g5 = s5s + 0.3
-prog5 = ['Bm', 'G', 'D', 'A']
-ARP = {'Bm': [59, 62, 66, 69], 'G': [59, 62, 67, 71], 'D': [57, 62, 66, 69], 'A': [57, 61, 64, 69]}
-PADV = {'Bm': [50, 54, 59, 66], 'G': [50, 55, 59, 67], 'D': [50, 54, 57, 66], 'A': [49, 52, 57, 64]}
-R5 = {'Bm': 35, 'G': 31, 'D': 38, 'A': 33}
-# split events: cluster 'window' cues (a burst of windows opening = one split)
-wins = tl.cue_times('window', 's5_team', lo=s5s, hi=cut)
-splits = []
-for t in wins:
-    if not splits or t - splits[-1][-1] > 0.35: splits.append([t])
-    else: splits[-1].append(t)
-splits = [s_[0] for s_ in splits]
-NL = 5
-if len(splits) < 2:   # fallback: dialog enter after L17 starts, then splits spread up to L19
-    splits = list(np.linspace(tl.ls('L17') + 0.8, tl.ls('L19'), NL))
-if len(splits) > NL:  # more splits than layers: keep first and last, spread the rest
-    idx = np.round(np.linspace(0, len(splits) - 1, NL)).astype(int); splits = [splits[k] for k in idx]
-while len(splits) < NL: splits.append(tl.ls('L19'))
-splits = [min(s_, tl.ls('L19')) for s_ in splits]
+piano_ev = pedal([e for e in piano_ev if e['t'] < D - 0.5])
+for e in pulse_ev: e['off'] = e['t'] + (0.55 if e.get('kind') == 'hb' else 0.42)
 
 
-def q_next(t, grid):   # quantise to the nearest grid line
-    k = np.round((t - g5) / grid); return g5 + k * grid
+# ----------------------------------------------------------------------------- 3. render
+class Bus:
+    def __init__(self, rt60, send, bright=0.45, width=0.8, seed=1, predelay=0.02):
+        self.x = np.zeros((NB, 2), dtype=np.float32)
+        self.ir = make_ir(rt60, bright=bright, width=width, seed=seed, predelay=predelay)
+        self.send = send
+
+    def add(self, t, y, gain=1.0, pan=0.0): place(self.x, t, y, gain, pan)
+
+    def render(self, pre=None):
+        d = self.x.astype(np.float64)
+        if pre: d = pre(d)
+        return d + self.send * convolve(d, self.ir)
 
 
-L_on = [q_next(s_, e16) for s_ in splits]    # layer 1..5 on-times
-i = 0
-while True:
-    tb = g5 + i * bar
-    if tb >= cut: break
-    c = prog5[i % 4]; arp = ARP[c]
-    # base layer: pad chord from the start (soft), grows with layer 4
-    lvl = 0.22 if tb < L_on[3] else 0.42
-    for j, m in enumerate(PADV[c]):
-        gm(b5, tb, WPAD, m, 50, bar + 0.1, gain=lvl, pan=(j - 1.5) * 0.35, send=0.35, tail=2)
-    prog_u = np.clip((tb - g5) / max(1.0, cut - g5), 0, 1)       # brightness rises through the scene
-    for s16 in range(16):
-        tt = tb + s16 * e16
-        if tt >= cut: break
-        # layer 1: 16th arp (mid)
-        if tt >= L_on[0] - 1e-6:
-            m = (arp + [arp[0] + 12])[[0, 1, 2, 3, 4, 3, 2, 1][s16 % 8]]
-            acc = 1.0 if s16 % 4 == 0 else 0.7
-            b5.add(tt, pluck(m, 0.35, 6 + 5 * prog_u, 0.18), gain=0.12 * acc, pan=-0.25, send=0.25)
-        # layer 3: 8th arp octave up, other side
-        if tt >= L_on[2] - 1e-6 and s16 % 2 == 0:
-            m = [arp[3] + 12, arp[1] + 12, arp[2] + 12, arp[0] + 24][(s16 // 2) % 4]
-            b5.add(tt + e16 * 0.02, pluck(m, 0.5, 5 + 4 * prog_u, 0.3), gain=0.06, pan=0.45, send=0.4)
-        # layer 2: kick + bass
-        if tt >= L_on[1] - 1e-6:
-            if s16 % 4 == 0: b5d.add(tt, kick(0.8), gain=0.34)
-            if s16 % 2 == 0:
-                bm = R5[c] + (12 if s16 % 8 == 4 else 0)
-                b5.add(tt, bass(bm, e8 * 0.75, 5 + 3 * prog_u), gain=0.24, send=0.02)
-        # layer 4: hats, shaker, celesta counter, EP stabs
-        if tt >= L_on[3] - 1e-6:
-            if s16 % 2 == 1: b5d.add(tt, hat(s16 % 4, 0.035, 8000), gain=0.035, pan=0.25)
-            if s16 % 4 == 2: b5d.add(tt, shaker(s16 % 3), gain=0.035, pan=-0.3)
-        if tt >= L_on[4] - 1e-6:
-            if s16 % 8 == 0:
-                gm(b5, tt, CELESTA, arp[[3, 2][(s16 // 8) % 2]] + 12, 46, 0.4, gain=0.35, pan=0.3, send=0.4, tail=2)
-            if s16 == 0 or abs(tt - L_on[4]) < 1e-6:
-                for k, m in enumerate(PADV[c][1:]):
-                    gm(b5, tt + 0.005 * k, STR, m + 12, 56, tb + bar - tt, gain=0.35, pan=(k - 1) * 0.4, send=0.3, tail=2)
-    i += 1
-# a soft rising air into L20 -- that is cut together with everything else
-rs = tl.ls('L19')
-b5.add(rs, noise_riser(cut - rs + 0.2, 400, 4000), gain=0.016, pan=0, send=0.3)
-gates['s5'] = [(s5s - 0.5, 0.0), (s5s + 0.8, 1.0), (cut - 0.03, 1.0), (cut, 0.0)]
-gates['s5drums'] = gates['s5']
-# the one thing left after the stop: a quiet held note (revealed at the cut) that leads into s6
-bb = section_bus('bridge', cut - 2, s6e, rt60=4.0, send=0.5, bright=0.3, width=0.85, seed=21)
-anchor6 = max(s6s + 0.4, tl.ls('L21') - 0.8)
-gm(bb, cut - 1.5, HALO, 57, 34, anchor6 - cut + 3.0, gain=0.35, tail=3)
-gm(bb, cut - 1.5, GLASS, 69, 26, anchor6 - cut + 2.5, gain=0.12, pan=0.3, tail=3)
-gates['bridge'] = [(cut - 1.5, 0.0), (cut - 0.9, 1.0), (anchor6 + 0.5, 1.0), (anchor6 + 3.0, 0.0)]
+def note(prog, key, vel, gate, tail=3.5):
+    y = sf2.note(prog[0], prog[1], key, vel, max(0.05, gate), tail)
+    sf2.cache.clear()
+    return y
 
-# ============================================================================= s6_loop (warm, resolving)
-b6 = section_bus('s6', s6s - 0.5, D + 1, rt60=3.2, send=0.3, bright=0.45, width=0.8, seed=22)
-b6p = section_bus('s6pad', s6s - 0.5, D + 1, rt60=4.5, send=0.45, bright=0.35, width=0.85, seed=23)
-b6f = section_bus('s6felt', s6s - 0.5, D + 1, rt60=3.4, send=0.42, bright=0.3, seed=24)
-b6f.pre = lambda x: filt(x, 'lp', 3000, order=2)
-final_t, _ = tl.first_cue('final', 's6_loop', tl.le('L24') + 3.5, lo=tl.le('L23'))
-final_t = min(final_t, D - 3.0)
-L24s, L24e = tl.ls('L24'), tl.le('L24')
-# '停一拍': the Asus4 just hangs over the 02:13 clock; the next chord lands with the clock tick (or just before L24)
-clock_t, _ = tl.first_cue('tick', 's6_loop', L24s - 0.3, lo=tl.le('L23'), hi=L24s + 0.6)
-spark6 = tl.cue_times('spark', 's6_loop', lo=L24s)
-ev6 = [(anchor6, 'Gadd9'), (tl.ls('L22') - 0.3, 'D/F#'), (tl.ls('L22') + tl.ln['L22']['dur'] * 0.55, 'Em9'),
-       (tl.ls('L23') - 0.3, 'Asus4'),
-       (clock_t, 'Bm9'), (L24s + tl.ln['L24']['dur'] * 0.5, 'Gmaj9'),
-       (max(L24e + 0.2, final_t - 3.6), 'D/F#'), (final_t - 2.4, 'Asus4'), (final_t - 1.2, 'A7sus')]
-ev6 = sorted(ev6)
-clean = []
-for t, c in ev6:     # drop events that crowd each other if the timeline gets tight
-    if clean and t - clean[-1][0] < 0.9: clean[-1] = (clean[-1][0], c) if c in ('Asus4', 'A7sus') else clean[-1]; continue
-    clean.append((t, c))
-ev6 = clean + [(final_t, 'Dadd9')]
-for k, (t, c) in enumerate(ev6[:-1]):
-    d = ev6[k + 1][0] - t + 0.3
-    keys = CH[c]
-    v = 62 if c not in ('Bm9', 'Gmaj9') else 66
-    after = t > L24e                      # after the last line: breathe out, so the final chord can arrive
-    if after: v = 50
-    roll(b6, t, EPC, keys[1:], v, d, gain=0.95 if not after else 0.7, spread=0.05, pan_w=0.35)
-    gm(b6, t, PIANO, keys[0], 46 if not after else 40, d, gain=0.9, pan=-0.1, tail=3)
-    for j, m in enumerate([keys[1] + 12, keys[2] + 12, keys[-1] + 12]):
-        gm(b6p, t - 0.05, WPAD, m, 50, d + 0.4, gain=(0.42 if k else 0.3) * (0.35 if after else 1), pan=(j - 1) * 0.5, tail=3)
-# strings bloom under L24 (the most moving moment -- kept low, no crescendo to the sky)
-for j, m in enumerate([50, 57, 62, 66]):
-    gm(b6p, L24s - 0.5 + 0.15 * j, STR, m, 58, min(final_t - 0.3, L24e + 1.0) - L24s + 0.5 - 0.15 * j, gain=0.45, pan=(j - 1.5) * 0.4, tail=4)
-# felt-piano melody: sparse, stepwise, mostly in the gaps
-mel = [(anchor6 + 0.25, 74, 40), (tl.le('L21') + 0.05, 78, 38), (tl.ls('L22') - 0.1, 76, 38),
-       (tl.le('L22') + 0.1, 74, 36), (tl.le('L22') + 0.35, 71, 34), (tl.le('L23') + 0.7, 76, 36),
-       (clock_t + 0.02, 78, 44), (L24s + 1.2, 76, 40), (L24s + tl.ln['L24']['dur'] * 0.5, 74, 44),
-       (L24s + tl.ln['L24']['dur'] * 0.5 + 0.55, 71, 38), (L24e + 0.25, 69, 40), (final_t - 2.4, 74, 36), (final_t - 1.2, 73, 36)]
-for t, m, v in mel:
-    if t < final_t - 0.3:
-        gm(b6f, t + hum_t(0.01), PIANO, m, hum_v(v, 2), 1.4, gain=0.95, pan=0.15, tail=3)
-# the side quest triggers: the same little twinkle as the spark in s4 (callback)
-for ts in spark6[:1]:
-    if ts < final_t - 0.5:
-        for j, m in enumerate([78, 81, 86, 90]):
-            gm(b6, ts + j * 0.07, CELESTA, m, 52 - 5 * j, 0.5, gain=0.6, pan=0.3 + 0.05 * j, send=0.6, tail=3)
-# final: one complete, clean D chord, left to decay on its own
-fk = CH['Dadd9']
-for k, m in enumerate(fk):
-    gm(b6, final_t + 0.012 * k, PIANO, m, 60 - 2 * k, max(1.5, D - final_t - 3.2), gain=0.9, pan=(k / (len(fk) - 1) - 0.5) * 0.5, tail=5)
-roll(b6, final_t, EPC, [62, 66, 69, 76], 58, max(1.5, D - final_t - 3.2), gain=0.8, spread=0.02, human=False, tail=5)
-gm(b6f, final_t + 0.05, PIANO, 74, 42, 5.0, gain=0.9, pan=0.15, tail=5)
-gm(b6f, final_t + 0.65, CELESTA, 86, 34, 1.0, gain=0.35, pan=0.3, send=0.7, tail=4)
-for j, m in enumerate([50, 57, 62, 66]):
-    gm(b6p, final_t - 0.05, WPAD, m + 12, 52, max(1.5, D - final_t - 3.2), gain=0.4, pan=(j - 1.5) * 0.45, tail=4)
-end_fade0 = min(max(final_t + 3.5, D - 3.5), D - 1.2)      # let the chord ring, reach silence just before the end
-g6 = [(anchor6 - 0.02, 0.0), (anchor6, 1.0), (end_fade0, 1.0), (D - 0.1, 0.0)]
-gates['s6'] = gates['s6felt'] = g6
-# the pad bed thins out after the last line so the final chord arrives as an event
-gates['s6pad'] = [(anchor6 - 0.02, 0.0), (anchor6, 1.0), (L24e + 0.3, 1.0), (final_t - 0.4, 0.5), (final_t - 0.05, 1.0),
-                  (end_fade0, 1.0), (D - 0.1, 0.0)]
 
-# ============================================================================= render
-# windows where the voice must NOT duck the music (the score is deliberately silent there) -> mix.py
-import json
-os.makedirs(OUT, exist_ok=True)
-json.dump({'no_duck': [[cut - 0.05, anchor6]], 'cut': cut, 'final': final_t, 'open_s4': open_t,
-           'spark': spark_t, 'alarm': alarm_t, 'groove_s3': g0, 'splits_s5': L_on,
-           'edits': sorted({round(t, 3) for g in gates.values() for t, _ in g if 0 < t < D})},
-          open(f'{OUT}/music_meta.json', 'w'), indent=1)
-print(f'  tempi: s1 {bpm1:.1f} BPM (grid {t0:.2f}s)  s3 {bpm3:.1f} BPM (grid {g0:.2f}s)  s5 96 BPM')
+def felt(x, fc):
+    """felt-piano tone: gentle low-pass, a little less 250 Hz boxiness, soft top"""
+    x = filt(x, 'lp', fc, q=0.6, order=2)
+    x = filt(x, 'peak', 260, q=0.9, gain_db=-2.0)
+    return filt(x, 'hs', 6000, gain_db=-4)
 
-master = np.zeros((N + n_of(PAD + 2), 2))
-for b in buses:
-    y = b.render()
-    if b.name in gates:
-        y = y * env_points(len(y), [(t - b.lo, g) for t, g in gates[b.name]])[:, None]
-    y *= 10 ** (BUS_DB.get(b.name, 0.0) / 20)
-    if os.environ.get('DEBUG_WIN'):
-        w0, w1 = map(float, os.environ['DEBUG_WIN'].split(','))
-        seg = y[max(0, n_of(w0 - b.lo)):max(0, n_of(w1 - b.lo))]
-        if len(seg): print(f'    [{w0}-{w1}] {b.name:9s} rms {db(np.sqrt((seg ** 2).mean()) + 1e-12):6.1f}')
-    place(master, b.lo, y)
-    print(f'  bus {b.name:9s} {b.lo:7.2f}s  peak {db(np.abs(y).max()):6.1f} dB')
-master = master[:N]
-master = filt(master, 'hp', 35, order=2)
-master = filt(master, 'ls', 90, q=0.7, gain_db=-3.0)     # keep the sub region polite under the voice
-# gentle glue
-from pedalboard import Pedalboard, Compressor
-pb = Pedalboard([Compressor(threshold_db=-20, ratio=1.8, attack_ms=25, release_ms=300)])
-master = pb(master.T.astype(np.float32), SR).T.astype(np.float64)
-peak = np.abs(master).max()
-master *= 10 ** (-3 / 20) / peak        # music stem normalised to -3 dBFS sample peak; mix.py sets its level
-master = limiter(master, -1.5)
-master = fade(master, 0.01, 0.2)
-write(f'{OUT}/music.wav', master)
 
-# per-section report
-for s in tl.d['scenes']:
-    a, b_ = n_of(s['start']), n_of(s['end'])
-    seg = master[a:b_]
-    try: L = lufs(seg)
-    except Exception: L = float('nan')
-    print(f"  {s['id']:10s} {s['start']:7.2f}-{s['end']:7.2f}  {L:6.1f} LUFS  peak {db(np.abs(seg).max()):6.1f}")
-if '--plot' in sys.argv:
-    plot_tracks([('music', master)], tl, f'{OUT}/plot_music.png', 'music.wav')
+def pan_of(k): return float(np.clip((k - 64) / 30.0, -0.45, 0.45))
+
+
+out = np.zeros((NB, 2))
+stems = {}
+
+# piano
+bus = Bus(3.4, 0.55, bright=0.4, width=0.9, seed=11, predelay=0.025)
+for e in piano_ev:
+    y = note(PIANO, e['key'], e['vel'], e['off'] - e['t'], tail=3.0)
+    bus.add(e['t'], y, 1.0, pan_of(e['key']))
+stems['piano'] = bus.render(lambda d: felt(d, 3200)); del bus
+
+# pulse (muted felt, drier)
+bus = Bus(2.2, 0.35, bright=0.3, seed=12)
+for e in pulse_ev:
+    y = note(PIANO, e['key'], e['vel'], e['off'] - e['t'], tail=1.5)
+    bus.add(e['t'], y, 1.0, -0.15 if e.get('kind') != 'hb' else 0.0)
+stems['pulse'] = bus.render(lambda d: felt(d, 1300)); del bus
+
+# sparks (celesta / vibes / harp / nylon)
+bus = Bus(3.8, 0.7, bright=0.5, width=1.0, seed=13, predelay=0.035)
+for e in spark_ev:
+    if e['t'] >= D - 1: continue
+    y = note(e['prog'], e['key'], e['vel'], 1.5 if e['prog'] in (HARP, NYLON) else 0.8, tail=4.0)
+    bus.add(e['t'], y, 1.0, e['pan'])
+stems['spark'] = bus.render(lambda d: filt(d, 'lp', 7000, order=1)); del bus
+
+# pads, with a very slow low-pass drift (per-chapter base cutoff, two slow LFOs)
+bus = Bus(4.5, 0.45, bright=0.35, width=1.0, seed=14, predelay=0.03)
+for e in pad_ev:
+    y = note(e['prog'], e['key'], e['vel'], e['off'] - e['t'], tail=5.0)
+    bus.add(e['t'], y, 10 ** (e['g'] / 20), e['pan'])
+tt = np.arange(NB) / SR
+pts = []
+for c in tl.chapters:
+    pts += [(c['start'] - 1.5, np.log(plan(c['id'])['mood']['cut'])), (c['start'] + 2.5, np.log(plan(c['id'])['mood']['cut']))]
+base = env_points(NB, sorted(pts))
+cut = np.exp(base) * (1 + 0.22 * np.sin(2 * np.pi * tt / 41.0 + 0.7)) * (1 + 0.10 * np.sin(2 * np.pi * tt / 13.7))
+del tt
+stems['pad'] = bus.render(lambda d: filt(sweep(d, 'lp', cut, q=0.6, block=256), 'hp', 45, order=1)); del bus, cut
+
+# tape-like hiss (very low, band-limited, slowly breathing)
+hs = np.zeros((NB, 2))
+nz = np.random.default_rng(7).standard_normal((NB, 2))
+nz = filt(filt(nz, 'lp', 2500, order=1), 'hp', 250, order=1)
+k = np.random.default_rng(8).standard_normal(NB // SR + 3)
+from scipy.ndimage import gaussian_filter1d
+mod = np.interp(np.arange(NB) / SR, np.arange(len(k)), 0.75 + 0.25 * np.tanh(gaussian_filter1d(k, 4) * 3))
+hs = nz * mod[:, None]
+del nz, mod
+stems['hiss'] = hs
+
+# ----------------------------------------------------------------------------- 4. balance + section gains
+GAIN = {'piano': 0.0, 'pulse': -5.0, 'spark': -6.0, 'pad': -4.0, 'hiss': None}
+ref = lufs(stems['piano'][:N])
+for k, x in stems.items():
+    if k == 'hiss':
+        g = 10 ** ((ref - 44 - lufs(x[:N])) / 20)
+    else:
+        g = 10 ** (GAIN[k] / 20)
+    out += x * g
+    stems[k] = None
+
+pts = []
+for c in tl.chapters:
+    gdb = plan(c['id'])['mood']['gain']
+    pts += [(c['start'] - 1.0, None), (c['start'] + 2.0, 10 ** (gdb / 20))]
+pp = []
+prev = 10 ** (plan(tl.chapters[0]['id'])['mood']['gain'] / 20)
+for t, g in pts:
+    if g is None: pp.append((max(0.0, t), prev))
+    else: pp.append((t, g)); prev = g
+out *= env_points(NB, pp)[:, None]
+
+out = out[:N]
+out = fade(out, 0.3, 2.5)
+out *= 10 ** (-3.0 / 20) / max(np.abs(out).max(), 1e-9)
+write(f'{OUT}/music.wav', out)
+
+meta = dict(
+    bpm=BPM,
+    chapters={c['id']: dict(key=plan(c['id'])['key'], mode=plan(c['id'])['mode'], scale=plan(c['id'])['scale']) for c in tl.chapters},
+    chords=[dict(t0=round(s['t0'], 3), t1=round(s['t1'], 3), chapter=s['cid'], kind=s['kind'], name=s['chord']['name'],
+                 pcs=s['chord']['pcs'], root=s['chord']['root'], scale=plan(s['cid'])['scale']) for s in SLOTS],
+    no_duck=[], edits=[])
+json.dump(meta, open(f'{OUT}/music_meta.json', 'w'), indent=1, ensure_ascii=False)
+cnt = lambda ev: len(ev)
+print(f'slots {len(SLOTS)}, piano notes {len(piano_ev)}, pulse {len(pulse_ev)}, spark {len(spark_ev)}, pad {len(pad_ev)}')
+in_line = sum(1 for e in piano_ev if tl.voiced(e['t']))
+print(f'piano notes under voice: {in_line}/{len(piano_ev)}')
+for c in tl.chapters:
+    ss = [s for s in SLOTS if s['cid'] == c['id']]
+    print(f"  {c['id']} {plan(c['id'])['key']:>2} {plan(c['id'])['mode']:5s}: " + ' '.join(f"{s['chord']['name']}{'*' if s['kind'] in ('cad', 'final') else ''}" for s in ss))

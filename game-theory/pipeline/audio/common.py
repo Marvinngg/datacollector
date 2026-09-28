@@ -1,4 +1,4 @@
-"""Shared helpers for the Earth Online audio pipeline (music.py / sfx.py / mix.py).
+"""Shared helpers for the 《博弈论：看局、解局、改局》 audio pipeline (music.py / sfx.py / mix.py).
 
 Everything time-related is read from build/timeline.json (and optionally build/cues.json) at run time.
 Audio is float32/float64 numpy, stereo arrays have shape (n, 2), SR = 48 kHz.
@@ -11,7 +11,7 @@ from scipy import signal
 
 SR = 48000
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(os.path.dirname(HERE))          # earth-online/
+ROOT = os.path.dirname(os.path.dirname(HERE))          # game-theory/
 BUILD = os.path.join(ROOT, 'build')
 OUT = os.path.join(BUILD, 'audio')
 SF2_PATH = os.path.join(ROOT, 'models', 'sf2', 'GeneralUser-GS.sf2')
@@ -20,35 +20,42 @@ SF2_URL = 'https://raw.githubusercontent.com/mrbumpy409/GeneralUser-GS/main/Gene
 
 # ----------------------------------------------------------------------------- timeline
 class Timeline:
+    """build/timeline.json (regenerated with every voice pass -- never cache times) + build/cues.json"""
     def __init__(self):
-        # EO_TIMELINE / EO_CUES env vars only exist for robustness tests; the build always uses build/*.json
-        self.d = json.load(open(os.environ.get('EO_TIMELINE') or os.path.join(BUILD, 'timeline.json')))
+        # GT_TIMELINE / GT_CUES env vars only exist for robustness tests; the build always uses build/*.json
+        self.d = json.load(open(os.environ.get('GT_TIMELINE') or os.path.join(BUILD, 'timeline.json')))
         self.duration = float(self.d['duration'])
-        self.sc = {s['id']: s for s in self.d['scenes']}
-        self.ln = {l['id']: l for l in self.d['lines']}
+        self.chapters = sorted(self.d['chapters'], key=lambda c: c['start'])
+        self.beats = sorted(self.d['beats'], key=lambda b: b['start'])
+        self.lines = sorted(self.d['lines'], key=lambda l: l['start'])
         self.vo_sr = int(self.d['sample_rate'])
-        p = os.environ.get('EO_CUES') or os.path.join(BUILD, 'cues.json')
+        p = os.environ.get('GT_CUES') or os.path.join(BUILD, 'cues.json')
         self.cues = json.load(open(p)) if os.path.exists(p) else []
 
-    def s(self, sid):  return float(self.sc[sid]['start'])
-    def e(self, sid):  return float(self.sc[sid]['end'])
-    def ls(self, lid): return float(self.ln[lid]['start'])
-    def le(self, lid): return float(self.ln[lid]['start'] + self.ln[lid]['dur'])
+    @staticmethod
+    def btype(b): return (b.get('visual') or {}).get('type', '')
 
-    def cue_times(self, typ, scene=None, lo=None, hi=None):
-        out = []
-        for c in self.cues:
-            if c.get('type') != typ: continue
-            if scene and c.get('scene') != scene: continue
-            t = float(c['t'])
-            if lo is not None and t < lo: continue
-            if hi is not None and t > hi: continue
-            out.append(t)
-        return sorted(out)
+    def chapter_of(self, t):
+        for c in reversed(self.chapters):
+            if t >= c['start'] - 1e-6: return c
+        return self.chapters[0]
 
-    def first_cue(self, typ, scene, default, lo=None, hi=None):
-        ts = self.cue_times(typ, scene, lo, hi)
-        return (ts[0], True) if ts else (default, False)
+    def beats_of(self, cid): return [b for b in self.beats if b['chapter'] == cid]
+
+    def voiced(self, t, pad=0.0):
+        return any(l['start'] - pad <= t <= l['start'] + l['dur'] + pad for l in self.lines)
+
+    def gaps(self, lo, hi, min_len=0.0):
+        """voice-free intervals inside [lo, hi]"""
+        out, cur = [], lo
+        for l in self.lines:
+            a, b = l['start'], l['start'] + l['dur']
+            if b <= cur: continue
+            if a >= hi: break
+            if a > cur and a - cur >= min_len: out.append((cur, min(a, hi)))
+            cur = max(cur, b)
+        if hi - cur >= min_len and cur < hi: out.append((cur, hi))
+        return out
 
 
 def n_of(t): return int(round(t * SR))
@@ -206,7 +213,7 @@ def make_ir(rt60=2.5, length=None, predelay=0.018, bright=0.5, seed=1, width=0.8
 
 def convolve(x, ir):
     x = to_stereo(x)
-    y = np.stack([signal.fftconvolve(x[:, c], ir[:, c])[:len(x)] for c in range(2)], 1)
+    y = np.stack([signal.oaconvolve(x[:, c], ir[:, c])[:len(x)] for c in range(2)], 1)
     return y
 
 
@@ -343,14 +350,15 @@ def plot_tracks(tracks, tl, path, title=''):
         ax.pcolormesh(t, f, 10 * np.log10(S + 1e-14), shading='auto', vmin=-130, vmax=-40, cmap='magma')
         ax.set_yscale('symlog', linthresh=200); ax.set_ylim(30, 16000); ax.set_ylabel(name + ' Hz')
     for ax in axes:
-        for s in tl.d['scenes']:
-            ax.axvline(s['start'], color='lime', lw=1.2)
-        for l in tl.d['lines']:
+        for c in tl.chapters:
+            ax.axvline(c['start'], color='lime', lw=1.4)
+        for b in tl.beats:
+            if tl.btype(b) == 'remember': ax.axvspan(b['start'], b['end'], color='gold', alpha=0.10)
+            else: ax.axvline(b['start'], color='lime', lw=0.5, ls=':')
+        for l in tl.lines:
             ax.axvspan(l['start'], l['start'] + l['dur'], color='cyan', alpha=0.07)
-    for s in tl.d['scenes']:
-        axes[0].text(s['start'] + 0.2, -5, s['id'], color='green', fontsize=9, va='top')
-    for l in tl.d['lines']:
-        axes[0].text(l['start'], -75, l['id'], color='teal', fontsize=7)
+    for c in tl.chapters:
+        axes[0].text(c['start'] + 0.3, -3, c['id'], color='green', fontsize=11, va='top')
     axes[-1].set_xlabel('s')
     axes[0].set_title(title)
     plt.tight_layout(); fig.savefig(path, dpi=60); plt.close(fig)
@@ -399,9 +407,13 @@ def plot_range(x, tl, t0, t1, path, title='', vmin=-130):
     ax2.pcolormesh(t + t0, f, 10 * np.log10(S + 1e-14), shading='auto', vmin=vmin, vmax=-40, cmap='magma')
     ax2.set_yscale('symlog', linthresh=200); ax2.set_ylim(30, 20000)
     for ax in (ax1, ax2):
-        for s in tl.d['scenes']:
-            if t0 <= s['start'] <= t1: ax.axvline(s['start'], color='lime', lw=1.2)
-        for l in tl.d['lines']:
+        for c in tl.chapters:
+            if t0 <= c['start'] <= t1: ax.axvline(c['start'], color='lime', lw=1.4)
+        for b in tl.beats:
+            if t0 <= b['start'] <= t1: ax.axvline(b['start'], color='lime', lw=0.6, ls=':')
+            if tl.btype(b) == 'remember' and b['start'] < t1 and b['end'] > t0:
+                ax.axvspan(b['start'], b['end'], color='gold', alpha=0.10)
+        for l in tl.lines:
             if l['start'] < t1 and l['start'] + l['dur'] > t0:
                 ax.axvspan(l['start'], l['start'] + l['dur'], color='cyan', alpha=0.08)
                 ax1.text(l['start'], -76, l['id'], color='teal', fontsize=8)
