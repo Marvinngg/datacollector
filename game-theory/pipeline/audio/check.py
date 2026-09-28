@@ -42,6 +42,7 @@ for c in tl.chapters:
     a, b = max(0, c['start'] - 3), min(tl.duration, c['end'] + 2)
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 8), sharex=True, gridspec_kw={'height_ratios': [1.3, 1]})
     for k, col in (('voice', 'k'), ('music_ducked', 'C3'), ('sfx', 'C2')):
+        if k == 'voice' and tl.silent: continue
         x = rd(f'{OUT}/stems/{k}.wav', a, b) if k != 'sfx' else rd(f'{OUT}/sfx.wav', a, b)
         if x is None: continue
         e, fr = env(x)
@@ -62,6 +63,8 @@ for c in tl.chapters:
             if tl.btype(bt) == 'remember' and bt['start'] < b and bt['end'] > a:
                 ax.axvspan(bt['start'], bt['end'], color='gold', alpha=0.12)
         if c.get('card'): ax.axvspan(c['card'][0], c['card'][1], color='lime', alpha=0.10)
+        for st_a, st_b in meta.get('still', []):
+            if st_a < b and st_b > a: ax.axvspan(st_a, st_b, color='violet', alpha=0.12)
         for l in tl.lines:
             if l['start'] < b and l['start'] + l['dur'] > a:
                 ax.axvspan(l['start'], l['start'] + l['dur'], color='cyan', alpha=0.08)

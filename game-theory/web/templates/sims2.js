@@ -79,7 +79,7 @@
           let sw = false;
           for (let q = 0; q < n - 1; q++) {
             const u = o[q], v = o[q + 1];
-            if (s(v) > s(u) + Math.max(2, 0.015 * s(u))) { o[q] = v; o[q + 1] = u; sw = true; }
+            if (s(v) > s(u) + Math.max(1, 0.008 * s(u))) { o[q] = v; o[q + 1] = u; sw = true; }
           }
           if (!sw) break;
         }
@@ -126,7 +126,7 @@
         text(V.roundLabel || '轮次', 160, 196, { size: 28, color: P.dim });
         const big = { size: 112, family: F.mono, weight: 700 }, wBig = measure(String(R), big);
         const shown = Math.min(R, Math.ceil(r - 1e-6));
-        text(String(shown), 160 + wBig, y, { ...big, color: winA > 0 ? P.ink : P.ink, align: 'right' });
+        text(String(shown), 160 + wBig, y, { ...big, color: P.ink, align: 'right' });
         text('/ ' + R, 160 + wBig + 22, y, { size: 44, family: F.mono, color: P.dim });
         // thin progress line under the counter
         ctx.fillStyle = 'rgba(233,228,216,0.12)'; ctx.fillRect(160, y + 30, 700, 3);
@@ -142,13 +142,11 @@
           const y = 470 + k * 118;
           runs([[nameOf(p.x), P.gold, { weight: 700 }], ['  对  ', P.dim, { size: 26 }], [nameOf(p.y), P.teal, { weight: 700 }]], x0, y, { size: 32 });
           const sc = t => (ri >= R ? t[R] : t[ri]);
-          const sStr = `${sc(p.m.sa)} : ${sc(p.m.sb)}`;
           const w2 = measure(`${sc(p.m.sb)}`, { size: 32, family: F.mono, weight: 700 });
           text(`${sc(p.m.sb)}`, x1, y, { size: 32, family: F.mono, weight: 700, color: P.teal, align: 'right' });
           text(':', x1 - w2 - 16, y, { size: 32, family: F.mono, color: P.dim, align: 'center' });
           text(`${sc(p.m.sa)}`, x1 - w2 - 32, y, { size: 32, family: F.mono, weight: 700, color: P.gold, align: 'right' });
-          void sStr;
-          const strip = (list, yy, col) => {
+          const strip = (list, yy) => {
             ctx.fillStyle = 'rgba(233,228,216,0.06)'; ctx.fillRect(x0, yy, x1 - x0, 16);
             for (const [s0, s1, d] of list) {
               if (s0 >= r) break;
@@ -156,10 +154,9 @@
               ctx.fillStyle = d ? P.red : P.ok;
               ctx.fillRect(x0 + s0 * cw, yy, (e - s0) * cw + 0.3, 16);
             }
-            void col;
           };
-          strip(p.runsA, y + 18, P.gold);
-          strip(p.runsB, y + 40, P.teal);
+          strip(p.runsA, y + 18);
+          strip(p.runsB, y + 40);
           // the front of the sweep glows softly while rounds are being played
           const live = r > 0 && r < R ? 1 : 0;
           if (live) K.dot(x0 + r * cw, y + 37, 5, P.ink, { glow: 14, alpha: 0.8 });
@@ -187,16 +184,17 @@
       const lA = fin(lt, tm.tP, 0.7);
       A(ctx, lA, () => {
         text(V.boardLabel || '总分', bx + bw, 212, { size: 28, color: P.dim, align: 'right' });
-        // the board re-sorts at a calm, fixed cadence: every Q seconds it takes the (hysteresis) ranking of
-        // that moment and glides there over D seconds — a pure function of time
-        const Q = V.resort || 0.55, D = 0.45;
+        // the board re-sorts at a calm, fixed cadence: every Q seconds it glides (over D seconds) to the
+        // (hysteresis) ranking it will have when the glide ends — so it is never visibly out of order.
+        // A pure function of time.
+        const Q = V.resort || 0.5, D = 0.42;
         const rankAtT = t => S.rankAt[Math.min(R, Math.max(0, Math.floor(roundAt(t))))];
         const kq = Math.floor((lt - tm.tS) / Q), sq = tm.tS + kq * Q;
         const endK = Math.ceil((tm.tE - tm.tS) / Q);
         let pos;
         if (lt < tm.tS) pos = rankAtT(lt).slice();
         else {
-          const cur = kq >= endK ? S.rankAt[R] : rankAtT(sq), prev = kq >= endK + 1 ? S.rankAt[R] : rankAtT(sq - Q);
+          const cur = kq >= endK ? S.rankAt[R] : rankAtT(sq + D), prev = kq >= endK + 1 ? S.rankAt[R] : rankAtT(sq - Q + D);
           const f = ease.inOut(prog(lt, sq, sq + D));
           pos = cur.map((c, i) => lerp(prev[i], c, f));
         }
@@ -288,10 +286,10 @@
       const openD = Math.max(3, tB - tO);
       const tLic = tO, tLock = tO + 1.0;
       const t5 = tO + clamp(openD * 0.3, 1.6, 3.5);                 // the extra licence
-      const tN0 = t5 + 0.9, tN1 = Math.max(tN0 + 0.3 * nNew, tB + 0.4); // newcomers walk in, one by one
-      const gap = (tN1 - tN0) / Math.max(1, nNew);
-      const tR0 = Math.max(tB + 0.5, tN1 + 0.2);
-      const tR1 = Math.max(tR0 + 2.6, Math.min(tR0 + 9, api.dur - 2.6)); // bidding rounds
+      const tN0 = t5 + 0.9;                                          // newcomers walk in, one by one
+      const gap = clamp((tB - 0.2 - tN0) / Math.max(1, nNew), 0.3, 0.55), tN1 = tN0 + gap * nNew;
+      const tR0 = Math.max(tB + 0.5, tN1 + 0.8);                     // the full count holds a moment first
+      const tR1 = Math.max(tR0 + 2.6, Math.min(tR0 + 9, api.dur - 2.3)); // bidding rounds
       const tLand = tR1 + 0.25;
       return { tO, tB, tLic, tLock, t5, tN0, tN1, gap, tR0, tR1, tLand, tFin: tLand + 1.2 };
     },
@@ -399,12 +397,12 @@
 
       // ---------------- right panel: bidders counter → amount counter
       const RX = 1110;
-      const cntA = fin(lt, tm.tO + 0.2, 0.7) * (1 - ease.inOut(prog(lt, tm.tR0 - 0.2, tm.tR0 + 0.5)));
+      const cntA = fin(lt, tm.tO + 0.2, 0.7) * (1 - ease.inOut(prog(lt, tm.tR0 - 0.1, tm.tR0 + 0.4)));
       A(ctx, cntA, () => {
-        const nNow = S.bidders.filter(b => lt >= tEnter(b) + 0.3).length;
+        const nNow = nInc + S.bidders.filter(b => !b.inc && lt >= tEnter(b) + 0.3).length;
         text(V.countLabel || '竞标者', RX, 232, { size: 32, color: P.dim });
         const big = { size: 170, family: F.mono, weight: 700 };
-        const lastIn = S.bidders.filter(b => lt >= tEnter(b) + 0.3).reduce((m, b) => Math.max(m, tEnter(b) + 0.3), -9);
+        const lastIn = S.bidders.filter(b => !b.inc && lt >= tEnter(b) + 0.3).reduce((m, b) => Math.max(m, tEnter(b) + 0.3), -9);
         const pop = 1 - ease.out(prog(lt, lastIn, lastIn + 0.5));
         const col = nNow > nInc ? P.ink : P.teal;
         ctx.save(); ctx.translate(RX, 400); ctx.scale(1 + 0.04 * pop, 1 + 0.04 * pop);
@@ -416,7 +414,7 @@
         const nn = Math.max(0, nNow - nInc);
         runs([[`${inName}运营商 ${Math.min(nNow, nInc)}`, P.teal], ['  +  ', P.dim], [`新来者 ${nn}`, P.blue]], RX, 462, { size: 32, weight: 500 });
       });
-      const amtA = fin(lt, tm.tR0, 0.7);
+      const amtA = fin(lt, tm.tR0 + 0.3, 0.6);
       A(ctx, amtA, () => {
         text(V.amountLabel || '五张牌照总价', RX, 232 + rise(amtA, 8), { size: 32, color: P.dim });
         const v = valAt(lt), done = fin(lt, tm.tR1, 0.6);
@@ -424,7 +422,7 @@
         const preW = fPre ? measure(fPre, { size: 64, weight: 500 }) + 18 : 0;
         if (fPre) text(fPre, RX, 398, { size: 64, weight: 500, color: P.gold, alpha: done });
         const num = lt >= tm.tR1 ? String(fNum) : String(Math.round(v));
-        const x0 = RX + preW * done;
+        const x0 = RX + preW;                                      // room for the prefix is kept from the start
         text(num, x0, 400 + rise(amtA, 8), { ...big, color: P.gold, glow: 10 + 22 * done * (1 - prog(lt, tm.tR1 + 0.6, tm.tR1 + 2.5)) });
         text(fUnit, x0 + measure(num, big) + 18, 398, { size: 50, weight: 500, color: P.gold });
       });
@@ -449,7 +447,7 @@
           ctx.strokeStyle = P.teal; ctx.lineWidth = 3; ctx.setLineDash([10, 9]);
           const xe = lerp(cx0, cx1, ease.inOut(prog(lt, tm.tLock + 0.3, tm.tLock + 1.6)));
           ctx.beginPath(); ctx.moveTo(cx0, yOf(S.start) - 3); ctx.lineTo(xe, yOf(S.start) - 3); ctx.stroke(); ctx.setLineDash([]);
-          A(ctx, fio(lt, tm.tLock + 1.0, tm.tR0 + 1.2, 0.6), () => text(V.flatLabel || '只有老运营商：价格平平', cx0 + 12, yOf(S.start) - 22, { size: 28, color: P.teal }));
+          A(ctx, fio(lt, tm.tLock + 1.0, tm.tR0 + 0.6, 0.5), () => text(V.flatLabel || '只有老运营商：价格平平', cx0 + 12, yOf(S.start) - 22, { size: 28, color: P.teal }));
         });
         // the rising price
         if (lt >= tm.tR0) {
