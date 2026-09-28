@@ -21,6 +21,6 @@ echo "== mux"
 mkdir -p release
 AUD=(-i build/audio/mix.wav); [ -n "${FROM:-}" ] && AUD=(-ss "$FROM" -i build/audio/mix.wav)
 ffmpeg -y -loglevel error -i build/video.mp4 "${AUD[@]}" -map 0:v -map 1:a \
-  -c:v libx264 -preset slow -crf 22 -tune stillimage -pix_fmt yuv420p -c:a aac -b:a 192k -shortest -movflags +faststart \
+  -vf hqdn3d=3:3:6:6 -c:v libx264 -preset slow -crf 26 -tune stillimage -pix_fmt yuv420p -c:a aac -b:a 160k -shortest -movflags +faststart \
   "release/${RELEASE_NAME:-game-theory}.mp4"
 echo "done: release/${RELEASE_NAME:-game-theory}.mp4 $(ffmpeg -i release/${RELEASE_NAME:-game-theory}.mp4 2>&1 | grep -o 'Duration: [0-9:.]*')"
