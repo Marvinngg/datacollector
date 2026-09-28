@@ -572,29 +572,32 @@
     const dO = { size: 32, family: F.sans, weight: 400 };
     const cells = items.map(it => ({ dl: String(it.desc || '').split(/\s+·\s+/).flatMap(p => wrapNice(p, w - pad * 2, dO)), fn: it.footnote ? wrap(it.footnote, w - pad * 2, { size: 24, family: F.sans }) : [] }));
     const top0 = V.title ? 316 : 190, maxH = (870 - top0 - (rows - 1) * gap) / rows;
-    const h = Math.min(maxH, Math.max(200, ...cells.map(c => pad + 72 + 26 + c.dl.length * 46 + c.fn.length * 34 + pad - 18)));
+    const bare = cells.every(c => !c.dl.length && !c.fn.length);   // titles only: bigger type, centred in the cell
+    const h = Math.min(maxH, bare ? 230 : Math.max(200, ...cells.map(c => pad + 72 + 26 + c.dl.length * 46 + c.fn.length * 34 + pad - 18)));
     const totalH = rows * h + (rows - 1) * gap;
     const top = top0 + Math.max(0, (870 - top0 - totalH) / 2);
-    return { cols, w, h, pad, dO, cells, top, gap };
+    return { cols, w, h, pad, dO, cells, top, gap, bare };
   }
   function columnLayout(V) {
     const items = V.items || [];
-    const tO = { size: 42, family: F.sans, weight: 700 }, dO = { size: 33, family: F.sans, weight: 400 }, nO = { size: 24, family: F.sans, weight: 400 };
+    const bare = items.every(it => !it.desc && !it.footnote);   // titles only: larger rows, block centred
+    const tO = { size: bare ? 58 : 42, family: F.sans, weight: 700 }, dO = { size: 33, family: F.sans, weight: 400 }, nO = { size: 24, family: F.sans, weight: 400 };
     const titleW = Math.max(160, ...items.map(it => measure(it.title || '', tO)));
-    const idxW = 84, gapT = 56;
+    const idxW = bare ? 104 : 84, gapT = bare ? 0 : 56;
     const descMax = Math.min(1060, 1560 - idxW - titleW - gapT);
     const rows = items.map(it => {
       const dl = it.desc ? wrapNice(it.desc, descMax, dO) : [];
       const fn = it.footnote ? wrap((/^注/.test(it.footnote) ? '' : '注：') + it.footnote, descMax, nO) : [];
       const descW = Math.max(0, ...dl.map(l => measure(l, dO)), ...fn.map(l => measure(l, nO)));
+      if (bare) return { dl, fn, h: 118, descW: 0 };
       const h = Math.max(62, dl.length * 50 + (fn.length ? 14 + fn.length * 34 : 0)) + 50;
       return { dl, fn, h, descW };
     });
-    const blockW = idxW + titleW + gapT + Math.max(...rows.map(r => r.descW), 300);
+    const blockW = bare ? Math.max(idxW + titleW + 120, 520) : idxW + titleW + gapT + Math.max(...rows.map(r => r.descW), 300);
     const x0 = 960 - blockW / 2;
     const top0 = V.title ? 320 : 190, totalH = rows.reduce((s, r) => s + r.h, 0);
     const top = top0 + Math.max(0, (870 - top0 - totalH) / 2);
-    return { tO, dO, nO, titleW, idxW, gapT, rows, x0, blockW, top };
+    return { tO, dO, nO, titleW, idxW, gapT, rows, x0: bare ? 960 - (idxW + titleW) / 2 - 20 : x0, blockW, sepX: bare ? 960 - blockW / 2 - 20 : x0, top, bare };
   }
   T.register('list', {
     draw(ctx_, V, lt, api) {
@@ -619,10 +622,16 @@
           panel(x, y, G.w, G.h, { r: 16, fill: 'rgba(16,21,30,0.86)', stroke: rgba(mix(P.ink, P.gold, em), 0.15 + 0.5 * em), lineWidth: 1.5 + em });
           text(String(i + 1).padStart(2, '0'), x + G.w - G.pad, y + G.pad + 22, { size: 26, family: F.mono, color: mix(P.dim, P.gold, 0.35 + 0.65 * em), align: 'right' });
           ctx.fillStyle = rgba(P.gold, 0.35 + 0.6 * em); ctx.fillRect(x + G.pad, y + G.pad + 12, 28, 2);
+          if (G.bare) {
+            const tsz = 76, ty = y + G.h / 2 + (it.en ? 14 : 28);
+            text(it.title || '', x + G.pad, ty, { size: tsz, family: F.sans, weight: 700, color: P.ink });
+            if (it.en) text(String(it.en).toUpperCase(), x + G.pad + 2, ty + 54, { size: 28, family: F.mono, color: P.dim, spacing: 4 });
+            ctx.restore(); return;
+          }
           const ty = y + G.pad + 78;
           const tw = measure(it.title || '', { size: 56, family: F.sans, weight: 700 });
           text(it.title || '', x + G.pad, ty, { size: 56, family: F.sans, weight: 700, color: P.ink });
-          if (it.en) text(String(it.en).toUpperCase(), x + G.pad + tw + 20, ty, { size: 24, family: F.mono, color: P.dim, spacing: 3 });
+          if (it.en) text(String(it.en).toUpperCase(), x + G.pad + tw + 20, ty, { size: 28, family: F.mono, color: P.dim, spacing: 3 });
           let yy = ty + 26 + 34;
           G.cells[i].dl.forEach((l, k) => { text(l, x + G.pad, yy, { ...G.dO, color: P.ink, alpha: k === 0 ? 0.86 : 0.66 }); yy += 46; });
           G.cells[i].fn.forEach(l => { text(l, x + G.pad, yy, { size: 24, family: F.sans, color: P.dim }); yy += 34; });
@@ -636,9 +645,10 @@
             ctx.save(); ctx.globalAlpha *= f.a; ctx.translate((1 - f.a) * 24, 0);
             const by = y + 25;   // row content top
             // gold bar marks the current item
-            ctx.fillStyle = rgba(P.gold, 0.9 * em); ctx.fillRect(C.x0 - 30, by + 2, 4, R.h - 54);
-            text(String(i + 1).padStart(2, '0'), C.x0, by + 42, { size: 30, family: F.mono, color: mix(P.dim, P.gold, 0.3 + 0.7 * em) });
-            text(it.title || '', C.x0 + C.idxW, by + 44, { ...C.tO, color: P.ink });
+            const ob = C.bare ? 12 : 0;   // baseline offset for the larger bare rows
+            ctx.fillStyle = rgba(P.gold, 0.9 * em); ctx.fillRect(C.x0 - 30, by + 2 - ob / 2, 4, R.h - 54 + ob);
+            text(String(i + 1).padStart(2, '0'), C.x0, by + 42 + ob, { size: C.bare ? 34 : 30, family: F.mono, color: mix(P.dim, P.gold, 0.3 + 0.7 * em) });
+            text(it.title || '', C.x0 + C.idxW, by + 44 + ob, { ...C.tO, color: mix(P.ink, P.gold, C.bare ? 0.25 * em : 0) });
             const dx = C.x0 + C.idxW + C.titleW + C.gapT;
             let yy = by + 42;
             R.dl.forEach(l => { text(l, dx, yy, { ...C.dO, color: P.ink, alpha: 0.82 }); yy += 50; });
@@ -647,7 +657,7 @@
           }
           // hairline separator (drawn once the row below exists)
           const sa = i < items.length - 1 ? fu(lt, ts[i + 1], 0.6).a : 0;
-          if (sa > 0) { ctx.save(); ctx.globalAlpha *= sa; ctx.fillStyle = P.line; ctx.fillRect(C.x0, y + R.h, C.blockW, 1.5); ctx.restore(); }
+          if (sa > 0) { ctx.save(); ctx.globalAlpha *= sa; ctx.fillStyle = P.line; ctx.fillRect(C.sepX, y + R.h, C.blockW, 1.5); ctx.restore(); }
           y += R.h;
         });
       }

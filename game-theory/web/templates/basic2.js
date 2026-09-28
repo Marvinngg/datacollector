@@ -240,7 +240,7 @@
       // quiet countdown: a thin ring slowly closing, "想一想" at its heart
       const ca = Math.min(ease.out(prog(lt, p0 - 0.2, p0 + 0.9)), 1 - ease.inOut(prog(lt, r0 - 0.1, r0 + 0.5)));
       if (ca > 0) {
-        const R = 90, ry = Math.min(top + h + 34 + R, 872 - R);
+        const R = 90, ry = Math.min(top + h + 44 + R, 872 - R);
         const cp = prog(lt, p0 + 0.3, p1 - 0.15);
         ctx.save(); ctx.globalAlpha *= ca;
         ring(cx, ry, R, P.ink, { lineWidth: 2, alpha: 0.13 });
