@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-# script/script.json -> finished film.
-#   bash pipeline/make.sh                       # voice (with pronunciation repair) -> cues -> audio -> frames -> MP4
-#   SKIP_VO=1 bash pipeline/make.sh             # reuse build/vo + timeline
+# script -> finished film.
+#   bash pipeline/make.sh                       # v2 (default): silent film from script/v2.json — text + music, no narration
+#   VERSION=1 bash pipeline/make.sh             # v1: narrated film from script/script.json (voice + pronunciation repair)
+#   SKIP_VO=1 VERSION=1 bash pipeline/make.sh   # v1, reuse build/vo + timeline
 #   FROM=115 TO=206 RELEASE_NAME=c3-pilot bash pipeline/make.sh   # render only a time range (e.g. one chapter)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$PWD/.bin:$PATH"
-[ -z "${SKIP_VO:-}" ] && bash pipeline/voice.sh
+if [ "${VERSION:-2}" = "1" ]; then
+  [ -z "${SKIP_VO:-}" ] && bash pipeline/voice.sh
+else
+  echo "== timeline (silent)"; python3 pipeline/gen_timeline.py | tail -1
+fi
 echo "== sound cues";  node pipeline/render.mjs cues
 echo "== audio";       SKIP_CUES=1 bash pipeline/audio/build_audio.sh
 echo "== frames"
