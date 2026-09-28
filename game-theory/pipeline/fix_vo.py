@@ -10,7 +10,7 @@ import numpy as np, soundfile as sf, sherpa_onnx
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tts_engines import make_engine
-from pinyin_match import distance
+from pinyin_match import distance, speakable
 import importlib.util, hashlib
 def clip_key(say, voice):
     return hashlib.sha1(json.dumps([say, voice], ensure_ascii=False, sort_keys=True).encode()).hexdigest()
@@ -37,7 +37,7 @@ def unmapped(t):
     return t
 def mapped(t):
     for k, v in say_map.items(): t = t.replace(k, v)
-    return t
+    return speakable(t) if S['voice'].get('cn_numbers', True) else t
 
 beats = {b['id']: b for c in S['chapters'] for b in c['beats']}
 fixed, stuck = [], []

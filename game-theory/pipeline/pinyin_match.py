@@ -37,3 +37,12 @@ def distance(ref, hyp):
         for j in range(1, len(b) + 1):
             p, d[j] = d[j], min(d[j] + 1, d[j - 1] + 1, p + (0 if a[i - 1] & b[j - 1] else 1))
     return d[len(b)]
+
+
+def speakable(text):
+    """Rewrite what TTS engines tend to read in English: 4-digit years digit by digit (1928年 → 一九二八年),
+    other Arabic numbers as Chinese quantities, and letter+digit tokens (4S, 3G) with a Chinese digit."""
+    text = re.sub(r'(\d{4})年', lambda m: ''.join(CN[int(c)] for c in m.group(1)) + '年', text)
+    text = re.sub(r'(\d+)([A-Za-z])', lambda m: _qty(int(m.group(1))) + m.group(2), text)
+    text = re.sub(r'(?<![A-Za-z])\d+(?![A-Za-z])', lambda m: _qty(int(m.group(0))), text)
+    return text

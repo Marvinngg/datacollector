@@ -13,6 +13,7 @@ import numpy as np, soundfile as sf
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tts_engines import make_engine
+from pinyin_match import speakable
 
 PACE = {
     'card': 2.6,        # chapter title card (no voice)
@@ -44,9 +45,9 @@ def clip_key(say, voice):
 
 
 def say_of(text, line_say=None):
-    if line_say: return line_say
-    for k, v in say_map.items(): text = text.replace(k, v)
-    return text
+    t = line_say or text
+    for k, v in say_map.items(): t = t.replace(k, v)
+    return speakable(t) if voice.get('cn_numbers', True) else t
 
 
 beats_by_id = {b['id']: b for c in S['chapters'] for b in c['beats']}
