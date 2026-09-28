@@ -295,7 +295,8 @@
       const tP = stepT(api, 'play', 0.3), tW = stepT(api, 'winner', api.dur * 0.42);
       const tS = tP + 0.7;
       const tE = Math.max(tW + 0.5, tS + clamp(api.dur - tS - 7, 3.2, 12));
-      return { tP, tW, tS, tE, tH: tE + 0.25, tR1: tE + 0.7, tR2: tE + 1.4, tNote: tE + 2.3 };
+      const tH = tE + 0.25;   // then: others dim (tH), the champion comes forward (tH+0.9), its total (tH+2), its rules
+      return { tP, tW, tS, tE, tH, tScore: tH + 2.0, tR1: tH + 2.8, tR2: tH + 3.5, tNote: tH + 4.4 };
     },
     sim(V) {
       const keys = V.strategies || ['alld', 'allc', 'grudger', 'tft', 'random', 'stft'];
@@ -317,7 +318,7 @@
         const M = S.all.length, cols = 64, colW = 1760 / cols;
         for (let k = 0; k < M; k++) {
           const m = S.all[k], depth = ((k * 7) % 5) / 4, y = 176 + k * (700 / (M - 1)) + ((k * 13) % 7 - 3) * 6;   // depth 0 far … 1 near
-          const size = even(14 + depth * 10), blur = Math.round(4 - depth * 3), aa = playA * (0.16 + 0.14 * depth);
+          const size = even(14 + depth * 10), blur = 2 + Math.round((1 - depth) * 3), aa = playA * (0.13 + 0.11 * depth);   // behind the focal plane: always soft
           for (let c = 0; c < cols; c++) {
             const t = ri - c; if (t < 0) break;
             const x = 1840 - c * colW - rf * colW, fade = 1 - 0.8 * c / cols;
@@ -371,19 +372,20 @@
         const name = nameOf(wKey);
         Lt(BX, 420, 460, 'rgba(255,159,90,0.12)', big);
         Sf(name, BX, 300, { size: 100, color: EMBER, glow: 18, reveal: big, spacing: 12 });
-        const sa = fin(lt, tm.tH + 2.0, 1.4);
+        const sa = fin(lt, tm.tScore, 1.4);
         Sf(String(S.final[S.winner]), BX, 480, { size: 176, family: F.mono, color: EMBER, glow: 24, alpha: sa, reveal: sa, spacing: 4 });
         Sf(V.boardLabel || '总分', BX, 585, { size: 30, color: DIM, glow: 0, alpha: sa, reveal: sa, spacing: 10 });
       }
-      const r1 = fin(lt, Math.max(tm.tR1, tm.tH + 2.8), 1.2), r2 = fin(lt, Math.max(tm.tR2, tm.tH + 3.5), 1.2), nA = fin(lt, Math.max(tm.tNote, tm.tH + 4.4), 1.4);
+      const r1 = fin(lt, tm.tR1, 1.2), r2 = fin(lt, tm.tR2, 1.2), nA = fin(lt, tm.tNote, 1.4);
+      const rs = [V.rule1 || '第一次合作', V.rule2 || '之后照抄对方'], rw = Math.max(...rs.map(x => L.measureSerif(x, 42)));
       const rule = (k, str, a, y) => {
         if (a <= 0) return;
-        const w = L.measureSerif(str, 42), x = BX - w / 2 + 24;
+        const x = BX - rw / 2 + 24;                                  // both rules share one left edge
         Sf(k, x - 34, y - 2, { size: 26, family: F.mono, color: EMBER, glow: 0, alpha: a * 0.8, align: 'right' });
         Sf(str, x, y, { size: 42, glow: 8, alpha: a, reveal: a, align: 'left' });
       };
-      rule('01', V.rule1 || '第一次合作', r1, 675);
-      rule('02', V.rule2 || '之后照抄对方', r2, 742);
+      rule('01', rs[0], r1, 675);
+      rule('02', rs[1], r2, 742);
       if (V.note !== '' && wKey === 'tft' && S.wins[S.winner] === 0) Sf(V.note || '单场从没赢过谁，总分却是第一', BX, 822, { size: 30, color: DIM, glow: 0, alpha: nA, reveal: nA });
     },
     cues(V, api) {
@@ -461,21 +463,21 @@
       // ---------------- the misunderstanding: one stray defection, lit in ember
       const mis = opp.findIndex((d, i) => d && !opp[i - 1] && !opp[i + 1]);
       if (mis >= 0) {
-        const ma = fin(lt, tm.tMis, 1.0) * (1 - 0.4 * hotA);
+        const mr = fin(lt, tm.tMis, 1.0), ma = mr * (1 - 0.4 * hotA);
         Lt(X(mis), yO, 120, 'rgba(255,159,90,0.30)', ma);
-        Sf(V.misLabel || '误会', X(mis), yO - 76, { size: 34, color: EMBER, glow: 12, alpha: ma, reveal: ma });
+        Sf(V.misLabel || '误会', X(mis), yO - 76, { size: 34, color: EMBER, glow: 12, alpha: ma, reveal: mr });
       }
       // forgiven once: green light where tit for tat would have hit back
       changed.forEach(i => {
-        const a = fin(lt, tChange(i) + 0.4, 0.9) * (1 - 0.4 * hotA);
+        const rv = fin(lt, tChange(i) + 0.4, 0.9), a = rv * (1 - 0.4 * hotA);
         Lt(X(i), yM, 100, 'rgba(159,224,160,0.22)', a);
-        Sf(V.tolLabel || '不还手', X(i), yM + 88, { size: 30, color: OK, glow: 6, alpha: a, reveal: a });
+        Sf(V.tolLabel || '不还手', X(i), yM + 88, { size: 30, color: OK, glow: 6, alpha: a, reveal: rv });
       });
       const ret = fgv.findIndex(v => v);
       if (ret >= 0) {
-        const a = fin(lt, tRet, 1.0) * (1 - 0.4 * hotA);
+        const rv = fin(lt, tRet, 1.0), a = rv * (1 - 0.4 * hotA);
         Lt(X(ret), yM, 100, 'rgba(224,112,95,0.20)', a);
-        Sf(V.retLabel || '连续两次才还手', X(ret), yM + 138, { size: 30, color: RED, glow: 6, alpha: a, reveal: a });
+        Sf(V.retLabel || '连续两次才还手', X(ret), yM + 138, { size: 30, color: RED, glow: 6, alpha: a, reveal: rv });
       }
       // ---------------- the hotline: a direct line of light between the two sides, a pulse running along it
       if ((tm.note || V.hotline) && hotA > 0) {
