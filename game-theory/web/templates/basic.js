@@ -621,7 +621,7 @@
           ctx.save(); ctx.globalAlpha *= f.a; ctx.translate(0, f.dy);
           panel(x, y, G.w, G.h, { r: 16, fill: 'rgba(16,21,30,0.86)', stroke: rgba(mix(P.ink, P.gold, em), 0.15 + 0.5 * em), lineWidth: 1.5 + em });
           text(String(i + 1).padStart(2, '0'), x + G.w - G.pad, y + G.pad + 22, { size: 26, family: F.mono, color: mix(P.dim, P.gold, 0.35 + 0.65 * em), align: 'right' });
-          ctx.fillStyle = rgba(P.gold, 0.35 + 0.6 * em); ctx.fillRect(x + G.pad, y + G.pad + 12, 28, 2);
+          if (!G.bare) { ctx.fillStyle = rgba(P.gold, 0.35 + 0.6 * em); ctx.fillRect(x + G.pad, y + G.pad + 12, 28, 2); }
           if (G.bare) {
             const tsz = 76, ty = y + G.h / 2 + (it.en ? 14 : 28);
             text(it.title || '', x + G.pad, ty, { size: tsz, family: F.sans, weight: 700, color: P.ink });
