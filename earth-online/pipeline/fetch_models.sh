@@ -18,8 +18,9 @@ fetch() {  # fetch <url> <dir-it-unpacks-to>
   echo "ok   models/$dir"
 }
 
-# Voice-over engines (pipeline/lines.json "engine" picks one; Kokoro is the default)
-fetch "$TTS/kokoro-multi-lang-v1_1.tar.bz2" kokoro-multi-lang-v1_1
+# Voice-over: the film uses Kokoro v1.0, Chinese male voice zm_yunjian (lines.json: model_dir + voice_sid 49)
+fetch "$TTS/kokoro-multi-lang-v1_0.tar.bz2" kokoro-multi-lang-v1_0
+# other engines tried during casting (optional): kokoro-multi-lang-v1_1, sherpa-onnx-zipvoice-distill-int8-zh-en-emilia, vits-icefall-zh-aishell3
 for m in ${EXTRA_TTS:-}; do fetch "$TTS/$m.tar.bz2" "$m"; done   # e.g. EXTRA_TTS="sherpa-onnx-zipvoice-distill-zh-en-emilia vits-icefall-zh-aishell3"
 
 # Pronunciation check

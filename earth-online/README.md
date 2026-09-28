@@ -2,7 +2,7 @@
 
 一部约 2 分钟的动态文字短片（kinetic typography）：画面、配音、配乐、音效全部由本目录里的代码离线生成，没有用视频生成模型，也没有剪辑软件。同一套流水线改台词、改场景就能做新片。
 
-- 成片：`release/earth-online-v*.mp4`
+- 成片：`release/earth-online-final.mp4`（最终版）；早期版本 `earth-online-preview.mp4`、`earth-online-v1.mp4`
 - 剧本：`script/v4.md`
 - 调研笔记：`research/notes.md`
 - 制作规则（写新场景前必读）：`BRIEF.md`
@@ -10,7 +10,7 @@
 
 ## 快速开始
 
-需要 Python 3.10+、Node.js 18+、curl，以及约 2GB 磁盘（模型约 400MB，渲染中间文件约 1GB）。Linux 和 macOS 都可以。
+需要 Python 3.10+、Node.js 18+、curl，以及约 2GB 磁盘（模型约 420MB，渲染中间文件约 1GB）。Linux 和 macOS 都可以。
 
 ```bash
 cd earth-online
@@ -71,7 +71,7 @@ PLOTS=1 SKIP_CUES=1 bash pipeline/audio/build_audio.sh   # 只重做音频，并
 ## 常见改动
 
 - **改台词**：编辑 `pipeline/lines.json`，然后跑 `bash pipeline/make.sh`。某个字读错了，就给那句加一个 `"say"`（同音字替换或加逗号），字幕仍显示 `text`。改完跑 `check_vo.py` 验证。
-- **换声音**：修改 `lines.json` 里的 `voice_sid`（引擎说明见 `gen_vo.py` 文件头），再跑 `make.sh`。
+- **换声音**：修改 `lines.json` 里的 `engine`、`model_dir`、`voice_sid`（可选引擎和参数见 `pipeline/tts_engines.py` 文件头），再跑 `make.sh`。当前是 Kokoro v1.0 的 49 号（zm_yunjian）。选角时试过的候选和试听样本在 `release/voice_samples/`。注意 ZipVoice 的训练数据许可为非商用（CC BY-NC 4.0）。
 - **调节奏**：全局语速用 `speed`，单句用 `"speed"`；留白用 `lead`、`tail`、`pre`。时间轴会自动重算。
 - **改画面文字**（比如日志条目、通知内容、人物卡片）：直接改对应 `web/scenes/*.js` 里的字符串，然后 `SKIP_VO=1 bash pipeline/make.sh`。
 - **写新的一幕**：先读 `BRIEF.md`。用 `E.register('场景id', {draw, cues, pad})` 注册，时间一律相对 `E.lineLocal('Lxx')` 或场景时长来算，禁止用 `Math.random` 或 `Date`（帧会并行、乱序渲染）。
@@ -89,7 +89,7 @@ PLOTS=1 SKIP_CUES=1 bash pipeline/audio/build_audio.sh   # 只重做音频，并
 | 素材 | 来源 | 许可 |
 |---|---|---|
 | 字体 | 思源黑体 / 思源宋体（Noto Sans SC / Noto Serif SC）、霞鹜文楷、JetBrains Mono | SIL OFL 1.1 |
-| 配音模型 | Kokoro-82M v1.1-zh（经 sherpa-onnx） | Apache-2.0 |
+| 配音模型 | Kokoro-82M v1.0 中文男声 zm_yunjian（经 sherpa-onnx） | Apache-2.0 |
 | 读音检查 | SenseVoice（经 sherpa-onnx） | 见模型目录内 LICENSE |
 | 乐器音色 | GeneralUser GS v2.0.3 | 允许用于个人和商业音乐制作 |
 | 其他 | 音效、鼓、合成器、混响均为代码合成 | 无第三方素材 |
