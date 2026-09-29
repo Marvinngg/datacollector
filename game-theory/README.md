@@ -11,6 +11,8 @@
 - 按章节自动作曲、加音效、混音；
 - 逐帧渲染，合成 MP4。
 
+> **给 AI 的入口是 `AGENTS.md`**：先读它。它会告诉你只需要读哪几个文件，Claude Code 会通过 `CLAUDE.md` 自动加载它。
+
 ## 当前版本：v4（无旁白、无字幕、电影化画面）
 
 `bash pipeline/make.sh` 默认出 v4，脚本是 `script/v4.json`。全片没有旁白，也没有字幕。**文字屏**和**画面屏**交替出现：文字屏一句一屏，占满整个画面；画面屏只放模拟和图示，里面只有简短的画面内标签。配乐负责节奏，中间穿插问答题和停顿。
@@ -27,7 +29,7 @@
 
 ```bash
 cd game-theory
-bash setup.sh            # 一次性安装：Python/Node 依赖、无头浏览器、ffmpeg、模型（约 1.3GB）
+bash setup.sh            # 一次性安装：Python/Node 依赖、无头浏览器、ffmpeg（v1 配音模型要加 WITH_VOICE=1）
 bash pipeline/make.sh    # 从脚本到成片 → release/game-theory.mp4
 ```
 

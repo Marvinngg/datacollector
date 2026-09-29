@@ -84,6 +84,8 @@ for c in S['chapters']:
             if 't' in st and 'dur' in st: continue   # already timed on the picture's own clock
             k = st.get('at', 0)
             st['t'] = round((blines[k]['start'] if k < len(blines) else b_start) + st.get('delay', 0), 3)
+        if t - b_start < 2.0 and vis['type'] not in ('breath',):
+            print(f"warning: {b['id']} ({vis['type']}) lasts only {t - b_start:.1f}s: give it steps with dur, or a hold")
         beats.append({'id': b['id'], 'chapter': c['id'], 'start': round(b_start, 3), 'end': round(t, 3),
                       'visual': vis, 'lines': blines})
     chapters.append({'id': c['id'], 'num': c['num'], 'title': c['title'], 'part': '', 'next': c.get('next', ''),

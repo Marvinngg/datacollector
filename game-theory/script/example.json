@@ -1,0 +1,43 @@
+{
+  "title": "示例：一部新片的最小脚本",
+  "mode": "silent",
+  "subtitles": false,
+  "pace": { "cps": 4.2, "base": 1.0, "pause": 3.5, "lead": 0.3, "tail": 0.5, "card": 2.8, "q_pause": 6.0, "q_reveal": 3.5, "breath": 3.8 },
+  "chapters": [
+    {
+      "id": "e1", "num": "第 1 集", "title": "先看清问题", "next": "再做选择",
+      "beats": [
+        { "id": "e1b1", "lines": ["做决定之前，", { "text": "先问：我到底在选什么？", "pause": true }],
+          "visual": { "type": "line", "highlight": ["在选什么"] } },
+        { "id": "e1q1",
+          "visual": { "type": "question", "q": "两份工作，一份钱多，一份成长快。你先看什么？",
+                      "options": ["工资", "五年后的自己", "别人怎么选"], "answer": 1, "note": "看长期" } },
+        { "id": "e1b2_a", "lines": ["短期和长期，常常指向不同的答案。"], "visual": { "type": "line" } },
+        { "id": "e1b2",
+          "visual": { "type": "compare",
+                      "left":  { "title": "短期", "items": ["看得见", "马上兑现"] },
+                      "right": { "title": "长期", "items": ["看不见", "会复利"] },
+                      "steps": [{ "show": "left", "dur": 4 }, { "show": "right", "dur": 5.5 }] } },
+        { "id": "e1b3", "lines": ["长期的选择，靠复利取胜。"], "visual": { "type": "remember" } }
+      ]
+    },
+    {
+      "id": "e2", "num": "第 2 集", "title": "再做选择",
+      "beats": [
+        { "id": "e2b1_a", "lines": ["三个问题，帮你做决定。"], "visual": { "type": "line" } },
+        { "id": "e2b1",
+          "visual": { "type": "cards", "title": "决定前问自己",
+                      "items": [{ "title": "可逆吗", "desc": "能反悔的事，快点做" },
+                                { "title": "最坏会怎样", "desc": "能承受，就去试" },
+                                { "title": "十年后在意吗", "desc": "不在意，就别纠结" }],
+                      "steps": [{ "show": "all", "stagger": 3.0, "dur": 11 }] } },
+        { "id": "e2b2",
+          "hold": 14,
+          "visual": { "type": "knowledge_tree", "root": "做决定",
+                      "branches": [{ "name": "看清", "leaves": ["短期", "长期"] },
+                                   { "name": "选择", "leaves": ["可逆", "最坏情况", "十年后"] }] } },
+        { "id": "e2b3", "hold": 8, "visual": { "type": "endcard", "title": "示例片", "lines": ["画面与配乐均由代码自动生成"] } }
+      ]
+    }
+  ]
+}

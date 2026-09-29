@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # One-time setup on a fresh clone (Linux or macOS). Then:  bash pipeline/make.sh
-#   bash setup.sh                 # deps + models (voice, ASR)
+#   bash setup.sh                 # deps (Python, Node, Chromium, ffmpeg)
+#   WITH_VOICE=1 bash setup.sh    # + voice/ASR models, only needed for the narrated v1
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -34,7 +35,11 @@ else
 fi
 
 echo "== models"
-bash pipeline/fetch_models.sh
+if [ "${WITH_VOICE:-0}" = "1" ]; then
+  bash pipeline/fetch_models.sh                 # voice + ASR models (~1.3GB), only for the narrated v1
+else
+  echo "skipped (v4 has no narration). For the narrated v1:  WITH_VOICE=1 bash setup.sh"
+fi
 
 echo
 echo "setup done. build the film with:  bash pipeline/make.sh   (output: release/game-theory.mp4)"
