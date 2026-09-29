@@ -17,6 +17,11 @@ S = json.load(open(args.script))
 P = {'cps': 3.6, 'base': 1.4, 'pause': 4.5, 'lead': 0.6, 'tail': 1.0, 'card': 3.2,
      'q_pause': 7.0, 'q_reveal': 3.2, 'breath': 4.5, **S.get('pace', {})}
 NO_CAPTION = {'line', 'remember', 'question', 'breath', 'endcard', 'title', 'knowledge_tree'}
+TEXT_TYPES = {'line', 'remember'}          # the only beats allowed to carry sentences when subtitles are off
+if S.get('subtitles') is False:           # v4+: a picture beat with `lines` would be a subtitle -> refuse the script
+    bad = [b['id'] for c in S['chapters'] for b in c['beats'] if b.get('lines') and b['visual']['type'] not in TEXT_TYPES]
+    if bad: raise SystemExit(f"subtitles are off, but these picture beats still have lines: {bad}\n"
+                             "move each sentence to a text beat (type line) before/after the picture, or into an in-scene label")
 
 def chars(t):  # reading load: CJK and letters/digits count, punctuation does not
     return len(re.sub(r'[\s，。、：；？！,.:;?!…—“”「」（）()·≠+\-=]', '', t))
@@ -46,6 +51,7 @@ for c in S['chapters']:
         cbeats.append({'id': f"{c['id']}br", 'lines': [], 'hold': P['breath'],
                        'visual': {'type': 'breath', 'num': c['num'], 'title': c['title'], 'next': c['next']}})
     for b in cbeats:
+        b.setdefault('lines', [])
         vis = copy.deepcopy(b['visual'])
         if 'ref' in vis:
             base = copy.deepcopy(by_id[vis['ref']]['visual']); base.update({k: v for k, v in vis.items() if k != 'ref'})
@@ -65,10 +71,17 @@ for c in S['chapters']:
                         'pause': bool(ln.get('pause'))}
                 blines.append(item); lines.append(item); t += d
             t += P['tail'] if b['lines'] else 0
+            if not b['lines'] and any('dur' in st for st in vis.get('steps', [])):
+                # a picture on its own clock: each step is held for `dur` seconds, then the next one starts
+                tc = b_start + P['lead']
+                for st in vis['steps']:
+                    st['t'] = round(tc + st.get('delay', 0), 3); tc += st.get('dur', 3.0)
+                t = tc + P['tail']
             t = max(t, b_start + b.get('hold', 0), b_start + min(20.0, P['lead'] + visual_read(vis) + sum(l['dur'] for l in blines) * 0.35))
         if vis['type'] == 'remember' and 'text' not in vis and blines: vis['text'] = blines[0]['text']
         vis['_caption'] = vis['type'] not in NO_CAPTION and vis.get('caption') is not False
         for st in vis.get('steps', []):
+            if 't' in st and 'dur' in st: continue   # already timed on the picture's own clock
             k = st.get('at', 0)
             st['t'] = round((blines[k]['start'] if k < len(blines) else b_start) + st.get('delay', 0), 3)
         beats.append({'id': b['id'], 'chapter': c['id'], 'start': round(b_start, 3), 'end': round(t, 3),
@@ -77,7 +90,7 @@ for c in S['chapters']:
                      'start': round(c_start, 3), 'end': round(t, 3), 'card': card})
     print(f"{c['id']} {c['num']} {c['title']:<10} {c_start:7.1f} -> {t:7.1f}  ({t - c_start:5.1f}s)")
 
-tl = {'mode': 'silent', 'fps': 30, 'width': 1920, 'height': 1080, 'duration': round(t + 0.5, 3), 'sample_rate': 48000,
+tl = {'mode': 'silent', 'subtitles': S.get('subtitles', True), 'fps': 30, 'width': 1920, 'height': 1080, 'duration': round(t + 0.5, 3), 'sample_rate': 48000,
       'title': S['title'], 'credit': '', 'chapters': chapters, 'beats': beats, 'lines': lines}
 os.makedirs(args.out, exist_ok=True)
 json.dump(tl, open(f'{args.out}/timeline.json', 'w'), ensure_ascii=False, indent=1)

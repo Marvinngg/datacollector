@@ -244,7 +244,7 @@
     let ending = false;
     for (const b of TL.beats) if (t >= b.start && t < b.end) { drawBeat(b, t); if (b.visual.type === 'endcard') ending = true; }
     if (!ending && !V3) progressBar(t);
-    if (V3) { captions3(t); L.bloom(0.42); } else if (TL.mode === 'silent') captions(t); else subtitles(t);
+    if (V3) { if (TL.subtitles !== false) captions3(t); L.bloom(0.42); } else if (TL.mode === 'silent') captions(t); else subtitles(t);
     post(t);
     const fe = prog(t, TL.duration - 1.2, TL.duration - 0.2);   // the film always ends on pure black
     if (fe > 0) { ctx.globalAlpha = ease.in(fe); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }

@@ -148,8 +148,8 @@
       const ni = api.steps.findIndex(s => s.note != null && s.show == null);
       const ls = lineStarts(api), last = ls.length ? ls[ls.length - 1] : null;
       // the closing remark: an explicit note step, else the last screen of text if it comes after KMRW
-      const tNote = ni >= 0 ? api.steps[ni].lt : last != null && last > tK + 4 ? last : api.dur * 0.78;
-      const cs = tB + 4.0, ce = Math.max(cs + 1.8, tK - 1.0);
+      const tNote = ni >= 0 ? api.steps[ni].lt : last != null && last > tK + 4 ? last : Math.max(tK + 6, api.dur * 0.78);
+      const cs = tB + 4.0, ce = cs + Math.min(3.5, Math.max(1.8, tK - 1.0 - cs));   // the sweep never waits for a later beat
       return { wave: 2.6, tB, tLast: tB + 1.6, t2nd: tB + 3.0, cs, ce, tMath: ce + 0.2, tK, tOne: tK + 1.8, tWave: tK + 3.5, tNote, note: ni >= 0 ? api.steps[ni].note : null };
     },
     draw(ctx, V, lt, api) {

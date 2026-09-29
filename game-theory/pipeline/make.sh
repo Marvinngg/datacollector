@@ -10,7 +10,7 @@ export PATH="$PWD/.bin:$PATH"
 if [ "${VERSION:-2}" = "1" ]; then
   [ -z "${SKIP_VO:-}" ] && bash pipeline/voice.sh
 else
-  echo "== timeline (silent)"; python3 pipeline/gen_timeline.py --script "${SCRIPT:-script/v3.json}" | tail -1
+  echo "== timeline (silent)"; python3 pipeline/gen_timeline.py --script "${SCRIPT:-script/v4.json}" | tail -1
 fi
 echo "== sound cues";  node pipeline/render.mjs cues
 echo "== audio";       SKIP_CUES=1 bash pipeline/audio/build_audio.sh

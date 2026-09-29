@@ -24,14 +24,21 @@
         if (i > k || i < k - 1) return;
         const next = lines[i + 1];
         const isCur = i === k;
-        const since = t - l.start, into = next ? t - next.start : -1;
+        // the new sentence waits until the previous one has moved out of the centre (no overlap)
+        const hand = i > 0 ? 0.8 : 0, since = t - l.start - hand, into = next ? t - next.start : -1;
         const str = l.text.replace(/[。]$/, '');
         // current sentence centred; the previous one rises and fades as context
-        const up = isCur ? 0 : ease.inOut(clamp(into / 1.2));
+        const up = isCur ? 0 : ease.inOut(clamp(into / 0.9));
         const size = lerp(74, 40, up), y = lerp(520, 330, up), a = isCur ? 1 : lerp(1, 0.4, up) * (1 - ease.in(prog(into, 4, 6)));
         const n = [...str].length, rev = clamp(since / Math.min(1.8, 0.5 + n * 0.05));
         let rows = [str];
-        if (L.measureSerif(str, size) > 1560) { const c = Math.ceil(n / 2); rows = [str.slice(0, c), str.slice(c)]; }
+        if (L.measureSerif(str, size) > 1560) {
+          // break at the punctuation nearest the middle, never inside a word
+          let c = Math.ceil(n / 2), best = -1;
+          [...str].forEach((ch, j) => { if ('，：；、'.includes(ch) && (best < 0 || Math.abs(j + 1 - n / 2) < Math.abs(best - n / 2))) best = j + 1; });
+          if (best > 0) c = best;
+          rows = [str.slice(0, c), str.slice(c)];
+        }
         rows.forEach((r, j) => L.serif(r, W / 2, y + (j - (rows.length - 1) / 2) * size * 1.35,
           { size, glow: isCur ? 12 : 4, alpha: a, reveal: rev, highlight: hi, hiOn: since > 1.2, hiColor: EMBER }));
         if (isCur && l.pause) {   // a thin line of light settles under a key sentence
@@ -182,6 +189,12 @@
           L.light(x - 70, lerp(y + 60, y2 - 40, k), 14, 'rgba(255,220,150,0.9)', 1 - k * 0.3);
         }
       });
+      // an in-scene note while one column is being compared (there are no subtitles)
+      for (const x of cmp) {
+        if (!x.s.label) continue;
+        const k = Math.min(ease.out(prog(lt, x.s.lt + 0.4, x.s.lt + 1.2)), 1 - ease.in(prog(lt, x.s.lt + 3.4, x.s.lt + 4.0)));
+        L.serif(x.s.label, cx + (x.s.col ? dx : -dx), cy + dy + 128, { size: 34, color: GOLD, glow: 6, alpha: k, reveal: k });
+      }
       // dominant strategies: a band of light along the row / column
       for (const d of S('dominant')) {
         const k = P0(d, 1.0) * (1 - optP * 0.8);
