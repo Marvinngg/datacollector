@@ -293,9 +293,9 @@
             if (wt > 5.25) { ctx.save(); ctx.translate(PEN_REST[0], PEN_REST[1]); ctx.rotate(0.82); ctx.save(); ctx.filter = 'blur(3px)'; ctx.globalAlpha = 0.5; ctx.fillStyle = '#000'; ctx.fillRect(10, 2, 300, 14); ctx.restore(); pencil(0, 330); ctx.restore(); }
             // the writing hand / folding hand
             if (ct < 0) {
-              const tp = tipAt(V, wt), enter = P01(wt, -0.5, 0.3, ease.out), leave = P01(wt, 5.0, 5.3);
+              const tp = tipAt(V, wt), enter = P01(wt, -0.7, 0.3, ease.out), leave = P01(wt, 5.0, 5.3);
               const wig = tp.on ? [Math.sin(lt * 29) * 5 + Math.sin(lt * 11) * 3, Math.cos(lt * 23) * 6] : [0, 0];
-              let hx = tp.p[0] + wig[0] + (1 - enter) * 420, hy = tp.p[1] + wig[1] + (1 - enter) * 470;
+              let hx = tp.p[0] + wig[0] + (1 - enter) * 900, hy = tp.p[1] + wig[1] + (1 - enter) * 1000;
               hx = lerp(hx, PEN_REST[0], leave); hy = lerp(hy, PEN_REST[1], leave);
               const toTop = P01(wt, 5.25, 5.5);   // after putting the pencil down, the hand goes to the top edge of the paper
               if (wt > 5.25) { hx = lerp(PEN_REST[0] + 20, 60, toTop); hy = lerp(PEN_REST[1] - 30, -ph / 2 + 10, toTop); }
@@ -760,7 +760,7 @@
     for (const [x, y] of [[170, hz - 22], [196, hz - 20], [830, hz - 30]]) { g.fillStyle = 'rgba(255,196,120,0.9)'; g.fillRect(x, y, 5, 5); g.filter = 'blur(6px)'; g.fillStyle = 'rgba(255,170,90,0.5)'; g.beginPath(); g.arc(x + 2, y + 2, 10, 0, TAU); g.fill(); g.filter = 'none'; }
     // the dark field: soft patches of leaves fading toward the ridge
     g.filter = 'blur(10px)';
-    for (let i = 0; i < 60; i++) { const y = hz + 20 + Math.pow(r(), 1.6) * 900, sc = 0.3 + (y - hz) / 700; g.fillStyle = `rgba(${20 + r() * 8},${24 + r() * 8},${24 + r() * 6},${0.5 + r() * 0.4})`; g.beginPath(); g.ellipse(r() * W, y, 80 * sc, 26 * sc, 0, 0, TAU); g.fill(); }
+    for (let i = 0; i < 34; i++) { const y = hz + 20 + Math.pow(r(), 1.6) * 900, sc = 0.3 + (y - hz) / 700; g.fillStyle = `rgba(${20 + r() * 6},${23 + r() * 6},${24 + r() * 5},${0.25 + r() * 0.25})`; g.beginPath(); g.ellipse(r() * W, y, 80 * sc, 26 * sc, 0, 0, TAU); g.fill(); }
     g.filter = 'none';
   });
   // melon leaves (big, round, a little ruffled), behind (0) and in front of (1) the melon
@@ -788,8 +788,12 @@
         S.layer(1.0, () => {
           ctx.drawImage(endLeaves(0), 0, 0);
           // soft warm light from a window off frame, left
-          S.light(420, 690, 520, 'rgba(255,190,120,0.07)', lightK);
-          S.melon(540, 742, 600, { tod: 'dusk', rot: -0.04, color: '#2a4232', lit: lerp(0.3, 0.55, lightK), rim: 0.75, carve: S.SURNAME, carveA: 0.3 + 0.35 * lightK, frost: 0.6 });
+          ctx.save(); ctx.filter = 'blur(18px)'; ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.ellipse(560, 860, 330, 40, 0, 0, TAU); ctx.fill(); ctx.restore();
+          S.melon(540, 742, 600, { tod: 'night', rot: -0.04, color: '#1a2d21', lit: 0.25, rim: 0.45, dark: 0.3, carve: S.SURNAME, carveA: 0.3 + 0.3 * lightK, frost: 0.35 });
+          // the lamp-light falls on the near (left) half of the melon only
+          ctx.save(); ctx.beginPath(); ctx.ellipse(540, 742, 292, 126, -0.04, 0, TAU); ctx.clip(); ctx.globalCompositeOperation = 'lighter';
+          const wg = ctx.createRadialGradient(360, 680, 10, 360, 690, 420); wg.addColorStop(0, `rgba(255,180,110,${0.16 * lightK})`); wg.addColorStop(1, 'rgba(255,190,120,0)');
+          ctx.fillStyle = wg; ctx.fillRect(240, 600, 600, 300); ctx.restore();
           ctx.drawImage(endLeaves(1), 0, 0);
           const sw = prog(lt, 0.6, 3.6);
           S.light(lerp(330, 760, ease.inOut(sw)), 720, 200, 'rgba(255,226,180,0.12)', Math.sin(sw * Math.PI));

@@ -362,14 +362,14 @@
     return { c, ox, oy, hand: hf, handB: hb, head: hc, hr, S };
   }
   function person(who, x, y, h, o = {}) {
-    const p = TOD[o.tod || 'dusk'];
+    const p = TOD[o.tod || 'dusk'], A0 = ctx.globalAlpha;   // inherit the beat's fade (and any alpha set by the caller)
     const m = personMask(who, h, o);
     const dx = x - m.ox, dy = y - m.oy, L = o.light || [1, -0.4], ln = Math.hypot(...L), lx = L[0] / ln, ly = L[1] / ln;
     const tint = (col) => { const c = mk(m.S, m.S), g = c.getContext('2d'); g.drawImage(m.c, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = col; g.fillRect(0, 0, m.S, m.S); return c; };
     const rim = tint(o.rimColor || p.rim), body = tint(o.color || p.fig);
     // halo (light wrapping round the figure), rim, body
-    if ((o.halo == null ? 0.08 : o.halo) > 0) { ctx.save(); ctx.globalAlpha = (o.halo == null ? 0.08 : o.halo) * (o.alpha == null ? 1 : o.alpha); ctx.filter = `blur(${Math.round(h * 0.03)}px)`; ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(rim, dx + lx * h * 0.01, dy + ly * h * 0.01); ctx.restore(); }
-    ctx.save(); ctx.globalAlpha = (o.alpha == null ? 1 : o.alpha);
+    if ((o.halo == null ? 0.08 : o.halo) > 0) { ctx.save(); ctx.globalAlpha = A0 * (o.halo == null ? 0.08 : o.halo) * (o.alpha == null ? 1 : o.alpha); ctx.filter = `blur(${Math.round(h * 0.03)}px)`; ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(rim, dx + lx * h * 0.01, dy + ly * h * 0.01); ctx.restore(); }
+    ctx.save(); ctx.globalAlpha = A0 * (o.alpha == null ? 1 : o.alpha);
     ctx.drawImage(rim, dx + lx * Math.max(1.5, h * 0.004), dy + ly * Math.max(1.5, h * 0.004));
     ctx.drawImage(body, dx, dy);
     ctx.restore();

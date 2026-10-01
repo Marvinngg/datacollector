@@ -24,7 +24,7 @@
   const seatY = (who, h, o) => -h * LEG[who] + h * 0.2 * (o.sit || 0) - footY(who, h, o);   // hip height above the ground (negative = up)
   // S.person sets ctx.globalAlpha from o.alpha (default 1), which drops the beat's fade and any alpha set around the
   // call; this wrapper carries the current alpha through.
-  const person = (who, x, y, h, o = {}) => S.person(who, x, y, h, { ...o, alpha: (o.alpha == null ? 1 : o.alpha) * ctx.globalAlpha });
+  const person = (who, x, y, h, o = {}) => S.person(who, x, y, h, o);   // S.person now inherits ctx.globalAlpha itself
   /* draw a figure into an offscreen canvas instead of the frame (same transform), so it can be masked — used for the
      phone's cold light on the face. S.person draws with ctx.drawImage only (halo off), so that one call is redirected. */
   function personOff(key, who, x, y, h, o) {
