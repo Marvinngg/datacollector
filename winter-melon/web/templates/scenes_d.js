@@ -255,12 +255,12 @@
           ctx.drawImage(noteBox(), 0, 0);
           // contents (clipped to the opening)
           ctx.save(); ctx.beginPath(); ctx.rect(BOX.x0 + 4, BOX.y0 + 4, BOX.x1 - BOX.x0 - 8, BOX.y1 - BOX.y0 - 8); ctx.clip();
-          S.melon(522, 458, 560, { tod: 'day', rot: 0.07, lit: 0.55, carve: S.SURNAME, carveA: 0.8 });
+          S.melon(522, 458, 560, { tod: 'day', rot: 0.07, lit: 0.55, carve: S.MARK, carveA: 0.8 });
           S.melon(400, 748, 440, { tod: 'day', rot: -0.12, lit: 0.5 });
           // the small one is lowered in during "straw"
           const pk = P01(lt, s0 + 0.1, s0 + 1.5, ease.out), sc = lerp(1.22, 1, pk);
           ctx.save(); ctx.translate(772, 792); ctx.scale(sc, sc);
-          S.melon(0, 0, 226, { tod: 'day', rot: 0.3, lit: 0.7, carve: S.SURNAME, shadow: pk, girth: 0.5 });
+          S.melon(0, 0, 226, { tod: 'day', rot: 0.3, lit: 0.7, carve: S.MARK, shadow: pk, girth: 0.5 });
           ctx.restore();
           ctx.drawImage(noteStraw2(), 0, 0);
           // shade cast by the far and left walls
@@ -571,14 +571,14 @@
             ctx.drawImage(cityTable(), 0, 0);
             cityBox(fOpen, sOpen);
             ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, yf); ctx.clip();
-            S.melon(melonAt[0], melonAt[1], 200, { tod: 'day', rot: lerp(-0.05, -0.12, mk), lit: 0.75, rim: 0.6, carve: S.SURNAME, color: '#46603f', girth: 0.48 });
+            S.melon(melonAt[0], melonAt[1], 200, { tod: 'day', rot: lerp(-0.05, -0.12, mk), lit: 0.75, rim: 0.6, carve: S.MARK, color: '#46603f', girth: 0.48 });
             ctx.restore();
             if (fOpen > 0.5) S.light(CB.cx + 30, yf - 10, 160, 'rgba(255,220,160,0.16)', P01(lt, o0 + 1.0, o0 + 2.0));
             if (lt > o0 + 2.45) { const nk = kid.hand; cityNote(nk[0] + 8, nk[1] - 18, -0.15 + unfold * 0.1, unfold); }
             lamp();
           } else {
             // ---------------- set-up B: the soup. The small melon keeps cool on the window sill now, the note beside it.
-            S.melon(400, WIN.y1 - 34, 180, { tod: 'night', rot: 0.02, lit: 0.35, rim: 0.8, carve: S.SURNAME, carveA: 0.7, girth: 0.48 });
+            S.melon(400, WIN.y1 - 34, 180, { tod: 'night', rot: 0.02, lit: 0.35, rim: 0.8, carve: S.MARK, carveA: 0.7, girth: 0.48 });
             ctx.save(); ctx.translate(512, WIN.y1 - 22); ctx.rotate(0.1); ctx.fillStyle = '#d6cab0'; ctx.fillRect(-16, -26, 32, 46); ctx.restore();
             const bt = lt - s0, pot = [535, 1420], potTop = pot[1] - 132, bowlAt = [702, 1238];
             const scoop = u => {               // one scoop: from above her bowl into the pot, and back to pour
@@ -677,7 +677,7 @@
           S.ground(tod, hz);
           S.house(-120, 1330, 600, tod, { window: 1, door: true, wall: '#3f3242' });
           ctx.drawImage(duskYard(), 0, 0);
-          for (const [mx, my, ml, mr] of [[430, 1318, 150, 0.05], [560, 1322, 140, -0.08], [495, 1286, 128, 0.1]]) S.melon(mx, my, ml, { tod, rot: mr, dark: 0.55, rim: 0.7, lit: 0.3, carve: S.SURNAME, carveA: 0.25 });
+          for (const [mx, my, ml, mr] of [[430, 1318, 150, 0.05], [560, 1322, 140, -0.08], [495, 1286, 128, 0.1]]) S.melon(mx, my, ml, { tod, rot: mr, dark: 0.55, rim: 0.7, lit: 0.3, carve: S.MARK, carveA: 0.25 });
         });
         S.motes(lt, { n: 22, seed: 14, x: 0, y: 900, w: W, h: 700, alpha: 0.35, vy: 2, color: 'rgba(255,200,140,' });
         let qinHead, xiaoHead;
@@ -791,7 +791,7 @@
           ctx.drawImage(endLeaves(0), 0, 0);
           // soft warm light from a window off frame, left
           ctx.save(); ctx.filter = 'blur(18px)'; ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.ellipse(560, 860, 330, 40, 0, 0, TAU); ctx.fill(); ctx.restore();
-          S.melon(540, 742, 600, { tod: 'night', rot: -0.04, color: '#1a2d21', lit: 0.25, rim: 0.45, dark: 0.3, carve: S.SURNAME, carveA: 0.3 + 0.3 * lightK, frost: 0.35 });
+          S.melon(540, 742, 600, { tod: 'night', rot: -0.04, color: '#1a2d21', lit: 0.25, rim: 0.45, dark: 0.3, carve: S.MARK, carveA: 0.3 + 0.3 * lightK, frost: 0.35 });
           // the lamp-light falls on the near (left) half of the melon only
           ctx.save(); ctx.beginPath(); ctx.ellipse(540, 742, 292, 126, -0.04, 0, TAU); ctx.clip(); ctx.globalCompositeOperation = 'lighter';
           const wg = ctx.createRadialGradient(360, 680, 10, 360, 690, 420); wg.addColorStop(0, `rgba(255,180,110,${0.16 * lightK})`); wg.addColorStop(1, 'rgba(255,190,120,0)');

@@ -354,7 +354,7 @@
           ctx.strokeStyle = 'rgba(235,236,240,0.7)'; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(x - 3, 40); ctx.bezierCurveTo(x - 5, 18, x + 6, -2, x + 10, -10); ctx.stroke();
         }
         // the heading, written earlier: 收瓜 and the date
-        for (const dx of [0, 1.3]) S.hand('收瓜', NB.margin + dx, NB.top - 34, 76, 1, { color: NB.ink, seed: 2, alpha: 0.9 });
+        for (const dx of [0, 1.3]) S.hand(V.header || '收瓜', NB.margin + dx, NB.top - 34, [...(V.header || '收瓜')].length > 3 ? 54 : 76, 1, { color: NB.ink, seed: 2, alpha: 0.9 });
         S.hand('八月廿六', NB.col2 + 20, NB.top - 34, 52, 1, { color: NB.ink, seed: 3, alpha: 0.8 });
         // the rows: ink goes down stroke by stroke; the later ones hurried, leaning more
         rows.forEach(([name, cnt], ri) => {

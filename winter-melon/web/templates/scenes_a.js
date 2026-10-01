@@ -39,7 +39,7 @@
       const sx = shake(k1) + shake(k2);
       const carveA = 0.35 + 0.65 * (cv ? ease.inOut(prog(lt, cv.lt, cv.lt + 1.8)) : 0);
       S.layer(1.0, () => {
-        S.melon(540 + sx, 1520, 900, { tod, rot: -0.05, carve: S.SURNAME, carveA, lit: 0.6, rim: 0.5 });
+        S.melon(540 + sx, 1520, 900, { tod, rot: -0.05, carve: S.MARK, carveA, lit: 0.6, rim: 0.5 });
         // morning light sweeping across the scar
         if (cv) { const k = prog(lt, cv.lt, cv.lt + 2.4); S.light(lerp(260, 820, ease.inOut(k)), 1460, 260, 'rgba(255,226,180,0.35)', Math.sin(k * Math.PI)); }
         // the knock: each tap sends a soft ring of light across the skin
@@ -157,7 +157,7 @@
         const my = 520 + drop, ml = 560;
         ctx.strokeStyle = '#a08560'; ctx.lineWidth = 7;
         ctx.beginPath(); ctx.moveTo(-6, 58); ctx.quadraticCurveTo(-120, my - 160, -ml * 0.42, my - 40); ctx.moveTo(-2, 58); ctx.quadraticCurveTo(120, my - 160, ml * 0.42, my - 40); ctx.stroke();
-        S.melon(0, my, ml, { tod, rot: 0.03, carve: S.SURNAME, lit: 0.8, rim: 0.35 });
+        S.melon(0, my, ml, { tod, rot: 0.03, carve: S.MARK, lit: 0.8, rim: 0.35 });
         ctx.strokeStyle = '#a08560'; ctx.lineWidth = 8; ctx.beginPath(); ctx.ellipse(0, my + 20, ml * 0.47, 90, 0, 0.15, Math.PI - 0.15); ctx.stroke();
         ctx.restore();
       });

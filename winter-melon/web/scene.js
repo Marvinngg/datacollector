@@ -461,6 +461,8 @@
     return `rgb(${f(r)},${f(g)},${f(b)})`;
   }
 
-  const SURNAME = '李';   // the old man's surname: carved on his melons, signed on his note
-  window.S = { SURNAME, TOD, camera, layer, sky, sun, stars, hills, fog, ground, field, fieldSpots, melon, house, tricycle, person, say, stepAt, P: P_, motes, steam, light, vignette, hand, shade, cached, mk };
+  const SURNAME = '李';   // everyone in 李家畈村 is a 李
+  const MARK = '厚';      // 李德厚 carves the last character of his name on his melons (a surname would not tell them apart)
+  const VILLAGE = '李家畈村';
+  window.S = { SURNAME, MARK, VILLAGE, TOD, camera, layer, sky, sun, stars, hills, fog, ground, field, fieldSpots, melon, house, tricycle, person, say, stepAt, P: P_, motes, steam, light, vignette, hand, shade, cached, mk };
 })();

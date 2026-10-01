@@ -240,7 +240,7 @@
           let cx = bx + pad; const cy = y + pad + fs / 2 + j * lh + 3;
           for (const ch of r) {
             ctx.font = `400 ${fs}px ${F.sans}`; const cw = ctx.measureText(ch).width;
-            if (ch === S.SURNAME) {      // the carved surname, picked out a little
+            if (ch === S.MARK) {      // the carved surname, picked out a little
               ctx.save();
               ctx.fillStyle = `rgba(242,196,128,${0.4 * hi})`; ctx.beginPath(); ctx.roundRect(cx - 3, cy - fs * 0.57, cw + 6, fs * 1.14, 8); ctx.fill();
               ctx.font = `500 ${fs}px ${F.sans}`; ctx.fillStyle = mixRGB([30, 29, 28], [156, 74, 22], hi);
@@ -474,10 +474,10 @@
       S.layer(0.85, () => {
         S.melon(Bpos[0], Bpos[1], lenB, { tod, rot: Brot, crack: roll, lit: 0.5, rim: 0.55, dark: 0.12 });
         if (roll > 0 && aside < 0.6) S.light(Bpos[0] + 12, Bpos[1] - 24, 150, 'rgba(255,236,200,0.2)', Math.sin(roll * Math.PI * 0.5) * (1 - aside / 0.6));
-        if (!carried) S.melon(Apos[0], Apos[1], lenA, { tod, rot: 0.04, carve: S.SURNAME, carveA: 0.85, lit: 0.5, rim: 0.6, dark: 0.1 });
+        if (!carried) S.melon(Apos[0], Apos[1], lenA, { tod, rot: 0.04, carve: S.MARK, carveA: 0.85, lit: 0.5, rim: 0.6, dark: 0.1 });
         qr = S.person('qin', qx, gy, qh, o);
         if (carried) {
-          S.melon(Apos[0], Apos[1], lenA, { tod, rot: lerp(0.04, -0.05, lift), carve: S.SURNAME, carveA: 0.85, lit: 0.5, rim: 0.6, dark: 0.1, shadow: lerp(1, 0, lift) });
+          S.melon(Apos[0], Apos[1], lenA, { tod, rot: lerp(0.04, -0.05, lift), carve: S.MARK, carveA: 0.85, lit: 0.5, rim: 0.6, dark: 0.1, shadow: lerp(1, 0, lift) });
           hand(qr.hand[0] + 6, qr.hand[1] - 16, qh, p.fig, p.rim, -1);
         }
         for (const t0 of [k1, k2]) { const d = lt - t0; if (d > 0 && d < 0.8) S.light(topA[0] + 20, topA[1] + 30, 60 + d * 200, 'rgba(255,240,210,0.22)', 1 - d / 0.8); }
@@ -556,7 +556,7 @@
         for (let row = 0; row < 3; row++) for (let i = 0; i < 4 - row; i++) heap.push([bedL + 210 + i * 78 + row * 38 + (r() - 0.5) * 14, rail + 22 - row * 46 + (r() - 0.5) * 8, 150 * (0.88 + r() * 0.22), (r() - 0.5) * 0.35]);
         heap.sort((a, b) => a[1] - b[1]);
         cardboard(boxX, boxY, boxW, boxH, tod, 'back');
-        if (inBox) S.melon(mpos[0], mpos[1], sl, { tod, rot: -0.05, carve: S.SURNAME, carveA: 0.6, lit: 0.6, rim: 0.5, girth: 0.55, shadow: 0 });
+        if (inBox) S.melon(mpos[0], mpos[1], sl, { tod, rot: -0.05, carve: S.MARK, carveA: 0.6, lit: 0.6, rim: 0.5, girth: 0.55, shadow: 0 });
         cardboard(boxX, boxY, boxW, boxH, tod, 'front');
         for (const [mx, my, ml, mr] of heap) S.melon(mx, my, ml, { tod, rot: mr, lit: 0.45, rim: 0.65, dark: 0.2, shadow: 0.25 });
         S.tricycle(tx, ty, ts, tod, { facing: 1, rim: 0.6, load: 0 });
@@ -568,7 +568,7 @@
         ctx.globalAlpha = 0.7; ctx.strokeStyle = p.rim; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(bedL, rail + 6); ctx.lineTo(bedR, rail + 6); ctx.stroke(); ctx.globalAlpha = 1;
         qr = S.person('qin', qx, gy, qh, { ...o, rimColor: mixRGB([60, 52, 44], [255, 243, 214], out), halo: 0.08 * out });
         if (!inBox) {
-          S.melon(mpos[0], mpos[1], sl, { tod, rot: -0.05, carve: S.SURNAME, carveA: 0.6, lit: 0.6, rim: 0.5, girth: 0.55, shadow: 0, dark: lerp(0.5, 0, out) });
+          S.melon(mpos[0], mpos[1], sl, { tod, rot: -0.05, carve: S.MARK, carveA: 0.6, lit: 0.6, rim: 0.5, girth: 0.55, shadow: 0, dark: lerp(0.5, 0, out) });
           hand(qr.hand[0] + 2, qr.hand[1] - 10, qh, p.fig, p.rim, 1);
         }
       });
