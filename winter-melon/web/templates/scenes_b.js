@@ -526,17 +526,19 @@
         const vf = ROAD.speed * ROAD.fgDepth, bedC = tx + 25 * s;
         ROAD.wipes.forEach((tc, i) => {
           const cx = bedC + (tc - lt) * vf; if (cx < -700 || cx > W + 700) return;
+          // built once per wipe; every blurred draw call is clipped to its own bounds (+3 sigma), which keeps the
+          // filter's working layer that small instead of the whole 1300 x 1920 canvas (same pixels, ~40x quicker)
           const c = S.cached(`road_wipe|${i}`, 1300, H, g => {
             const r = rng(90 + i); g.lineCap = 'round';
-            g.filter = 'blur(9px)';
+            const op = (x0, y0, x1, y1, b, fn) => { g.save(); g.beginPath(); g.rect(x0 - 3 * b, y0 - 3 * b, x1 - x0 + 6 * b, y1 - y0 + 6 * b); g.clip(); g.filter = `blur(${b}px)`; fn(); g.restore(); };
             for (let j = 0; j < 7; j++) {                                // culms, out of focus, overlapping across the width
               const x = 400 + j * 82 + (r() - 0.5) * 24, wd = 92 + r() * 30, lean = (r() - 0.5) * 50;
-              g.strokeStyle = j % 2 ? '#1a1f14' : '#20271a'; g.lineWidth = wd; g.beginPath(); g.moveTo(x, H + 40); g.quadraticCurveTo(x + lean * 0.4, H * 0.5, x + lean, -40); g.stroke();
-              g.strokeStyle = 'rgba(255,214,150,0.22)'; g.lineWidth = 5; g.beginPath(); g.moveTo(x - wd * 0.42, H + 40); g.quadraticCurveTo(x - wd * 0.42 + lean * 0.4, H * 0.5, x - wd * 0.42 + lean, -40); g.stroke();
-              for (let q = 1; q < 6; q++) { g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x - wd / 2 + lean * (1 - q / 6), H * q / 6, wd, 10); }
+              const xa = Math.min(x, x + lean) - wd, xb = Math.max(x, x + lean) + wd;
+              op(xa, -40, xb, H + 40, 9, () => { g.strokeStyle = j % 2 ? '#1a1f14' : '#20271a'; g.lineWidth = wd; g.beginPath(); g.moveTo(x, H + 40); g.quadraticCurveTo(x + lean * 0.4, H * 0.5, x + lean, -40); g.stroke(); });
+              op(xa - wd * 0.42, -40, xb, H + 40, 9, () => { g.strokeStyle = 'rgba(255,214,150,0.22)'; g.lineWidth = 5; g.beginPath(); g.moveTo(x - wd * 0.42, H + 40); g.quadraticCurveTo(x - wd * 0.42 + lean * 0.4, H * 0.5, x - wd * 0.42 + lean, -40); g.stroke(); });
+              for (let q = 1; q < 6; q++) { const rx = x - wd / 2 + lean * (1 - q / 6), ry = H * q / 6; op(rx, ry, rx + wd, ry + 10, 9, () => { g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(rx, ry, wd, 10); }); }
             }
-            g.filter = 'blur(16px)'; g.fillStyle = '#161b11';
-            for (let j = 0; j < 46; j++) { const a = r() * TAU, x = 650 + (r() - 0.5) * 700, y = r() < 0.45 ? r() * 520 : 1000 + r() * 800, L = 90 + r() * 90; g.beginPath(); g.ellipse(x, y, L, L * 0.2, a, 0, TAU); g.fill(); }
+            for (let j = 0; j < 46; j++) { const a = r() * TAU, x = 650 + (r() - 0.5) * 700, y = r() < 0.45 ? r() * 520 : 1000 + r() * 800, L = 90 + r() * 90; op(x - L, y - L, x + L, y + L, 16, () => { g.fillStyle = '#161b11'; g.beginPath(); g.ellipse(x, y, L, L * 0.2, a, 0, TAU); g.fill(); }); }
           });
           ctx.drawImage(c, cx - 650, 0);
         });

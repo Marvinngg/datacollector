@@ -22,7 +22,8 @@
    *  box = [x, y, w, h] bounds the unblurred shape in local coordinates; draw(g) draws it in those same coordinates.
    *  key must name everything draw depends on. Each draw call inside is blurred on its own, exactly like ctx.filter. */
   function soft(key, box, b, draw, g0 = ctx) {
-    const bl = qn(b / ctmScale(g0), 0.25), r = bl >= 8 ? 2 : 1, pad = Math.ceil(bl * 3) + 2;
+    const bl = +Math.pow(2, Math.round(Math.log2(b / ctmScale(g0)) * 12) / 12).toFixed(3);   // ~6% steps: few sprites while the camera zooms
+    const r = bl >= 8 ? 2 : 1, pad = Math.ceil(bl * 3) + 2;
     const x = Math.floor(box[0]) - pad, y = Math.floor(box[1]) - pad;
     const w = Math.ceil((Math.ceil(box[2]) + 2 * pad + 1) / r) * r, h = Math.ceil((Math.ceil(box[3]) + 2 * pad + 1) / r) * r;
     const c = cached(`soft|${key}|${x}|${y}|${w}|${h}|${bl}`, w / r, h / r, g => { g.scale(1 / r, 1 / r); g.translate(-x, -y); g.filter = `blur(${bl / r}px)`; draw(g); });
@@ -61,12 +62,16 @@
     const [A, B] = s;
     if (w > A.width || h > A.height) { s[0] = mk(Math.max(w, A.width), Math.max(h, A.height)); s[1] = mk(s[0].width, s[0].height); return blurred(b, fn, box); }
     const ga = A.getContext('2d'), gb = B.getContext('2d');
-    ga.setTransform(1, 0, 0, 1, 0, 0); ga.clearRect(0, 0, w, h); ga.filter = 'none';
+    // clear a little past the region too: scaled draws sample one texel beyond it, and stale pixels there (from an
+    // earlier, larger region) would make the frame depend on what was drawn before it
+    ga.setTransform(1, 0, 0, 1, 0, 0); ga.clearRect(0, 0, w + 4, h + 4); ga.filter = 'none';
+    gb.setTransform(1, 0, 0, 1, 0, 0); gb.clearRect(0, 0, w + 4, h + 4);
     ga.globalAlpha = ctx.globalAlpha; ga.globalCompositeOperation = ctx.globalCompositeOperation === 'lighter' ? 'lighter' : 'source-over';
     ga.setTransform(M.a / d, M.b / d, M.c / d, M.d / d, (M.e - X0) / d, (M.f - Y0) / d);
     ga.save(); fn(ga); ga.restore();
-    gb.setTransform(1, 0, 0, 1, 0, 0); gb.globalCompositeOperation = 'copy'; gb.filter = `blur(${b / d}px)`;
-    gb.drawImage(A, 0, 0, w, h, 0, 0, w, h); gb.filter = 'none'; gb.globalCompositeOperation = 'source-over';
+    // (the clip keeps the filter's working layer to the region in use; unclipped it spans the whole scratch canvas)
+    gb.save(); gb.beginPath(); gb.rect(0, 0, w, h); gb.clip();
+    gb.globalCompositeOperation = 'copy'; gb.filter = `blur(${b / d}px)`; gb.drawImage(A, 0, 0, w, h, 0, 0, w, h); gb.restore();
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.drawImage(B, 0, 0, w, h, X0, Y0, w * d, h * d); ctx.restore();
   }
 
@@ -270,11 +275,11 @@
       ctx.globalAlpha = A0 * a * 0.5; ctx.fillStyle = '#efe7c8'; ctx.fillText(o.carve, -cs * 0.012, -cs * 0.02);
       // grown-over: blur the scar into the skin a little, speckles across it
       ctx.globalAlpha = A0 * a * 0.35;
-      const cb = Math.max(1, Math.round(cs * 0.02)), cq = qn(cs, 1), cf = `400 ${cq}px ${F.hand}`;
-      if (document.fonts.check(cf, o.carve)) {    // pre-blurred glyph, scaled from the quantized size
-        ctx.scale(cs / cq, cs / cq);
-        soft(`carve|${o.carve}|${cq}`, [-cq, -cq, 2 * cq, 2 * cq], cb, g => { g.font = cf; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#9b9070'; g.fillText(o.carve, 0, 0); });
-      } else { ctx.filter = `blur(${cb}px)`; ctx.fillStyle = '#9b9070'; ctx.fillText(o.carve, 0, 0); ctx.filter = 'none'; }
+      // pre-blurred glyph, scaled from the quantized size (keyed on whether the web font is in yet, so a glyph drawn
+      // with the fallback font is never kept once the real one has loaded)
+      const cb = Math.max(1, Math.round(cs * 0.02)), cq = qn(cs, 1), cf = `400 ${cq}px ${F.hand}`, fok = document.fonts.check(cf, o.carve);
+      ctx.scale(cs / cq, cs / cq);
+      soft(`carve|${o.carve}|${cq}|${fok}`, [-cq, -cq, 2 * cq, 2 * cq], cb, g => { g.font = cf; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#9b9070'; g.fillText(o.carve, 0, 0); });
       ctx.restore();
     }
     // a crack
