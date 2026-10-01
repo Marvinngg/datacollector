@@ -1,0 +1,7 @@
+# Python deps for the sound pipeline. tinysoundfont is installed by setup.sh with --no-deps.
+numpy>=2.0
+scipy>=1.13
+soundfile>=0.12
+pyloudnorm==0.2.0
+matplotlib>=3.8
+imageio-ffmpeg>=0.5     # bundled static ffmpeg (libx264 + aac), used when no system ffmpeg
