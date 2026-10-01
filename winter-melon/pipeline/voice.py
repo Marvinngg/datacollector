@@ -163,11 +163,17 @@ def main():
     for bid, k, who, text in jobs:
         c = API_CAST[who] if API else CAST[who]; spoken = speakable(text)
         ov = f'{ROOT}/assets/voice_override/{bid}_{k}.wav'
+        ovsig = os.path.getmtime(ov) if os.path.exists(ov) else 0
         how = hows.get((bid, k), '')
-        key = hashlib.md5(json.dumps(['api', API_MODEL, who, spoken, c, how] if API else [who, spoken, c, open(f'{REFS}/{who}.wav', 'rb').read().__len__()]).encode()).hexdigest()[:12]
+        key = hashlib.md5(json.dumps((['api', API_MODEL, who, spoken, c, how] if API else [who, spoken, c, open(f'{REFS}/{who}.wav', 'rb').read().__len__()]) + [os.path.getsize(ov) if ovsig else 0]).encode()).hexdigest()[:12]
         f = f'{OUT}/{bid}_{k}_{key}.wav'
-        if os.path.exists(ov):
-            x, sr = sf.read(ov, dtype='float32'); x = resample(x.mean(1) if x.ndim > 1 else x, sr); sf.write(f, x, SR); score = 1.0; heard = '(录音)'
+        if os.path.exists(ov):   # a line voiced elsewhere (local CosyVoice, a recording): trim, level, check
+            x, sr = sf.read(ov, dtype='float32'); x = resample(x.mean(1) if x.ndim > 1 else x, sr)
+            x = trim(x, thr=0.02, pad=0.05)
+            x = x / (np.sqrt(np.mean(x ** 2)) + 1e-9) * 0.08; x = np.clip(x, -0.98, 0.98)
+            sf.write(f, x, SR); hear = hear or asr(); heard = hear(x); score = similar(spoken, heard)
+            if score < 0.85: bad.append((bid, k, who, text, heard, round(score, 2)))
+            heard = '(外部配音) ' + heard
         elif os.path.exists(f):
             x, _ = sf.read(f, dtype='float32'); score, heard = 1.0, '(缓存)'
         else:
