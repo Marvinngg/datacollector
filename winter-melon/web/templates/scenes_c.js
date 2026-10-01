@@ -44,7 +44,7 @@
     ctx.restore();
   }
   // Catmull-Rom path through points (closed)
-  function smoothPath(pts) {
+  function smoothPath(pts, ctx = K.ctx) {
     ctx.beginPath(); ctx.moveTo(...pts[0]);
     for (let i = 0; i < pts.length; i++) {
       const p0 = pts[(i - 1 + pts.length) % pts.length], p1 = pts[i], p2 = pts[(i + 1) % pts.length], p3 = pts[(i + 2) % pts.length];
@@ -166,6 +166,7 @@
   const FACE = [[-130, 340], [-186, 190], [-246, 0], [-214, -182], [-90, -276], [70, -272], [186, -200], [232, -100], [246, -32],
     [240, 6], [258, 46], [286, 92], [292, 106], [280, 116], [262, 122], [270, 142], [262, 156], [268, 170], [254, 188],
     [262, 220], [242, 254], [184, 280], [134, 302], [118, 380], [112, 480], [100, 640], [-90, 720], [-280, 650]];
+  const FACE_BOX = [-300, -300, 620, 1060];     // bounds of the FACE outline (+ stroke and offsets), face coordinates
   function face(x, y, s, rot, glow, lt, src) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
     const col = '#04060a';
@@ -177,18 +178,20 @@
     const lx = dx * c - dy * sn, ly = dx * sn + dy * c, ln = Math.hypot(lx, ly), ux = lx / ln, uy = ly / ln;
     ctx.save(); smoothPath(FACE); ctx.clip();
     // faint moonlight on the crown
-    ctx.globalAlpha = 0.3; ctx.strokeStyle = '#7f98c2'; ctx.lineWidth = 7; ctx.filter = 'blur(3px)';
-    ctx.save(); ctx.translate(10, 12); smoothPath(FACE); ctx.stroke(); ctx.restore();
+    ctx.globalAlpha = 0.3;      // (a fixed shape in face coordinates: a cached, pre-blurred sprite)
+    S.soft('face_moon', FACE_BOX, 3, g => { g.strokeStyle = '#7f98c2'; g.lineWidth = 7; g.translate(10, 12); smoothPath(FACE, g); g.stroke(); });
     // screen light: a soft wash on cheek and jaw, a warm-white rim on brow, nose, lips and chin, fading with distance
-    ctx.filter = 'none'; ctx.globalAlpha = 1;
+    ctx.globalAlpha = 1;
     const wash = ctx.createRadialGradient(lx, ly, 0, lx, ly, ln * 1.25);
     wash.addColorStop(0, `rgba(225,226,240,${0.16 * glow})`); wash.addColorStop(0.6, `rgba(225,226,240,${0.08 * glow})`); wash.addColorStop(1, 'rgba(225,226,240,0)');
     ctx.fillStyle = wash; ctx.fillRect(-500, -500, 1100, 1300);
     const rimG = ctx.createRadialGradient(lx, ly, ln * 0.4, lx, ly, ln * 1.35);
     rimG.addColorStop(0, `rgba(246,240,232,${clamp(glow)})`); rimG.addColorStop(1, 'rgba(246,240,232,0)');
-    ctx.strokeStyle = rimG; ctx.lineWidth = 22; ctx.filter = 'blur(7px)'; ctx.globalAlpha = 0.85;
-    ctx.translate(-ux * 13, -uy * 13); smoothPath(FACE); ctx.stroke();
-    ctx.lineWidth = 6; ctx.filter = 'blur(2px)'; ctx.globalAlpha = 0.5; ctx.translate(ux * 9, uy * 9); smoothPath(FACE); ctx.stroke();
+    // (the light moves every frame: blurred at reduced resolution, S.blurred)
+    ctx.globalAlpha = 0.85; ctx.translate(-ux * 13, -uy * 13);
+    S.blurred(7, g => { g.strokeStyle = rimG; g.lineWidth = 22; smoothPath(FACE, g); g.stroke(); }, FACE_BOX);
+    ctx.globalAlpha = 0.5; ctx.translate(ux * 9, uy * 9);
+    S.blurred(2, g => { g.strokeStyle = rimG; g.lineWidth = 6; smoothPath(FACE, g); g.stroke(); }, FACE_BOX);
     ctx.restore();
     ctx.restore();
   }

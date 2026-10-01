@@ -133,9 +133,10 @@
   }
 
   // the rim-lit silhouette's shadow, cast on the ground away from a low sun behind the figure
+  // fn(g) draws the figure on g (the pose changes every frame, so it is blurred at low resolution: S.blurred)
   function castShadow(fn, x, y, sx, sy, a = 0.28, blur = 6) {
-    ctx.save(); ctx.translate(x, y); ctx.transform(1, 0, sx, -sy, 0, 0); ctx.globalAlpha *= a; ctx.filter = `blur(${blur}px)`;
-    fn(); ctx.restore();
+    ctx.save(); ctx.translate(x, y); ctx.transform(1, 0, sx, -sy, 0, 0); ctx.globalAlpha *= a;
+    S.blurred(blur, fn); ctx.restore();
   }
 
   // a small wooden stool (小板凳); (x, y) = seat centre top
@@ -222,8 +223,9 @@
       const pile = YARD_PILE;
       S.layer(0.85, () => {
         // the heap's long shadow, toward the lens
-        ctx.save(); ctx.globalAlpha *= 0.22; ctx.fillStyle = '#1e1a12'; ctx.filter = 'blur(22px)';
-        ctx.beginPath(); ctx.moveTo(-60, 1440); ctx.lineTo(380, 1440); ctx.lineTo(560, 1640); ctx.lineTo(60, 1700); ctx.closePath(); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.globalAlpha *= 0.22;
+        S.soft('yard_heap_sh', [-60, 1440, 620, 260], 22, g => { g.fillStyle = '#1e1a12'; g.beginPath(); g.moveTo(-60, 1440); g.lineTo(380, 1440); g.lineTo(560, 1640); g.lineTo(60, 1700); g.closePath(); g.fill(); });
+        ctx.restore();
         for (const m of pile) S.melon(m.x, m.y, m.len, { tod, rot: m.rot, girth: m.girth, dark: 0.4, rim: 0.85, lit: 0.45 });
         S.melon(600, 1600, 175, { tod, rot: 0.25, dark: 0.36, rim: 0.8, lit: 0.5 });          // one that rolled away
       });
@@ -245,8 +247,8 @@
       let wHead, xHead;
       S.layer(0.9, () => {
         const wY = wy - footY('wang', wh, wPose), xY = xy - footY('xiao', xh, xPose);
-        castShadow(() => person('wang', 0, 0, wh, { ...wPose, color: '#000', rimColor: '#000', halo: 0 }), wx, wY, 0.5, 0.3, 0.2, 16);
-        castShadow(() => person('xiao', 0, 0, xh, { ...xPose, color: '#000', rimColor: '#000', halo: 0 }), xx, xY, 0.5, 0.3, 0.2, 16);
+        castShadow(g => person('wang', 0, 0, wh, { ...wPose, color: '#000', rimColor: '#000', halo: 0, g }), wx, wY, 0.5, 0.3, 0.2, 16);
+        castShadow(g => person('xiao', 0, 0, xh, { ...xPose, color: '#000', rimColor: '#000', halo: 0, g }), xx, xY, 0.5, 0.3, 0.2, 16);
         stool(wx - 2, wy + seatY('wang', wh, wPose) + wh * 0.035, 118, -seatY('wang', wh, wPose) - wh * 0.035, mix(p.fig, '#3a2c1c', 0.4), p.rim);
         const rw = person('wang', wx, wY, wh, wPose); wHead = rw.head;
         const rx = person('xiao', xx, xY, xh, xPose); xHead = rx.head;
@@ -282,7 +284,7 @@
   }
   // a writing hand, seen from above: pen from the tip T toward the lower right, index finger along it, thumb on the
   // left, the other fingers curled under, the back of the hand and the forearm leaving the frame
-  function writingHand(T, col, o = {}) {
+  function writingHand(T, col, o = {}, ctx = K.ctx) {
     const d = [0.5, 0.866], n = [-0.866, 0.5], at = (a, b) => [T[0] + d[0] * a + n[0] * b, T[1] + d[1] * a + n[1] * b], ang = Math.atan2(d[1], d[0]);
     const cap = (p, q, r1, r2) => { const dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy), nx = -dy / L, ny = dx / L;
       ctx.beginPath(); ctx.moveTo(p[0] + nx * r1, p[1] + ny * r1); ctx.lineTo(q[0] + nx * r2, q[1] + ny * r2); ctx.lineTo(q[0] - nx * r2, q[1] - ny * r2); ctx.lineTo(p[0] - nx * r1, p[1] - ny * r1); ctx.closePath(); ctx.fill();
@@ -295,6 +297,7 @@
     ctx.beginPath(); ctx.ellipse(...at(285, -20), 125, 98, ang, 0, TAU); ctx.fill();                 // back of the hand
     cap(at(330, -10), at(1600, 60), 92, 135);                        // wrist and forearm, out of frame
   }
+  const HAND_BOX = [-20, -20, 920, 1590];       // bounds of writingHand([0, 0]) (pen, fingers, hand, forearm)
   T.register('notebook', {
     draw(ctx, V, lt, api) {
       const rs = S.stepAt(api, 'rows'), rows = V.rows || [];
@@ -343,7 +346,7 @@
       let pen = null, down = 0;
       S.layer(0.9, () => {
         ctx.save(); ctx.translate(NB.x + NB.w / 2, NB.y + NB.h / 2); ctx.rotate(NB.rot); ctx.translate(-NB.w / 2, -NB.h / 2);
-        ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.filter = 'blur(26px)'; ctx.fillRect(34, 46, NB.w, NB.h); ctx.restore();
+        S.softRect(34, 46, NB.w, NB.h, 26, 'rgba(0,0,0,0.5)');
         ctx.fillStyle = '#bdb092'; ctx.fillRect(7, 9, NB.w, NB.h); ctx.fillStyle = '#d4c8a8'; ctx.fillRect(3, 4, NB.w, NB.h);     // the pages beneath
         ctx.drawImage(paper, 0, 0);
         // spiral binding along the top: punched holes, wire loops coming over the edge
@@ -379,10 +382,13 @@
         const T0 = [pen[0] + wig[0], pen[1] + wig[1]];
         // shadow of hand and pen on the paper: light from the upper left; nearer the page when the pen is down
         const lift = down ? 0 : 1;
-        ctx.save(); ctx.globalAlpha *= 0.32; ctx.filter = `blur(${12 + lift * 8}px)`; writingHand([T0[0] + 26 + lift * 26, T0[1] + 30 + lift * 30], '#2a2116'); ctx.restore();
+        // (the hand is rigid: only translated, so both blurred copies come from cached sprites of it)
+        ctx.save(); ctx.translate(T0[0] + 26 + lift * 26, T0[1] + 30 + lift * 30);
+        S.soft('nb_hand|#2a2116|0.32', HAND_BOX, 12 + lift * 8, g => { g.globalAlpha = 0.32; writingHand([0, 0], '#2a2116', {}, g); }); ctx.restore();
         // the hand itself: a back-lit silhouette with a warm rim on its upper-left edges
         const Tp = [T0[0] - lift * 6, T0[1] - lift * 14];
-        ctx.save(); ctx.filter = 'blur(2px)'; ctx.globalAlpha *= 0.9; writingHand([Tp[0] - 6, Tp[1] - 5], '#f6d9a6'); ctx.restore();
+        ctx.save(); ctx.translate(Tp[0] - 6, Tp[1] - 5);
+        S.soft('nb_hand|#f6d9a6|0.9', HAND_BOX, 2, g => { g.globalAlpha = 0.9; writingHand([0, 0], '#f6d9a6', {}, g); }); ctx.restore();
         writingHand(Tp, '#33281f');
         ctx.save(); ctx.fillStyle = '#c3c6cc'; ctx.beginPath(); ctx.moveTo(Tp[0], Tp[1]); ctx.lineTo(Tp[0] + 15, Tp[1] + 16); ctx.lineTo(Tp[0] + 6, Tp[1] + 22); ctx.closePath(); ctx.fill(); ctx.restore();   // metal tip
         ctx.restore();
@@ -493,8 +499,7 @@
       // her shadow and the tricycle, pedalling
       const wipeN = ROAD.wipes.filter(t => lt >= t).length, load = ROAD.loads[wipeN];
       const s = ROAD.s, spin = dist / (46 * s), bob = Math.sin(lt * 9.5) * 1.6, tx = ROAD.x, ty = ROAD.y + 30 + bob * 0.3;
-      ctx.save(); ctx.globalAlpha *= 0.28; ctx.filter = 'blur(10px)'; ctx.fillStyle = '#1d1810';
-      ctx.beginPath(); ctx.ellipse(tx + 150 * s, ty + 8, 300 * s, 22, 0, 0, TAU); ctx.fill(); ctx.restore();
+      ctx.save(); ctx.globalAlpha *= 0.28; S.softEllipse(tx + 150 * s, ty + 8, 300 * s, 22, 10, '#1d1810'); ctx.restore();
       S.tricycle(tx, ty, s, 'day', { load, facing: 1, rim: 0.7, spin, color: pal.fig });
       const rh = 300 * s;
       person('xiao', tx + 202 * s, ty - 160 * s + rh * 0.38 + bob, rh, { tod: 'day', facing: 1, light: [-1, -0.35], sit: 0.6, walk: spin * 0.5, bend: 0.32, head: -0.12, t: lt,
@@ -515,8 +520,9 @@
           const r = rng(71); g.fillStyle = '#1c2216';
           for (let i = 0; i < 280; i++) { const x = r() * 2400, h = 60 + r() * 170, lean = (r() - 0.5) * 50; g.beginPath(); g.moveTo(x - 6, 420); g.quadraticCurveTo(x + lean * 0.3, 420 - h * 0.6, x + lean, 420 - h); g.quadraticCurveTo(x + lean * 0.3 + 4, 420 - h * 0.5, x + 6, 420); g.fill(); }
         });
+        const fgb = S.cached('road_fg_b3', 2400 + 24, 420 + 24, g => { g.filter = 'blur(3px)'; g.drawImage(fg, 12, 12); });   // pre-blurred, with a margin for the blur
         const off = ((dist * 1.6) % 2400 + 2400) % 2400;
-        ctx.save(); ctx.filter = 'blur(3px)'; ctx.drawImage(fg, -off, H - 380); ctx.drawImage(fg, 2400 - off, H - 380); ctx.restore();
+        ctx.drawImage(fgb, -off - 12, H - 380 - 12); ctx.drawImage(fgb, 2400 - off - 12, H - 380 - 12);
         const vf = ROAD.speed * ROAD.fgDepth, bedC = tx + 25 * s;
         ROAD.wipes.forEach((tc, i) => {
           const cx = bedC + (tc - lt) * vf; if (cx < -700 || cx > W + 700) return;
@@ -621,9 +627,11 @@
         // the yard in front, and the fan of lamplight laid on it
         const gg = ctx.createLinearGradient(0, ground, 0, H); gg.addColorStop(0, '#141a24'); gg.addColorStop(1, '#070a10');
         ctx.fillStyle = gg; ctx.fillRect(-200, ground, W + 400, H - ground + 200);
-        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.filter = 'blur(16px)';
-        const lg = ctx.createLinearGradient(0, ground, 0, H); lg.addColorStop(0, 'rgba(255,170,90,0.32)'); lg.addColorStop(1, 'rgba(255,170,90,0)');
-        ctx.fillStyle = lg; ctx.beginPath(); ctx.moveTo(doorL - 110, ground); ctx.lineTo(doorR + 110, ground); ctx.lineTo(doorR + 420, H); ctx.lineTo(doorL - 300, H); ctx.closePath(); ctx.fill();
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        S.soft('night_fan', [doorL - 300, ground, doorR + 420 - doorL + 300, H - ground], 16, g => {
+          const lg = g.createLinearGradient(0, ground, 0, H); lg.addColorStop(0, 'rgba(255,170,90,0.32)'); lg.addColorStop(1, 'rgba(255,170,90,0)');
+          g.fillStyle = lg; g.beginPath(); g.moveTo(doorL - 110, ground); g.lineTo(doorR + 110, ground); g.lineTo(doorR + 420, H); g.lineTo(doorL - 300, H); g.closePath(); g.fill();
+        });
         ctx.restore();
       });
       // her: seated on the threshold in profile, facing the yard. First looking up at the sky; on "phone" the screen
@@ -640,7 +648,7 @@
       let r, phone;
       S.layer(0.85, () => {
         // her shadow thrown forward across the lamplight
-        castShadow(() => person('xiao', 0, 0, h, { ...pose, color: '#000', rimColor: '#000', halo: 0 }), hx, fy, -0.06, 1.15, 0.32, 22);
+        castShadow(g => person('xiao', 0, 0, h, { ...pose, color: '#000', rimColor: '#000', halo: 0, g }), hx, fy, -0.06, 1.15, 0.32, 22);
         r = person('xiao', hx, fy, h, { ...pose, color: silCol, rimColor: rimW, halo: 0.12 });
         phone = [r.hand[0] + 6, r.hand[1] - 10];
         // the phone: a dark slab in her hand, screen turned to her face; the glow spills round its edge

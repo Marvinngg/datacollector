@@ -11,6 +11,65 @@
   const cached = (key, w, h, draw) => { let c = cache.get(key); if (!c) { c = mk(w, h); draw(c.getContext('2d'), c); cache.set(key, c); } return c; };
   const TAU = Math.PI * 2;
 
+  // ---------------------------------------------------------------- soft (blurred) drawing without a live ctx.filter
+  // A ctx.filter blur on the 1080x1920 frame costs ~40 ms per draw call, whatever the shape's size (the filter layer is the
+  // whole canvas). So blurred things are drawn either from cached, pre-blurred sprites (shapes that don't change) or
+  // rendered at reduced resolution, blurred there and scaled back up (shapes that change every frame).
+  // Like ctx.filter, the blur radii given to these helpers are in device pixels (the transform does not scale them).
+  const ctmScale = (g = ctx) => { const m = g.getTransform(); return Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)) || 1; };
+  const qn = (v, s) => Math.max(s, Math.round(v / s) * s);          // quantize (cache keys stay finite)
+  /** soft(key, box, b, draw): what draw(g) draws, blurred by b device px, from a cached sprite drawn in the current transform.
+   *  box = [x, y, w, h] bounds the unblurred shape in local coordinates; draw(g) draws it in those same coordinates.
+   *  key must name everything draw depends on. Each draw call inside is blurred on its own, exactly like ctx.filter. */
+  function soft(key, box, b, draw, g0 = ctx) {
+    const bl = qn(b / ctmScale(g0), 0.25), r = bl >= 8 ? 2 : 1, pad = Math.ceil(bl * 3) + 2;
+    const x = Math.floor(box[0]) - pad, y = Math.floor(box[1]) - pad;
+    const w = Math.ceil((Math.ceil(box[2]) + 2 * pad + 1) / r) * r, h = Math.ceil((Math.ceil(box[3]) + 2 * pad + 1) / r) * r;
+    const c = cached(`soft|${key}|${x}|${y}|${w}|${h}|${bl}`, w / r, h / r, g => { g.scale(1 / r, 1 / r); g.translate(-x, -y); g.filter = `blur(${bl / r}px)`; draw(g); });
+    g0.drawImage(c, x, y, w, h);
+  }
+  /** a blurred filled ellipse (axis-aligned in the current transform); radii quantized to 2 px, the sprite scaled to fit */
+  function softEllipse(cx, cy, rx, ry, b, fill) {
+    const qx = qn(rx, 2), qy = qn(ry, 2);
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(rx / qx, ry / qy);
+    soft(`ell|${qx}|${qy}|${fill}`, [-qx, -qy, 2 * qx, 2 * qy], b, g => { g.fillStyle = fill; g.beginPath(); g.ellipse(0, 0, qx, qy, 0, 0, TAU); g.fill(); });
+    ctx.restore();
+  }
+  /** a blurred filled rectangle; size quantized to 2 px, the sprite scaled to fit */
+  function softRect(x, y, w, h, b, fill) {
+    const qw = qn(w, 2), qh = qn(h, 2);
+    ctx.save(); ctx.translate(x, y); ctx.scale(w / qw, h / qh);
+    soft(`rect|${qw}|${qh}|${fill}`, [0, 0, qw, qh], b, g => { g.fillStyle = fill; g.fillRect(0, 0, qw, qh); });
+    ctx.restore();
+  }
+  /** blurred(b, fn, box): for shapes that change every frame. fn(g) draws on g (same transform as ctx, same alpha and
+   *  composite op) at 1/4 (or 1/2) resolution; that is blurred there and laid back over the frame at full size, with
+   *  ctx's composite op and clip. box = [x, y, w, h] in local coordinates bounds the shape (default: the whole frame). */
+  const SCR = {};
+  function blurred(b, fn, box) {
+    if (b <= 0) { fn(ctx); return; }
+    const d = b >= 8 ? 4 : b >= 2 ? 2 : 1, M = ctx.getTransform(), m = Math.ceil(b * 3) + d;
+    let X0 = -m, Y0 = -m, X1 = W + m, Y1 = H + m;
+    if (box) {
+      const [bx, by, bw, bh] = box, xs = [], ys = [];
+      for (const [px, py] of [[bx, by], [bx + bw, by], [bx, by + bh], [bx + bw, by + bh]]) { xs.push(M.a * px + M.c * py + M.e); ys.push(M.b * px + M.d * py + M.f); }
+      X0 = Math.max(X0, Math.min(...xs) - m); X1 = Math.min(X1, Math.max(...xs) + m); Y0 = Math.max(Y0, Math.min(...ys) - m); Y1 = Math.min(Y1, Math.max(...ys) + m);
+    }
+    X0 = Math.floor(X0 / d) * d; Y0 = Math.floor(Y0 / d) * d;
+    const w = Math.ceil((X1 - X0) / d), h = Math.ceil((Y1 - Y0) / d); if (w <= 0 || h <= 0) return;
+    let s = SCR[d]; if (!s) { const cw = Math.ceil(W / d) + 2 * Math.ceil(m / d) + 64, ch = Math.ceil(H / d) + 2 * Math.ceil(m / d) + 64; s = SCR[d] = [mk(cw, ch), mk(cw, ch)]; }
+    const [A, B] = s;
+    if (w > A.width || h > A.height) { s[0] = mk(Math.max(w, A.width), Math.max(h, A.height)); s[1] = mk(s[0].width, s[0].height); return blurred(b, fn, box); }
+    const ga = A.getContext('2d'), gb = B.getContext('2d');
+    ga.setTransform(1, 0, 0, 1, 0, 0); ga.clearRect(0, 0, w, h); ga.filter = 'none';
+    ga.globalAlpha = ctx.globalAlpha; ga.globalCompositeOperation = ctx.globalCompositeOperation === 'lighter' ? 'lighter' : 'source-over';
+    ga.setTransform(M.a / d, M.b / d, M.c / d, M.d / d, (M.e - X0) / d, (M.f - Y0) / d);
+    ga.save(); fn(ga); ga.restore();
+    gb.setTransform(1, 0, 0, 1, 0, 0); gb.globalCompositeOperation = 'copy'; gb.filter = `blur(${b / d}px)`;
+    gb.drawImage(A, 0, 0, w, h, 0, 0, w, h); gb.filter = 'none'; gb.globalCompositeOperation = 'source-over';
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.drawImage(B, 0, 0, w, h, X0, Y0, w * d, h * d); ctx.restore();
+  }
+
   // ---------------------------------------------------------------- palettes (time of day)
   const TOD = {
     dawn:  { sky: ['#56677f', '#a9a3a5', '#e9c9a6'], sun: '#fff1d6', sunGlow: 'rgba(255,224,180,0.55)', far: '#8e97a2', mid: '#6c7684', near: '#3e4652',
@@ -167,17 +226,17 @@
     const p = TOD[o.tod || 'day'], gr = len * (o.girth || 0.46), rot = o.rot || 0;
     ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
     // contact shadow
-    ctx.save(); ctx.globalAlpha = A0 * 0.4 * (o.shadow == null ? 1 : o.shadow); ctx.fillStyle = '#000'; ctx.filter = `blur(${Math.max(2, Math.round(len * 0.04))}px)`;
-    ctx.beginPath(); ctx.ellipse(len * 0.02, gr * 0.46, len * 0.5, gr * 0.14, 0, 0, TAU); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.globalAlpha = A0 * 0.4 * (o.shadow == null ? 1 : o.shadow);
+    softEllipse(len * 0.02, gr * 0.46, len * 0.5, gr * 0.14, Math.max(2, Math.round(len * 0.04)), '#000'); ctx.restore();
     // body: a long rounded barrel (superellipse), a little fuller at the blossom end
-    const body = () => {
-      ctx.beginPath();
+    const body = (g = ctx, L = len, G = gr) => {
+      g.beginPath();
       for (let i = 0; i <= 64; i++) {
         const a = i / 64 * TAU, c = Math.cos(a), s = Math.sin(a);
-        const ex = Math.sign(c) * Math.pow(Math.abs(c), 0.62) * len / 2, ey = Math.sign(s) * Math.pow(Math.abs(s), 0.8) * gr / 2 * (1 + 0.05 * c);
-        i ? ctx.lineTo(ex, ey) : ctx.moveTo(ex, ey);
+        const ex = Math.sign(c) * Math.pow(Math.abs(c), 0.62) * L / 2, ey = Math.sign(s) * Math.pow(Math.abs(s), 0.8) * G / 2 * (1 + 0.05 * c);
+        i ? g.lineTo(ex, ey) : g.moveTo(ex, ey);
       }
-      ctx.closePath();
+      g.closePath();
     };
     const base = o.color || p.melon, lit = o.lit == null ? 0.6 : o.lit;
     // cylindrical shading: light across the top, core shadow below, bounce at the bottom edge
@@ -210,7 +269,12 @@
       ctx.globalAlpha = A0 * a; ctx.fillStyle = '#b8ab84'; ctx.fillText(o.carve, 0, 0);
       ctx.globalAlpha = A0 * a * 0.5; ctx.fillStyle = '#efe7c8'; ctx.fillText(o.carve, -cs * 0.012, -cs * 0.02);
       // grown-over: blur the scar into the skin a little, speckles across it
-      ctx.globalAlpha = A0 * a * 0.35; ctx.filter = `blur(${Math.max(1, Math.round(cs * 0.02))}px)`; ctx.fillStyle = '#9b9070'; ctx.fillText(o.carve, 0, 0); ctx.filter = 'none';
+      ctx.globalAlpha = A0 * a * 0.35;
+      const cb = Math.max(1, Math.round(cs * 0.02)), cq = qn(cs, 1), cf = `400 ${cq}px ${F.hand}`;
+      if (document.fonts.check(cf, o.carve)) {    // pre-blurred glyph, scaled from the quantized size
+        ctx.scale(cs / cq, cs / cq);
+        soft(`carve|${o.carve}|${cq}`, [-cq, -cq, 2 * cq, 2 * cq], cb, g => { g.font = cf; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#9b9070'; g.fillText(o.carve, 0, 0); });
+      } else { ctx.filter = `blur(${cb}px)`; ctx.fillStyle = '#9b9070'; ctx.fillText(o.carve, 0, 0); ctx.filter = 'none'; }
       ctx.restore();
     }
     // a crack
@@ -228,7 +292,14 @@
     // silhouette mix (for back-lit wide shots)
     if (o.dark) { ctx.globalAlpha = A0 * o.dark; body(); ctx.fillStyle = p.fig; ctx.fill(); ctx.globalAlpha = A0 * 1; }
     // back-lit rim: a thin bright line along the top edge only
-    if (o.rim) { ctx.save(); ctx.globalAlpha = A0 * o.rim * 0.7; body(); ctx.clip(); ctx.strokeStyle = p.rim; ctx.lineWidth = Math.max(2, gr * 0.05); ctx.filter = `blur(${Math.max(1, Math.round(gr * 0.02))}px)`; ctx.translate(0, gr * 0.035); body(); ctx.stroke(); ctx.restore(); }
+    if (o.rim) {     // pre-blurred rim (clipped to the body), from a sprite at the quantized size, scaled to fit exactly
+      const lq = qn(len, 2), gq = qn(gr, 2);
+      ctx.save(); ctx.globalAlpha = A0 * o.rim * 0.7; ctx.scale(len / lq, gr / gq);
+      soft(`mrim|${lq}|${gq}|${p.rim}`, [-lq / 2 - 2, -gq / 2 - 2, lq + 4, gq + 4], Math.max(1, Math.round(gr * 0.02)), g => {
+        body(g, lq, gq); g.clip(); g.strokeStyle = p.rim; g.lineWidth = Math.max(2, gq * 0.05); g.translate(0, gq * 0.035); body(g, lq, gq); g.stroke();
+      });
+      ctx.restore();
+    }
     ctx.restore();
   }
 
@@ -366,13 +437,20 @@
     return { c, ox, oy, hand: hf, handB: hb, head: hc, hr, S };
   }
   function person(who, x, y, h, o = {}) {
+    const ctx = o.g || K.ctx;   // o.g: draw into another context (same transform conventions), e.g. for a blurred cast shadow
     const p = TOD[o.tod || 'dusk'], A0 = ctx.globalAlpha;   // inherit the beat's fade (and any alpha set by the caller)
     const m = personMask(who, h, o);
     const dx = x - m.ox, dy = y - m.oy, L = o.light || [1, -0.4], ln = Math.hypot(...L), lx = L[0] / ln, ly = L[1] / ln;
     const tint = (col) => { const c = mk(m.S, m.S), g = c.getContext('2d'); g.drawImage(m.c, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = col; g.fillRect(0, 0, m.S, m.S); return c; };
     const rim = tint(o.rimColor || p.rim), body = tint(o.color || p.fig);
     // halo (light wrapping round the figure), rim, body
-    if ((o.halo == null ? 0.08 : o.halo) > 0) { ctx.save(); ctx.globalAlpha = A0 * (o.halo == null ? 0.08 : o.halo) * (o.alpha == null ? 1 : o.alpha); ctx.filter = `blur(${Math.round(h * 0.03)}px)`; ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(rim, dx + lx * h * 0.01, dy + ly * h * 0.01); ctx.restore(); }
+    if ((o.halo == null ? 0.08 : o.halo) > 0) {   // blurred at 1/4 resolution and scaled back up (the pose changes every frame)
+      ctx.save(); ctx.globalAlpha = A0 * (o.halo == null ? 0.08 : o.halo) * (o.alpha == null ? 1 : o.alpha); ctx.globalCompositeOperation = 'lighter';
+      const hx = dx + lx * h * 0.01, hy = dy + ly * h * 0.01;
+      if (ctx === K.ctx) blurred(Math.round(h * 0.03), g => g.drawImage(rim, hx, hy), [hx, hy, m.S, m.S]);
+      else { ctx.filter = `blur(${Math.round(h * 0.03)}px)`; ctx.drawImage(rim, hx, hy); }
+      ctx.restore();
+    }
     ctx.save(); ctx.globalAlpha = A0 * (o.alpha == null ? 1 : o.alpha);
     ctx.drawImage(rim, dx + lx * Math.max(1.5, h * 0.004), dy + ly * Math.max(1.5, h * 0.004));
     ctx.drawImage(body, dx, dy);
@@ -400,8 +478,7 @@
       const cx = clamp(x, 60 + wmax / 2, W - 60 - wmax / 2), ry = y - (rows.length - 1) * size * 0.65 - k * 6;
       ctx.textAlign = 'center'; ctx.globalAlpha = ctx.globalAlpha * k;
       if (o.backing) {      // on a bright background: a soft dark haze behind the words (no box)
-        ctx.save(); ctx.filter = 'blur(26px)'; ctx.fillStyle = 'rgba(20,14,8,0.55)';
-        ctx.beginPath(); ctx.ellipse(cx, ry + (rows.length - 1) * size * 0.65, wmax * 0.62 + 30, size * (0.75 + rows.length * 0.55), 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+        ctx.save(); softEllipse(cx, ry + (rows.length - 1) * size * 0.65, wmax * 0.62 + 30, size * (0.75 + rows.length * 0.55), 26, 'rgba(20,14,8,0.55)'); ctx.restore();
       }
       ctx.shadowColor = 'rgba(0,0,0,0.75)'; ctx.shadowBlur = 14;
       ctx.fillStyle = o.color || '#fff6e6';
@@ -428,11 +505,13 @@
   }
   function steam(x, y, t, a = 0.5, w = 60) {
     const A0 = ctx.globalAlpha;   // inherit the beat fade
-    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.filter = 'blur(10px)';
-    for (let i = 0; i < 7; i++) {
-      const k = ((t * 0.18 + i / 7) % 1), yy = y - k * 260, xx = x + Math.sin(t * 0.8 + i * 1.7 + k * 4) * w * (0.3 + k);
-      ctx.globalAlpha = A0 * a * Math.sin(k * Math.PI) * 0.6; ctx.fillStyle = '#fff3e4'; ctx.beginPath(); ctx.ellipse(xx, yy, 26 + k * 50, 18 + k * 30, 0, 0, TAU); ctx.fill();
-    }
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';   // additive, so blurring the sum (at 1/4 resolution) = the sum of the blurs
+    blurred(10, g => {
+      for (let i = 0; i < 7; i++) {
+        const k = ((t * 0.18 + i / 7) % 1), yy = y - k * 260, xx = x + Math.sin(t * 0.8 + i * 1.7 + k * 4) * w * (0.3 + k);
+        g.globalAlpha = A0 * a * Math.sin(k * Math.PI) * 0.6; g.fillStyle = '#fff3e4'; g.beginPath(); g.ellipse(xx, yy, 26 + k * 50, 18 + k * 30, 0, 0, TAU); g.fill();
+      }
+    }, [x - w * 1.3 - 80, y - 260 - 50, w * 2.6 + 160, 260 + 70]);
     ctx.restore();
   }
   function light(x, y, r, color, a = 1) {
@@ -468,5 +547,5 @@
   const SURNAME = '李';   // everyone in 李家畈村 is a 李
   const MARK = '李';      // carved on his melons; in 李家畈村 only 李德厚 has the habit of carving, so 「李」 still means his melons
   const VILLAGE = '李家畈村';
-  window.S = { SURNAME, MARK, VILLAGE, TOD, camera, layer, sky, sun, stars, hills, fog, ground, field, fieldSpots, melon, house, tricycle, person, say, stepAt, P: P_, motes, steam, light, vignette, hand, shade, cached, mk };
+  window.S = { SURNAME, MARK, VILLAGE, TOD, camera, layer, sky, sun, stars, hills, fog, ground, field, fieldSpots, melon, house, tricycle, person, say, stepAt, P: P_, motes, steam, light, vignette, hand, shade, cached, mk, soft, softEllipse, softRect, blurred };
 })();

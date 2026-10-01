@@ -65,7 +65,7 @@
   function handTop(x, y, a, o = {}) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(a);
     const fa = 0.5, fx = Math.cos(fa), fy = Math.sin(fa);
-    const shapes = (col, grow = 0) => {
+    const shapes = (col, grow = 0, ctx = K.ctx) => {
       ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       ctx.lineWidth = 128 + grow; ctx.beginPath(); ctx.moveTo(250, 100); ctx.lineTo(250 + fx * 1000, 100 + fy * 1000); ctx.stroke();      // forearm
       ctx.save(); ctx.translate(205, 58); ctx.rotate(fa * 0.8);
@@ -85,7 +85,15 @@
     const lift = o.lift || 0, sx = 24 + lift * 30, sy = 30 + lift * 34;
     const toL = (vx, vy) => [Math.cos(-a) * vx - Math.sin(-a) * vy, Math.sin(-a) * vx + Math.cos(-a) * vy];
     const [lx, ly] = toL(sx, sy);
-    ctx.save(); ctx.translate(lx, ly); ctx.globalAlpha = 0.3 - lift * 0.08; ctx.filter = 'blur(14px)'; shapes('#000'); if (o.pencil) { ctx.fillStyle = '#000'; ctx.fillRect(0, -7, 330, 14); } ctx.restore();
+    {   // the shadow: the hand's shape is fixed in its own coordinates, so it comes from a cached pre-blurred sprite. Each part
+        // is blurred and laid down on its own at alpha a (overlaps darker), so the sprite is made at a quantized a.
+      const a = 0.3 - lift * 0.08, aq = Math.ceil(a / 0.02 - 1e-9) * 0.02;
+      ctx.save(); ctx.translate(lx, ly); ctx.globalAlpha = a / aq;
+      S.soft(`hand_sh|${!!o.pinch}|${!!o.pencil}|${aq.toFixed(2)}`, [-20, -60, 1230, 720], 14, g => {
+        g.globalAlpha = aq; shapes('#000', 0, g); if (o.pencil) { g.fillStyle = '#000'; g.fillRect(0, -7, 330, 14); }
+      });
+      ctx.restore();
+    }
     if (o.pencil) pencil(0, 330, o.pencilA);
     const [rx, ry] = toL(-3.2, -3.6);
     ctx.save(); ctx.translate(rx, ry); shapes(SKIN_RIM); ctx.restore();
@@ -177,7 +185,7 @@
     ctx.strokeStyle = '#e2c08d'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(...pts[1]); ctx.lineTo(...pts[2]); ctx.stroke();   // free edge catches light
     ctx.restore();
   }
-  function paperPath(w, h) {
+  function paperPath(w, h, ctx = K.ctx) {
     const r = rng(77); ctx.beginPath(); ctx.moveTo(-w / 2, -h / 2 + 4);
     for (let x = -w / 2; x <= w / 2; x += 12) ctx.lineTo(x, -h / 2 + r() * 9);            // torn edge
     ctx.lineTo(w / 2, h / 2); ctx.lineTo(-w / 2, h / 2); ctx.closePath();
@@ -275,7 +283,7 @@
           noteFlap('T', lerp(2.05, 0, kL), 355); noteFlap('B', lerp(1.75, 0, kL), 355);
           if (kL > 0.97) {   // closed: the seam, and the edges of the inner flaps pressing up from below
             const my = (BOX.y0 + BOX.y1) / 2;
-            ctx.save(); ctx.filter = 'blur(3px)'; ctx.fillStyle = 'rgba(40,24,10,0.55)'; ctx.fillRect(BOX.x0, my - 3, BOX.x1 - BOX.x0, 7); ctx.restore();
+            S.softRect(BOX.x0, my - 3, BOX.x1 - BOX.x0, 7, 3, 'rgba(40,24,10,0.55)');
             ctx.strokeStyle = 'rgba(40,24,10,0.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(BOX.x0, my); ctx.lineTo(BOX.x1, my); ctx.stroke();
           }
           // the paper on the table: written, folded twice, then carried into the box
@@ -283,14 +291,15 @@
           const pw = PAPER.w, ph = PAPER.h;
           if (ct < 0.8) {
             ctx.save(); ctx.translate(PAPER.x, PAPER.y); ctx.rotate(PAPER.r);
-            ctx.save(); ctx.filter = 'blur(7px)'; ctx.globalAlpha = 0.45; ctx.translate(8, 12); ctx.fillStyle = '#000';
-            if (f1 < 0.5) { paperPath(pw, ph); ctx.fill(); } else ctx.fillRect(f2 < 0.5 ? -pw / 2 : 0, 0, f2 < 0.5 ? pw : pw / 2, ph / 2);
+            ctx.save(); ctx.globalAlpha = 0.45; ctx.translate(8, 12);
+            if (f1 < 0.5) S.soft('note_paper_sh', [-pw / 2, -ph / 2, pw, ph], 7, g => { g.fillStyle = '#000'; paperPath(pw, ph, g); g.fill(); });
+            else S.softRect(f2 < 0.5 ? -pw / 2 : 0, 0, f2 < 0.5 ? pw : pw / 2, ph / 2, 7, '#000');
             ctx.restore();
             if (f1 <= 0) { paperFace(pw, ph); noteText(V, wt); }
             else if (f2 <= 0) foldOne(V, wt, f1);
             else foldTwo(f2);
             // pencil left lying on the table after writing
-            if (wt > 5.25) { ctx.save(); ctx.translate(PEN_REST[0], PEN_REST[1]); ctx.rotate(0.82); ctx.save(); ctx.filter = 'blur(3px)'; ctx.globalAlpha = 0.5; ctx.fillStyle = '#000'; ctx.fillRect(10, 2, 300, 14); ctx.restore(); pencil(0, 330); ctx.restore(); }
+            if (wt > 5.25) { ctx.save(); ctx.translate(PEN_REST[0], PEN_REST[1]); ctx.rotate(0.82); ctx.save(); ctx.globalAlpha = 0.5; S.softRect(10, 2, 300, 14, 3, '#000'); ctx.restore(); pencil(0, 330); ctx.restore(); }
             // the writing hand / folding hand
             if (ct < 0) {
               const tp = tipAt(V, wt), enter = P01(wt, -0.7, 0.3, ease.out), leave = P01(wt, 5.0, 5.3);
@@ -333,7 +342,7 @@
   function foldOne(V, wt, k) {
     const pw = PAPER.w, ph = PAPER.h, c = Math.cos(Math.PI * k);
     ctx.save(); ctx.beginPath(); ctx.rect(-pw, 0, pw * 2, ph); ctx.clip(); paperFace(pw, ph); noteText(V, wt); ctx.restore();
-    if (c < 0) { ctx.save(); ctx.filter = 'blur(6px)'; ctx.fillStyle = `rgba(0,0,0,${0.25 * -c})`; ctx.fillRect(-pw / 2 + 6, 4, pw, -c * ph / 2 + 4); ctx.restore(); }
+    if (c < 0) { ctx.save(); ctx.globalAlpha *= 0.25 * -c; S.softRect(-pw / 2 + 6, 4, pw, -c * ph / 2 + 4, 6, '#000'); ctx.restore(); }
     ctx.save(); ctx.scale(1, Math.abs(c) < 0.02 ? 0.02 : c); ctx.beginPath(); ctx.rect(-pw, -ph, pw * 2, ph); ctx.clip();
     paperFace(pw, ph, c < 0); if (c > 0) noteText(V, wt);
     ctx.fillStyle = `rgba(40,30,15,${0.25 * (1 - Math.abs(c))})`; ctx.fillRect(-pw / 2, -ph / 2 + 8, pw, ph / 2 - 8);
@@ -356,7 +365,7 @@
   }
   function folded() {    // the folded note, centred
     const w = PAPER.w / 2, h = PAPER.h / 2;
-    ctx.save(); ctx.filter = 'blur(5px)'; ctx.globalAlpha = 0.45; ctx.fillStyle = '#000'; ctx.fillRect(-w / 2 + 8, -h / 2 + 10, w, h); ctx.restore();
+    ctx.save(); ctx.globalAlpha = 0.45; S.softRect(-w / 2 + 8, -h / 2 + 10, w, h, 5, '#000'); ctx.restore();
     blank(-w / 2, -h / 2, w, h);
     ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-w / 2, -h / 2 + 1); ctx.lineTo(w / 2, -h / 2 + 1); ctx.stroke();
     // a little of the pencil showing through
@@ -422,7 +431,7 @@
   function lamp() {   // desk lamp at the far right of the table
     const bx = 968, by = 1300;
     ctx.save(); ctx.fillStyle = '#1d130d'; ctx.strokeStyle = '#1d130d'; ctx.lineCap = 'round';
-    ctx.save(); ctx.filter = 'blur(8px)'; ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(bx - 20, by + 6, 70, 12, 0, 0, TAU); ctx.fill(); ctx.restore();
+    S.softEllipse(bx - 20, by + 6, 70, 12, 8, 'rgba(0,0,0,0.45)');
     ctx.beginPath(); ctx.ellipse(bx, by, 52, 12, 0, 0, TAU); ctx.fill();
     ctx.lineWidth = 9; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + 18, by - 150); ctx.lineTo(bx - 26, by - 236); ctx.stroke();
     ctx.translate(bx - 36, by - 246); ctx.rotate(-0.55);
@@ -438,7 +447,7 @@
   const cbEdges = () => { const yf = CB.by - CB.hh; return { x0: CB.cx - CB.w / 2, x1: CB.cx + CB.w / 2, yf, yb: yf - CB.dep }; };
   function cityBox(open, side) {
     const { cx, by, w, hh, dep, l, ls } = CB, { x0, x1, yf, yb } = cbEdges();
-    ctx.save(); ctx.filter = 'blur(12px)'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(cx - 40, by + 4, w * 0.62, 20, 0, 0, TAU); ctx.fill(); ctx.restore();
+    S.softEllipse(cx - 40, by + 4, w * 0.62, 20, 12, 'rgba(0,0,0,0.5)');
     const psiB = lerp(0, 1.95, open), tipB = yb + l * (0.12 * Math.cos(psiB) - Math.sin(psiB));
     const backFlap = () => { quad([[x0, yb], [x1, yb], [x1, tipB], [x0, tipB]], S.shade('#8a6238', -0.12 + 0.1 * Math.sin(psiB))); ctx.strokeStyle = '#d9b07a'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x0, tipB); ctx.lineTo(x1, tipB); ctx.stroke(); };
     if (open > 0.3) backFlap();
@@ -482,7 +491,7 @@
   }
   function soupPot(x, y, t) {   // 砂锅 on the table, lid off; y = where it stands
     const top = y - 132, rw = 112;
-    ctx.save(); ctx.filter = 'blur(10px)'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(x - 26, y + 2, 150, 16, 0, 0, TAU); ctx.fill(); ctx.restore();
+    S.softEllipse(x - 26, y + 2, 150, 16, 10, 'rgba(0,0,0,0.5)');
     const g = ctx.createLinearGradient(x - rw - 20, 0, x + rw + 20, 0); g.addColorStop(0, '#3e2a1f'); g.addColorStop(0.6, '#7d5d47'); g.addColorStop(1, '#b8916d');
     ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x - rw, top); ctx.bezierCurveTo(x - rw - 34, top + 50, x - rw * 0.95, y - 8, x - rw * 0.7, y); ctx.lineTo(x + rw * 0.7, y);
     ctx.bezierCurveTo(x + rw * 0.95, y - 8, x + rw + 34, top + 50, x + rw, top); ctx.closePath(); ctx.fill();
@@ -684,7 +693,7 @@
         S.layer(1.0, () => {
           const seatY = 1428, footY = 1562, qx = 360, xxEnd = 740, hgt = 600;
           // ground shadow
-          ctx.save(); ctx.filter = 'blur(14px)'; ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(540, footY + 6, 420, 20, 0, 0, TAU); ctx.fill(); ctx.restore();
+          S.softEllipse(540, footY + 6, 420, 20, 14, 'rgba(0,0,0,0.4)');
           bench(200, 900, seatY, footY, tod);
           // 晓禾: walks in from the right (the sun side), sits, holds out the phone
           const wk = P01(lt, b0 - 0.4, b0 + 1.8, ease.out), sd = P01(lt, b0 + 1.7, b0 + 2.5);
@@ -790,7 +799,7 @@
         S.layer(1.0, () => {
           ctx.drawImage(endLeaves(0), 0, 0);
           // soft warm light from a window off frame, left
-          ctx.save(); ctx.filter = 'blur(18px)'; ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.ellipse(560, 860, 330, 40, 0, 0, TAU); ctx.fill(); ctx.restore();
+          S.softEllipse(560, 860, 330, 40, 18, 'rgba(0,0,0,0.55)');
           S.melon(540, 742, 600, { tod: 'night', rot: -0.04, color: '#1a2d21', lit: 0.25, rim: 0.45, dark: 0.3, carve: S.MARK, carveA: 0.3 + 0.3 * lightK, frost: 0.35 });
           // the lamp-light falls on the near (left) half of the melon only
           ctx.save(); ctx.beginPath(); ctx.ellipse(540, 742, 292, 126, -0.04, 0, TAU); ctx.clip(); ctx.globalCompositeOperation = 'lighter';
