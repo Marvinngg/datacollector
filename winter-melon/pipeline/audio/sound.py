@@ -204,7 +204,7 @@ fx = convolve(fx, make_ir(rt60=0.6, bright=0.4, seed=5)) * 0.25 + fx
 
 # ================================================================= mix
 music = to_stereo(music)[:n]; music = np.pad(music, ((0, n - len(music)), (0, 0)))
-mix = music * 1.0 + amb * 1.0 + fx * 1.0
+mix = music * 1.0 + amb * 2.0 + fx * 1.2      # ambience carries the first act (no score until s08): keep it present
 mix = filt(mix, 'hp', 35)
 L0 = lufs(mix); g = 10 ** ((-16.0 - L0) / 20); mix *= g
 mix = limiter(mix, ceiling_db=-1.2)
