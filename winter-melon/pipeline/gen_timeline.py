@@ -1,0 +1,108 @@
+"""Silent-mode timeline: script with on-screen text only (no narration) -> build/timeline.json.
+Every "line" is one caption/screen of text; how long it stays is its reading time:
+    base + chars / cps   (+ pace.pause if the line is marked {"text": ..., "pause": true})
+Question beats get three phases (read → pause with countdown → reveal); every chapter with a "next"
+ends with an automatic breath card. The output has the same shape as the narrated timeline
+(chapters / beats / lines), so the runtime, templates and audio code work unchanged; "mode": "silent"
+tells them there is no voice.
+usage: python3 pipeline/gen_timeline.py [--script script/v2.json] [--out build]"""
+import argparse, copy, json, os, re
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ap = argparse.ArgumentParser()
+ap.add_argument('--script', default=f'{ROOT}/script/film.json')
+ap.add_argument('--out', default=f'{ROOT}/build')
+args = ap.parse_args()
+S = json.load(open(args.script))
+P = {'cps': 3.6, 'base': 1.4, 'pause': 4.5, 'lead': 0.6, 'tail': 1.0, 'card': 3.2,
+     'q_pause': 7.0, 'q_reveal': 3.2, 'breath': 4.5, **S.get('pace', {})}
+NO_CAPTION = {'line', 'remember', 'question', 'breath', 'endcard', 'title', 'knowledge_tree'}
+TEXT_TYPES = {'line', 'remember'}          # the only beats allowed to carry sentences when subtitles are off
+if S.get('subtitles') is False:           # v4+: a picture beat with `lines` would be a subtitle -> refuse the script
+    bad = [b['id'] for c in S['chapters'] for b in c['beats'] if b.get('lines') and b['visual']['type'] not in TEXT_TYPES]
+    if bad: raise SystemExit(f"subtitles are off, but these picture beats still have lines: {bad}\n"
+                             "move each sentence to a text beat (type line) before/after the picture, or into an in-scene label")
+
+def chars(t):  # reading load: CJK and letters/digits count, punctuation does not
+    return len(re.sub(r'[\s，。、：；？！,.:;?!…—“”「」（）()·≠+\-=]', '', t))
+
+def visual_read(v):
+    """seconds needed to read the text a template draws (card/list items, compare panels)"""
+    txt = []
+    for it in v.get('items', []):
+        txt += [it.get('title', ''), it.get('desc', '')] if isinstance(it, dict) else [str(it)]
+    for side in ('left', 'right'):
+        if side in v: txt += [v[side].get('title', '')] + v[side].get('items', [])
+    n = len([x for x in txt if x])
+    return sum(chars(x) for x in txt) / P['cps'] + 0.5 * n if n else 0
+
+
+def read_time(t):
+    return P['base'] + chars(t) / P['cps']
+
+t = 0.0
+chapters, beats, lines = [], [], []
+by_id = {b['id']: b for c in S['chapters'] for b in c['beats']}
+for c in S['chapters']:
+    c_start = t
+    card = [round(t, 3), round(t + P['card'], 3)]; t += P['card']
+    cbeats = copy.deepcopy(c['beats'])
+    if c.get('next'):
+        cbeats.append({'id': f"{c['id']}br", 'lines': [], 'hold': P['breath'],
+                       'visual': {'type': 'breath', 'num': c['num'], 'title': c['title'], 'next': c['next']}})
+    for b in cbeats:
+        b.setdefault('lines', [])
+        vis = copy.deepcopy(b['visual'])
+        if 'ref' in vis:
+            base = copy.deepcopy(by_id[vis['ref']]['visual']); base.update({k: v for k, v in vis.items() if k != 'ref'})
+            base['ref'] = vis['ref']; vis = base
+        b_start = t; blines = []
+        if vis['type'] == 'question':
+            r = P['base'] + chars(vis['q']) / P['cps'] + sum(0.5 + chars(o) / P['cps'] for o in vis['options'])
+            vis['phases'] = {'read': [0, round(r, 3)], 'pause': [round(r, 3), round(r + P['q_pause'], 3)],
+                             'reveal': [round(r + P['q_pause'], 3), round(r + P['q_pause'] + P['q_reveal'], 3)]}
+            t += r + P['q_pause'] + P['q_reveal']
+        else:
+            t += P['lead'] if b['lines'] else 0
+            for k, ln in enumerate(b['lines']):
+                ln = ln if isinstance(ln, dict) else {'text': ln}
+                d = read_time(ln['text']) + (P['pause'] if ln.get('pause') else 0)
+                item = {'id': f"{b['id']}_{k}", 'text': ln['text'], 'start': round(t, 3), 'dur': round(d, 3),
+                        'pause': bool(ln.get('pause'))}
+                blines.append(item); lines.append(item); t += d
+            t += P['tail'] if b['lines'] else 0
+            if not b['lines'] and vis.get('steps') and all('dur' in st for st in vis['steps']):
+                # a picture on its own clock: each step is held for `dur` seconds, then the next one starts
+                tc = b_start + P['lead']
+                for st in vis['steps']:
+                    st['t'] = round(tc + st.get('delay', 0), 3); tc += st.get('dur', 3.0)
+                t = tc + P['tail']
+            elif not b['lines'] and vis.get('steps'):
+                # a scene with dialogue: a step {"say": who, "text": ...} lasts as long as it takes to read,
+                # other steps default to 3 s; any step may set its own dur
+                tc = b_start + P['lead']
+                for st in vis['steps']:
+                    if 'dur' not in st:
+                        st['dur'] = round(read_time(st['text']) + P.get('say_gap', 0.6), 2) if st.get('text') else 3.0
+                    st['t'] = round(tc + st.get('delay', 0), 3); tc += st['dur']
+                t = tc + P['tail']
+            t = max(t, b_start + b.get('hold', 0), b_start + min(20.0, P['lead'] + visual_read(vis) + sum(l['dur'] for l in blines) * 0.35))
+        if vis['type'] == 'remember' and 'text' not in vis and blines: vis['text'] = blines[0]['text']
+        vis['_caption'] = vis['type'] not in NO_CAPTION and vis.get('caption') is not False
+        for st in vis.get('steps', []):
+            if 't' in st and 'dur' in st: continue   # already timed on the picture's own clock
+            k = st.get('at', 0)
+            st['t'] = round((blines[k]['start'] if k < len(blines) else b_start) + st.get('delay', 0), 3)
+        if t - b_start < 2.0 and vis['type'] not in ('breath',):
+            print(f"warning: {b['id']} ({vis['type']}) lasts only {t - b_start:.1f}s: give it steps with dur, or a hold")
+        beats.append({'id': b['id'], 'chapter': c['id'], 'start': round(b_start, 3), 'end': round(t, 3),
+                      'visual': vis, 'lines': blines})
+    chapters.append({'id': c['id'], 'num': c['num'], 'title': c['title'], 'part': '', 'next': c.get('next', ''),
+                     'start': round(c_start, 3), 'end': round(t, 3), 'card': card})
+    print(f"{c['id']} {c['num']} {c['title']:<10} {c_start:7.1f} -> {t:7.1f}  ({t - c_start:5.1f}s)")
+
+tl = {'mode': 'silent', 'subtitles': S.get('subtitles', True), 'fps': 30, 'width': S.get('width', 1920), 'height': S.get('height', 1080), 'duration': round(t + 0.5, 3), 'sample_rate': 48000,
+      'title': S['title'], 'credit': '', 'chapters': chapters, 'beats': beats, 'lines': lines}
+os.makedirs(args.out, exist_ok=True)
+json.dump(tl, open(f'{args.out}/timeline.json', 'w'), ensure_ascii=False, indent=1)
+print(f"total {tl['duration']:.1f}s = {tl['duration'] / 60:.1f} min, {len(lines)} screens, {len(beats)} beats")
