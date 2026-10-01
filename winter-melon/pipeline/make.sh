@@ -5,6 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$PWD/.bin:$PATH"
+echo "== voices";    python3 pipeline/voice.py 2>/dev/null | grep -E "voiced|CHECK"
 echo "== timeline";  python3 pipeline/gen_timeline.py --script "${SCRIPT:-script/film.json}" | tail -1
 echo "== cues";      node pipeline/render.mjs cues
 echo "== sound";     python3 pipeline/audio/sound.py | tail -1

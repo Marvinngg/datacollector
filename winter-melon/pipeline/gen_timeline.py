@@ -14,6 +14,8 @@ ap.add_argument('--script', default=f'{ROOT}/script/film.json')
 ap.add_argument('--out', default=f'{ROOT}/build')
 args = ap.parse_args()
 S = json.load(open(args.script))
+VOP = os.path.join(args.out, 'vo', 'lines.json')
+VO = json.load(open(VOP)) if os.path.exists(VOP) else {}   # from pipeline/voice.py (voiced lines)
 P = {'cps': 3.6, 'base': 1.4, 'pause': 4.5, 'lead': 0.6, 'tail': 1.0, 'card': 3.2,
      'q_pause': 7.0, 'q_reveal': 3.2, 'breath': 4.5, **S.get('pace', {})}
 NO_CAPTION = {'line', 'remember', 'question', 'breath', 'endcard', 'title', 'knowledge_tree'}
@@ -81,8 +83,12 @@ for c in S['chapters']:
                 # a scene with dialogue: a step {"say": who, "text": ...} lasts as long as it takes to read,
                 # other steps default to 3 s; any step may set its own dur
                 tc = b_start + P['lead']
-                for st in vis['steps']:
-                    if 'dur' not in st:
+                for k, st in enumerate(vis['steps']):
+                    v = VO.get(f"{b['id']}:{k}")
+                    if v and st.get('say'):        # voiced line: as long as the voice, but never too short to read
+                        st['vo'] = v['file']; st['vo_dur'] = v['dur']
+                        st['dur'] = round(max(v['dur'] + P.get('vo_gap', 0.55), 0.7 * read_time(st['text'])), 2)
+                    elif 'dur' not in st:
                         st['dur'] = round(read_time(st['text']) + P.get('say_gap', 0.6), 2) if st.get('text') else 3.0
                     st['t'] = round(tc + st.get('delay', 0), 3); tc += st['dur']
                 t = tc + P['tail']

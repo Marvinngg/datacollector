@@ -202,9 +202,27 @@ for c in tl.cues:
 fx = fx[:n]
 fx = convolve(fx, make_ir(rt60=0.6, bright=0.4, seed=5)) * 0.25 + fx
 
+# ================================================================= voices (pipeline/voice.py) + ducking
+vo = np.zeros((n + n_of(3), 2)); speech = np.zeros(n + n_of(3))
+import soundfile as sf_
+for b in tl.beats:
+    for st in b['visual'].get('steps', []):
+        if not st.get('vo'): continue
+        x, vsr = sf_.read(os.path.join(ROOT, st['vo']), dtype='float64')
+        if x.ndim > 1: x = x.mean(1)
+        if vsr != SR: x = signal.resample_poly(x, SR // 1000, vsr // 1000)
+        t = st['t'] + 0.18                                   # the line appears on screen a moment before it is spoken
+        x = filt(filt(x, 'hp', 90), 'peak', 3000, q=1.0, gain_db=2.0)
+        place(vo, t, x, 1.0, 0.0)
+        i = n_of(t); speech[i:i + len(x)] = 1.0
+vo = vo[:n]; speech = speech[:n]
+vo = convolve(vo, make_ir(rt60=0.45, bright=0.5, seed=7)) * 0.10 + vo
+from scipy.ndimage import uniform_filter1d
+duck = np.clip(uniform_filter1d(speech, n_of(0.5)) * 1.6, 0, 1)[:, None]   # smooth: in ~0.25 s, out ~0.25 s
+
 # ================================================================= mix
 music = to_stereo(music)[:n]; music = np.pad(music, ((0, n - len(music)), (0, 0)))
-mix = music * 1.0 + amb * 2.0 + fx * 1.2      # ambience carries the first act (no score until s08): keep it present
+mix = music * (1 - 0.5 * duck) + amb * 2.0 * (1 - 0.4 * duck) + fx * 1.2 + vo * 0.9   # ambience carries the first act (no score until s08)
 mix = filt(mix, 'hp', 35)
 L0 = lufs(mix); g = 10 ** ((-16.0 - L0) / 20); mix *= g
 mix = limiter(mix, ceiling_db=-1.2)

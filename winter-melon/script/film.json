@@ -4,7 +4,7 @@
   "subtitles": false,
   "width": 1080,
   "height": 1920,
-  "pace": { "cps": 5.0, "base": 0.9, "pause": 2.0, "lead": 0.5, "tail": 0.7, "card": 0, "say_gap": 0.5 },
+  "pace": { "cps": 5.0, "base": 0.9, "pause": 2.0, "lead": 0.5, "tail": 0.7, "card": 0, "say_gap": 0.5, "vo_gap": 0.85 },
   "chapters": [
     {
       "id": "e1", "num": "", "title": "李叔的冬瓜",
@@ -41,7 +41,7 @@
           "steps": [{ "show": "sit", "dur": 4.5 }, { "show": "phone", "dur": 2.0 }] } },
 
         { "id": "s07", "visual": { "type": "phone", "from": "林姐",
-          "msgs": ["去年在李家畈村买的冬瓜，皮上刻了个“厚”字，炖汤特别好喝。", "今年还能买到他家的吗？"],
+          "msgs": ["去年在李家畈村买的冬瓜，皮上刻了个“李”字，炖汤特别好喝。", "今年还能买到他家的吗？"],
           "steps": [{ "show": "msg", "dur": 5.5 }, { "show": "msg", "dur": 4.0 }, { "show": "smile", "dur": 2.5 }] } },
 
         { "id": "s08", "visual": { "type": "show_phone",
