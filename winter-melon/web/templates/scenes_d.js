@@ -689,10 +689,12 @@
           // 晓禾: walks in from the right (the sun side), sits, holds out the phone
           const wk = P01(lt, b0 - 0.4, b0 + 1.8, ease.out), sd = P01(lt, b0 + 1.7, b0 + 2.5);
           const xx = lerp(1180, xxEnd, wk);
+          // seated figures: put each seat on the bench (the builds differ), and keep the feet on the ground while she sits down
+          const qy = seatY + 108, xy = lerp(footY, seatY + 146, sd) - 34 * Math.sin(Math.PI * sd);
           const show = P01(lt, b0 + 2.4, b0 + 3.0), putDown = P01(lt, k0 + 0.1, k0 + 0.7), back = P01(lt, k0 + 0.7, k0 + 1.1);
           const lookAway = P01(lt, k0 + 0.9, k0 + 1.4);
           const xo = { facing: -1, sit: sd, bend: Math.sin(sd * Math.PI) * 0.35 + 0.05 * sd, walk: wk < 1 ? lt * 5.6 : undefined, t: lt };
-          const xsh = shoulderOf('xiao', xx, footY, hgt, xo).so;
+          const xsh = shoulderOf('xiao', xx, xy, hgt, xo).so;
           const xrest = [xsh[0] - 40, xsh[1] + 170];
           const phoneOut = [xx - 175, 1270], bench_ = [550, seatY - 10];
           let xt = [lerp(xrest[0], phoneOut[0], show), lerp(xrest[1], phoneOut[1], show)];
@@ -709,20 +711,20 @@
             return null;   // in his hand
           };
           let qArm = (f) => {
-            const qq = qo(f), sh = shoulderOf('qin', qx, footY, hgt, qq).so;
+            const qq = qo(f), sh = shoulderOf('qin', qx, qy, hgt, qq).so;
             if (take > 0) {
               const tgt0 = [bench_[0] - 4, bench_[1] - 6], face = [sh[0] + 92, sh[1] - 28];
               const tg = bring > 0 ? [lerp(tgt0[0], face[0], bring), lerp(tgt0[1], face[1], bring)] : [lerp(sh[0] + 90, tgt0[0], take), lerp(sh[1] + 150, tgt0[1], take)];
-              return reach('qin', qx, footY, hgt, qq, tg[0], tg[1]);
+              return reach('qin', qx, qy, hgt, qq, tg[0], tg[1]);
             }
-            if (wave > 0 && wave < 1 && f > 0) { const w = Math.sin(wave * Math.PI * 4) * 22; return reach('qin', qx, footY, hgt, qq, sh[0] + 120 + w, sh[1] + 30 - 30 * Math.sin(wave * Math.PI)); }
-            if (f < 0) return reach('qin', qx, footY, hgt, qq, sh[0] - 70, sh[1] + 95);   // arms folded, turned away
-            return reach('qin', qx, footY, hgt, qq, sh[0] + 115 * f, sh[1] + 160);           // hands on the knees
+            if (wave > 0 && wave < 1 && f > 0) { const w = Math.sin(wave * Math.PI * 4) * 22; return reach('qin', qx, qy, hgt, qq, sh[0] + 120 + w, sh[1] + 30 - 30 * Math.sin(wave * Math.PI)); }
+            if (f < 0) return reach('qin', qx, qy, hgt, qq, sh[0] - 70, sh[1] + 95);   // arms folded, turned away
+            return reach('qin', qx, qy, hgt, qq, sh[0] + 115 * f, sh[1] + 160);           // hands on the knees
           };
-          const q = turned(qx, qTurn, qf0, qf1, f => S.person('qin', qx, footY, hgt, { tod, light: [1, -0.25], ...qo(f), armF: qArm(f), armB: f < 0 ? reach('qin', qx, footY, hgt, qo(f), shoulderOf('qin', qx, footY, hgt, qo(f)).so[0] - 50, shoulderOf('qin', qx, footY, hgt, qo(f)).so[1] + 110) : [0.6, -0.4] }));
+          const q = turned(qx, qTurn, qf0, qf1, f => S.person('qin', qx, qy, hgt, { tod, light: [1, -0.25], ...qo(f), armF: qArm(f), armB: f < 0 ? reach('qin', qx, qy, hgt, qo(f), shoulderOf('qin', qx, qy, hgt, qo(f)).so[0] - 50, shoulderOf('qin', qx, qy, hgt, qo(f)).so[1] + 110) : [0.6, -0.4] }));
           qinHead = q.head;
-          const xArm = reach('xiao', xx, footY, hgt, xo, xt[0], xt[1]);
-          const x_ = turned(xx, lookAway, -1, 1, f => S.person('xiao', xx, footY, hgt, { tod, light: [1, -0.25], ...xo, facing: f, armF: f < 0 ? xArm : reach('xiao', xx, footY, hgt, { ...xo, facing: 1 }, xx + 110, footY - 170), armB: [0.3, 0.6] }));
+          const xArm = reach('xiao', xx, xy, hgt, xo, xt[0], xt[1]);
+          const x_ = turned(xx, lookAway, -1, 1, f => S.person('xiao', xx, xy, hgt, { tod, light: [1, -0.25], ...xo, facing: f, armF: f < 0 ? xArm : reach('xiao', xx, xy, hgt, { ...xo, facing: 1 }, xx + 110, footY - 170), armB: [0.3, 0.6] }));
           xiaoHead = x_.head;
           const pp = phonePos();
           if (pp) phone(pp[0], pp[1], putDown >= 1 ? 1.45 : -0.2, putDown >= 1 ? 0.15 : lerp(0, 1, show));

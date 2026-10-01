@@ -47,20 +47,22 @@
     if (tod === 'night') stars(o.t || 0);
   }
   function stars(t) {
+    const A0 = ctx.globalAlpha;   // inherit the beat fade
     const c = cached('stars', W, 1200, g => {
       const r = rng(7);
       for (let i = 0; i < 260; i++) { const x = r() * W, y = r() * 1100, s = r() < 0.08 ? 2.2 : 1.1; g.globalAlpha = 0.25 + r() * 0.6; g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, s, 0, TAU); g.fill(); }
     });
-    ctx.globalAlpha = 0.85 + 0.15 * Math.sin(t * 0.7); ctx.drawImage(c, 0, 0); ctx.globalAlpha = 1;
+    ctx.globalAlpha = A0 * 0.85 + 0.15 * Math.sin(t * 0.7); ctx.drawImage(c, 0, 0); ctx.globalAlpha = A0 * 1;
   }
   function sun(x, y, r, tod, a = 1) {
+    const A0 = ctx.globalAlpha;   // inherit the beat fade
     const p = TOD[tod];
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     let g = ctx.createRadialGradient(x, y, 0, x, y, r * 9);
     g.addColorStop(0, p.sunGlow); g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalAlpha = a; ctx.fillStyle = g; ctx.fillRect(x - r * 9, y - r * 9, r * 18, r * 18);
+    ctx.globalAlpha = A0 * a; ctx.fillStyle = g; ctx.fillRect(x - r * 9, y - r * 9, r * 18, r * 18);
     ctx.restore();
-    ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = p.sun; ctx.shadowColor = p.sun; ctx.shadowBlur = r * 0.8;
+    ctx.save(); ctx.globalAlpha = A0 * a; ctx.fillStyle = p.sun; ctx.shadowColor = p.sun; ctx.shadowBlur = r * 0.8;
     ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); ctx.restore();
   }
 
@@ -111,8 +113,9 @@
     for (let i = 0; i < 40; i++) { g.globalAlpha = 0.25 + r() * 0.35; g.fillStyle = '#fff'; g.beginPath(); g.ellipse(r() * 1024, 128 + (r() - 0.5) * 90, 80 + r() * 160, 24 + r() * 30, 0, 0, TAU); g.fill(); }
   });
   function fog(tod, t, y, a = 0.5, speed = 8, scale = 1) {
+    const A0 = ctx.globalAlpha;   // inherit the beat fade
     const tex = fogTex(), p = TOD[tod];
-    ctx.save(); ctx.globalAlpha = a;
+    ctx.save(); ctx.globalAlpha = A0 * a;
     const w = 1024 * scale * 1.6, h = 256 * scale * 1.6, off = ((t * speed) % w + w) % w;
     // tint: draw then colour with source-atop on a temp layer
     const c = cached(`fogt|${tod}`, 1024, 256, g => { g.drawImage(tex, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = p.fog + '1)'; g.fillRect(0, 0, 1024, 256); });
@@ -160,10 +163,11 @@
   });
   /** melon(x, y, len, o): o = {rot, tod, carve:'李', carveA, crack:0..1, lit:0..1 (front light), dark (silhouette mix), small} */
   function melon(x, y, len, o = {}) {
+    const A0 = ctx.globalAlpha;   // inherit the beat fade
     const p = TOD[o.tod || 'day'], gr = len * (o.girth || 0.46), rot = o.rot || 0;
     ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
     // contact shadow
-    ctx.save(); ctx.globalAlpha = 0.4 * (o.shadow == null ? 1 : o.shadow); ctx.fillStyle = '#000'; ctx.filter = `blur(${Math.max(2, Math.round(len * 0.04))}px)`;
+    ctx.save(); ctx.globalAlpha = A0 * 0.4 * (o.shadow == null ? 1 : o.shadow); ctx.fillStyle = '#000'; ctx.filter = `blur(${Math.max(2, Math.round(len * 0.04))}px)`;
     ctx.beginPath(); ctx.ellipse(len * 0.02, gr * 0.46, len * 0.5, gr * 0.14, 0, 0, TAU); ctx.fill(); ctx.restore();
     // body: a long rounded barrel (superellipse), a little fuller at the blossom end
     const body = () => {
@@ -188,30 +192,30 @@
     ctx.fillStyle = eg; ctx.fillRect(-len / 2, -gr / 2, len, gr);
     // pale speckles typical of 冬瓜 skin
     const r = rng(Math.round(len) + 3);
-    ctx.fillStyle = shade(base, 0.35); ctx.globalAlpha = 0.18;
+    ctx.fillStyle = shade(base, 0.35); ctx.globalAlpha = A0 * 0.18;
     for (let i = 0; i < 70; i++) { ctx.beginPath(); ctx.ellipse((r() - 0.5) * len * 0.95, (r() - 0.5) * gr * 0.9, len * 0.012 * (0.5 + r()), gr * 0.012 * (0.5 + r()), r() * 3, 0, TAU); ctx.fill(); }
     // frost bloom: the white powder, dusty and uneven, mostly on the upper half
     const ft = frostTex(), fs = Math.max(90, len * 0.32);
-    ctx.globalAlpha = 0.5 * (o.frost == null ? 1 : o.frost);
+    ctx.globalAlpha = A0 * 0.5 * (o.frost == null ? 1 : o.frost);
     for (let fx = -len / 2; fx < len / 2; fx += fs) for (let fy = -gr / 2; fy < gr * 0.15; fy += fs) ctx.drawImage(ft, fx, fy, fs, fs);
     const bloomG = ctx.createLinearGradient(0, -gr / 2, 0, gr / 2);
     bloomG.addColorStop(0, 'rgba(226,232,222,0.28)'); bloomG.addColorStop(0.4, 'rgba(226,232,222,0.10)'); bloomG.addColorStop(0.7, 'rgba(226,232,222,0)');
-    ctx.globalAlpha = 1; ctx.fillStyle = bloomG; ctx.fillRect(-len / 2, -gr / 2, len, gr);
+    ctx.globalAlpha = A0 * 1; ctx.fillStyle = bloomG; ctx.fillRect(-len / 2, -gr / 2, len, gr);
     // the carved 「李」: cut when the melon was small, it grew into a pale, uneven scar
     if (o.carve && (o.carveA == null || o.carveA > 0)) {
       const a = o.carveA == null ? 1 : o.carveA, cs = gr * 0.36;
       ctx.save(); ctx.translate(-len * 0.04, -gr * 0.06); ctx.scale(1.25, 0.9); ctx.rotate(-0.06);
       ctx.font = `400 ${cs}px ${F.hand}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.globalAlpha = a * 0.6; ctx.fillStyle = 'rgba(15,24,15,0.8)'; ctx.fillText(o.carve, cs * 0.025, cs * 0.04);
-      ctx.globalAlpha = a; ctx.fillStyle = '#b8ab84'; ctx.fillText(o.carve, 0, 0);
-      ctx.globalAlpha = a * 0.5; ctx.fillStyle = '#efe7c8'; ctx.fillText(o.carve, -cs * 0.012, -cs * 0.02);
+      ctx.globalAlpha = A0 * a * 0.6; ctx.fillStyle = 'rgba(15,24,15,0.8)'; ctx.fillText(o.carve, cs * 0.025, cs * 0.04);
+      ctx.globalAlpha = A0 * a; ctx.fillStyle = '#b8ab84'; ctx.fillText(o.carve, 0, 0);
+      ctx.globalAlpha = A0 * a * 0.5; ctx.fillStyle = '#efe7c8'; ctx.fillText(o.carve, -cs * 0.012, -cs * 0.02);
       // grown-over: blur the scar into the skin a little, speckles across it
-      ctx.globalAlpha = a * 0.35; ctx.filter = `blur(${Math.max(1, Math.round(cs * 0.02))}px)`; ctx.fillStyle = '#9b9070'; ctx.fillText(o.carve, 0, 0); ctx.filter = 'none';
+      ctx.globalAlpha = A0 * a * 0.35; ctx.filter = `blur(${Math.max(1, Math.round(cs * 0.02))}px)`; ctx.fillStyle = '#9b9070'; ctx.fillText(o.carve, 0, 0); ctx.filter = 'none';
       ctx.restore();
     }
     // a crack
     if (o.crack) {
-      ctx.globalAlpha = clamp(o.crack); ctx.lineJoin = 'round';
+      ctx.globalAlpha = A0 * clamp(o.crack); ctx.lineJoin = 'round';
       const r2 = rng(5); const pts = [[len * 0.06, -gr * 0.42]];
       for (let k = 0; k < 7; k++) { const [px, py] = pts[pts.length - 1]; pts.push([px + (r2() - 0.4) * len * 0.05, py + gr * 0.1]); }
       const path = () => { ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(...q) : ctx.moveTo(...q)); };
@@ -222,9 +226,9 @@
     // stem stub at the near end
     ctx.fillStyle = '#5b5135'; ctx.beginPath(); ctx.ellipse(len / 2 - len * 0.005, -gr * 0.04, len * 0.016, gr * 0.05, 0, 0, TAU); ctx.fill();
     // silhouette mix (for back-lit wide shots)
-    if (o.dark) { ctx.globalAlpha = o.dark; body(); ctx.fillStyle = p.fig; ctx.fill(); ctx.globalAlpha = 1; }
+    if (o.dark) { ctx.globalAlpha = A0 * o.dark; body(); ctx.fillStyle = p.fig; ctx.fill(); ctx.globalAlpha = A0 * 1; }
     // back-lit rim: a thin bright line along the top edge only
-    if (o.rim) { ctx.save(); ctx.globalAlpha = o.rim * 0.7; body(); ctx.clip(); ctx.strokeStyle = p.rim; ctx.lineWidth = Math.max(2, gr * 0.05); ctx.filter = `blur(${Math.max(1, Math.round(gr * 0.02))}px)`; ctx.translate(0, gr * 0.035); body(); ctx.stroke(); ctx.restore(); }
+    if (o.rim) { ctx.save(); ctx.globalAlpha = A0 * o.rim * 0.7; body(); ctx.clip(); ctx.strokeStyle = p.rim; ctx.lineWidth = Math.max(2, gr * 0.05); ctx.filter = `blur(${Math.max(1, Math.round(gr * 0.02))}px)`; ctx.translate(0, gr * 0.035); body(); ctx.stroke(); ctx.restore(); }
     ctx.restore();
   }
 
@@ -419,17 +423,19 @@
     ctx.restore();
   }
   function steam(x, y, t, a = 0.5, w = 60) {
+    const A0 = ctx.globalAlpha;   // inherit the beat fade
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.filter = 'blur(10px)';
     for (let i = 0; i < 7; i++) {
       const k = ((t * 0.18 + i / 7) % 1), yy = y - k * 260, xx = x + Math.sin(t * 0.8 + i * 1.7 + k * 4) * w * (0.3 + k);
-      ctx.globalAlpha = a * Math.sin(k * Math.PI) * 0.6; ctx.fillStyle = '#fff3e4'; ctx.beginPath(); ctx.ellipse(xx, yy, 26 + k * 50, 18 + k * 30, 0, 0, TAU); ctx.fill();
+      ctx.globalAlpha = A0 * a * Math.sin(k * Math.PI) * 0.6; ctx.fillStyle = '#fff3e4'; ctx.beginPath(); ctx.ellipse(xx, yy, 26 + k * 50, 18 + k * 30, 0, 0, TAU); ctx.fill();
     }
     ctx.restore();
   }
   function light(x, y, r, color, a = 1) {
+    const A0 = ctx.globalAlpha;   // inherit the beat fade
     if (a <= 0) return; ctx.save(); ctx.globalCompositeOperation = 'lighter';
     const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, color); g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalAlpha = a; ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); ctx.restore();
+    ctx.globalAlpha = A0 * a; ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); ctx.restore();
   }
   function vignette(a = 0.55) {
     const g = ctx.createRadialGradient(W / 2, H * 0.48, H * 0.25, W / 2, H * 0.5, H * 0.78);
