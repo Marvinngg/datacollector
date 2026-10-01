@@ -4,92 +4,450 @@
   "subtitles": false,
   "width": 1080,
   "height": 1920,
-  "pace": { "cps": 5.0, "base": 0.9, "pause": 2.0, "lead": 0.5, "tail": 0.7, "card": 0, "say_gap": 0.5, "vo_gap": 0.85 },
+  "pace": {
+    "cps": 5.0,
+    "base": 0.9,
+    "pause": 2.0,
+    "lead": 0.5,
+    "tail": 0.7,
+    "card": 0,
+    "say_gap": 0.5,
+    "vo_gap": 0.85
+  },
   "chapters": [
     {
-      "id": "e1", "num": "", "title": "李叔的冬瓜",
+      "id": "e1",
+      "num": "",
+      "title": "李叔的冬瓜",
       "beats": [
-        { "id": "s01", "hold": 11, "visual": { "type": "open", "title": "李叔的冬瓜",
-          "steps": [{ "show": "fog", "dur": 2.5 }, { "show": "knock", "dur": 2.6 }, { "show": "carve", "dur": 2.4 }, { "show": "title", "dur": 3 }] } },
-
-        { "id": "s02", "visual": { "type": "yard",
-          "steps": [{ "show": "wide", "dur": 2.6 },
-                    { "say": "wang", "text": "收瓜的今年不来了。" },
-                    { "say": "wang", "text": "再放下去，就烂地里了。" },
-                    { "say": "xiao", "text": "婶，我先把你家的记上。" },
-                    { "show": "write", "dur": 2.4 }] } },
-
-        { "id": "s03", "visual": { "type": "notebook",
-          "rows": [["桂兰婶", "12 个"], ["建国叔", "8 个"], ["秀英奶奶", "6 个"], ["长根家", "15 个"], ["二娃家", "9 个"]], "header": "李家畈村 收瓜",
-          "steps": [{ "show": "rows", "dur": 7.5 }] } },
-
-        { "id": "s04", "visual": { "type": "road",
-          "steps": [{ "show": "ride", "dur": 9.5 }] } },
-
-        { "id": "s05", "visual": { "type": "qin_field",
-          "steps": [{ "show": "arrive", "dur": 3.2 },
-                    { "say": "xiao", "text": "李叔，我来收瓜。" },
-                    { "say": "qin", "text": "不卖。" },
-                    { "say": "xiao", "text": "一块二一斤，比去年还高。" },
-                    { "say": "qin", "text": "市价才八毛。" },
-                    { "say": "qin", "text": "多那四毛，是可怜我？" },
-                    { "show": "pause", "dur": 1.6 },
-                    { "say": "qin", "text": "我还没老到要人可怜。" },
-                    { "show": "leave", "dur": 3.4 }] } },
-
-        { "id": "s06", "visual": { "type": "night",
-          "steps": [{ "show": "sit", "dur": 4.5 }, { "show": "phone", "dur": 2.0 }] } },
-
-        { "id": "s07", "visual": { "type": "phone", "from": "林姐",
-          "msgs": ["去年在李家畈村买的冬瓜，皮上刻了个“李”字，炖汤特别好喝。", "今年还能买到他家的吗？"],
-          "steps": [{ "show": "msg", "dur": 5.5 }, { "show": "msg", "dur": 4.0 }, { "show": "smile", "dur": 2.5 }] } },
-
-        { "id": "s08", "visual": { "type": "show_phone",
-          "steps": [{ "show": "hand", "dur": 2.6 },
-                    { "say": "xiao", "text": "李叔，你看看这个。" },
-                    { "show": "read", "dur": 4.0 },
-                    { "say": "qin", "text": "……她真说好喝？" },
-                    { "say": "xiao", "text": "人家点名要你的瓜。" },
-                    { "show": "turn", "dur": 2.8, "music": "in" }] } },
-
-        { "id": "s09", "visual": { "type": "pick",
-          "steps": [{ "show": "walk", "dur": 4.0 }, { "show": "knock", "dur": 3.0 }, { "show": "crack", "dur": 2.2 },
-                    { "say": "qin", "text": "这个裂了，别给人家。" },
-                    { "show": "carry", "dur": 2.6 }] } },
-
-        { "id": "s10", "visual": { "type": "scale", "weight": "三十二斤",
-          "steps": [{ "show": "hang", "dur": 2.4 }, { "show": "slide", "dur": 3.4 }, { "show": "read", "dur": 2.2 },
-                    { "say": "xiao", "text": "一块二。" },
-                    { "say": "qin", "text": "八毛。" },
-                    { "say": "xiao", "text": "人家说了，好瓜就值这个价。" },
-                    { "say": "xiao", "text": "明年还要你的。" },
-                    { "show": "silent", "dur": 2.4 }] } },
-
-        { "id": "s11", "visual": { "type": "gift",
-          "steps": [{ "show": "fetch", "dur": 3.6 },
-                    { "say": "qin", "text": "这个不要钱，给她家孩子。" },
-                    { "show": "box", "dur": 2.0 }] } },
-
-        { "id": "s12", "visual": { "type": "note", "note": ["放阴凉地方，", "能放到过年。", "——德厚"],
-          "steps": [{ "show": "straw", "dur": 2.0 }, { "show": "write", "dur": 5.5 }, { "show": "close", "dur": 2.2 }] } },
-
-        { "id": "s13", "visual": { "type": "city",
-          "steps": [{ "show": "open", "dur": 3.0 },
-                    { "say": "kid", "text": "妈，这里有张纸条。" },
-                    { "say": "kid", "text": "“放阴凉地方，能放到过年。”" },
-                    { "say": "lin", "text": "这老爷子，还挺细心。" },
-                    { "show": "soup", "dur": 2.6 },
-                    { "say": "lin", "text": "明年还买他家的。" }] } },
-
-        { "id": "s14", "visual": { "type": "dusk",
-          "steps": [{ "show": "bench", "dur": 2.8 },
-                    { "say": "xiao", "text": "林姐说，汤可好喝了。" },
-                    { "say": "qin", "text": "有啥好拍的。" },
-                    { "show": "look", "dur": 4.2 }] } },
-
-        { "id": "s15", "hold": 9.5, "visual": { "type": "end",
-          "lines_end": ["李叔的冬瓜，今年还有两千斤。", "想要的，找晓禾。"],
-          "info": ["产地：李家畈村 · 地头现摘", "价格、规格、发货方式（按实际填写）"] } }
+        {
+          "id": "s01",
+          "hold": 11,
+          "visual": {
+            "type": "open",
+            "title": "李叔的冬瓜",
+            "steps": [
+              {
+                "show": "fog",
+                "dur": 2.5
+              },
+              {
+                "show": "knock",
+                "dur": 2.6
+              },
+              {
+                "show": "carve",
+                "dur": 2.4
+              },
+              {
+                "show": "title",
+                "dur": 3
+              }
+            ]
+          }
+        },
+        {
+          "id": "s02",
+          "visual": {
+            "type": "yard",
+            "steps": [
+              {
+                "show": "wide",
+                "dur": 2.6
+              },
+              {
+                "say": "wang",
+                "text": "收瓜的今年不来了。",
+                "how": "用上了年纪的农村妇女的声音，叹着气、有点发愁地说"
+              },
+              {
+                "say": "wang",
+                "text": "再放下去，就烂地里了。",
+                "how": "无奈地、慢慢地说，带一点心疼"
+              },
+              {
+                "say": "xiao",
+                "text": "婶，我先把你家的记上。",
+                "how": "温和、宽慰地说"
+              },
+              {
+                "show": "write",
+                "dur": 2.4
+              }
+            ]
+          }
+        },
+        {
+          "id": "s03",
+          "visual": {
+            "type": "notebook",
+            "rows": [
+              [
+                "桂兰婶",
+                "12 个"
+              ],
+              [
+                "建国叔",
+                "8 个"
+              ],
+              [
+                "秀英奶奶",
+                "6 个"
+              ],
+              [
+                "长根家",
+                "15 个"
+              ],
+              [
+                "二娃家",
+                "9 个"
+              ]
+            ],
+            "header": "李家畈村 收瓜",
+            "steps": [
+              {
+                "show": "rows",
+                "dur": 7.5
+              }
+            ]
+          }
+        },
+        {
+          "id": "s04",
+          "visual": {
+            "type": "road",
+            "steps": [
+              {
+                "show": "ride",
+                "dur": 9.5
+              }
+            ]
+          }
+        },
+        {
+          "id": "s05",
+          "visual": {
+            "type": "qin_field",
+            "steps": [
+              {
+                "show": "arrive",
+                "dur": 3.2
+              },
+              {
+                "say": "xiao",
+                "text": "李叔，我来收瓜。",
+                "how": "客气、带点小心地说"
+              },
+              {
+                "say": "qin",
+                "text": "不卖。",
+                "how": "用七十多岁老汉低沉的声音，冷淡、干脆地说，头也不抬"
+              },
+              {
+                "say": "xiao",
+                "text": "一块二一斤，比去年还高。",
+                "how": "耐心地、好声好气地劝"
+              },
+              {
+                "say": "qin",
+                "text": "市价才八毛。",
+                "how": "用老汉低沉的声音，硬邦邦地说"
+              },
+              {
+                "say": "qin",
+                "text": "多那四毛，是可怜我？",
+                "how": "用老汉的声音，有点生气、有点委屈地反问"
+              },
+              {
+                "show": "pause",
+                "dur": 1.6
+              },
+              {
+                "say": "qin",
+                "text": "我还没老到要人可怜。",
+                "how": "用老汉的声音，倔强、压着情绪、一字一顿地说"
+              },
+              {
+                "show": "leave",
+                "dur": 3.4
+              }
+            ]
+          }
+        },
+        {
+          "id": "s06",
+          "visual": {
+            "type": "night",
+            "steps": [
+              {
+                "show": "sit",
+                "dur": 4.5
+              },
+              {
+                "show": "phone",
+                "dur": 2.0
+              }
+            ]
+          }
+        },
+        {
+          "id": "s07",
+          "visual": {
+            "type": "phone",
+            "from": "林姐",
+            "msgs": [
+              "去年在李家畈村买的冬瓜，皮上刻了个“李”字，炖汤特别好喝。",
+              "今年还能买到他家的吗？"
+            ],
+            "steps": [
+              {
+                "show": "msg",
+                "dur": 5.5
+              },
+              {
+                "show": "msg",
+                "dur": 4.0
+              },
+              {
+                "show": "smile",
+                "dur": 2.5
+              }
+            ]
+          }
+        },
+        {
+          "id": "s08",
+          "visual": {
+            "type": "show_phone",
+            "steps": [
+              {
+                "show": "hand",
+                "dur": 2.6
+              },
+              {
+                "say": "xiao",
+                "text": "李叔，你看看这个。",
+                "how": "轻声地、带点期待地说"
+              },
+              {
+                "show": "read",
+                "dur": 4.0
+              },
+              {
+                "say": "qin",
+                "text": "……她真说好喝？",
+                "how": "用老汉的声音，很轻、不敢相信、声音有点发颤地问"
+              },
+              {
+                "say": "xiao",
+                "text": "人家点名要你的瓜。",
+                "how": "温柔、肯定地说"
+              },
+              {
+                "show": "turn",
+                "dur": 2.8,
+                "music": "in"
+              }
+            ]
+          }
+        },
+        {
+          "id": "s09",
+          "visual": {
+            "type": "pick",
+            "steps": [
+              {
+                "show": "walk",
+                "dur": 4.0
+              },
+              {
+                "show": "knock",
+                "dur": 3.0
+              },
+              {
+                "show": "crack",
+                "dur": 2.2
+              },
+              {
+                "say": "qin",
+                "text": "这个裂了，别给人家。",
+                "how": "用老汉的声音，认真、仔细地叮嘱"
+              },
+              {
+                "show": "carry",
+                "dur": 2.6
+              }
+            ]
+          }
+        },
+        {
+          "id": "s10",
+          "visual": {
+            "type": "scale",
+            "weight": "三十二斤",
+            "steps": [
+              {
+                "show": "hang",
+                "dur": 2.4
+              },
+              {
+                "show": "slide",
+                "dur": 3.4
+              },
+              {
+                "show": "read",
+                "dur": 2.2
+              },
+              {
+                "say": "xiao",
+                "text": "一块二。",
+                "how": "平和地说"
+              },
+              {
+                "say": "qin",
+                "text": "八毛。",
+                "how": "用老汉的声音，固执地、不容商量地说"
+              },
+              {
+                "say": "xiao",
+                "text": "人家说了，好瓜就值这个价。",
+                "how": "笑着、温和地说"
+              },
+              {
+                "say": "xiao",
+                "text": "明年还要你的。",
+                "how": "真诚、肯定地说"
+              },
+              {
+                "show": "silent",
+                "dur": 2.4
+              }
+            ]
+          }
+        },
+        {
+          "id": "s11",
+          "visual": {
+            "type": "gift",
+            "steps": [
+              {
+                "show": "fetch",
+                "dur": 3.6
+              },
+              {
+                "say": "qin",
+                "text": "这个不要钱，给她家孩子。",
+                "how": "用老汉的声音，有点不好意思、但很坚持地说"
+              },
+              {
+                "show": "box",
+                "dur": 2.0
+              }
+            ]
+          }
+        },
+        {
+          "id": "s12",
+          "visual": {
+            "type": "note",
+            "note": [
+              "放阴凉地方，",
+              "能放到过年。",
+              "——德厚"
+            ],
+            "steps": [
+              {
+                "show": "straw",
+                "dur": 2.0
+              },
+              {
+                "show": "write",
+                "dur": 5.5
+              },
+              {
+                "show": "close",
+                "dur": 2.2
+              }
+            ]
+          }
+        },
+        {
+          "id": "s13",
+          "visual": {
+            "type": "city",
+            "steps": [
+              {
+                "show": "open",
+                "dur": 3.0
+              },
+              {
+                "say": "kid",
+                "text": "妈，这里有张纸条。",
+                "how": "用小孩子的声音，好奇、开心地说"
+              },
+              {
+                "say": "kid",
+                "text": "“放阴凉地方，能放到过年。”",
+                "how": "用小孩子的声音，一字一字认真地念"
+              },
+              {
+                "say": "lin",
+                "text": "这老爷子，还挺细心。",
+                "how": "笑着、有点感动地说"
+              },
+              {
+                "show": "soup",
+                "dur": 2.6
+              },
+              {
+                "say": "lin",
+                "text": "明年还买他家的。",
+                "how": "温和、肯定地说"
+              }
+            ]
+          }
+        },
+        {
+          "id": "s14",
+          "visual": {
+            "type": "dusk",
+            "steps": [
+              {
+                "show": "bench",
+                "dur": 2.8
+              },
+              {
+                "say": "xiao",
+                "text": "林姐说，汤可好喝了。",
+                "how": "笑着、轻快地说"
+              },
+              {
+                "say": "qin",
+                "text": "有啥好拍的。",
+                "how": "用老汉的声音，嘴硬、不好意思地嘟囔"
+              },
+              {
+                "show": "look",
+                "dur": 4.2
+              }
+            ]
+          }
+        },
+        {
+          "id": "s15",
+          "hold": 9.5,
+          "visual": {
+            "type": "end",
+            "lines_end": [
+              "李叔的冬瓜，今年还有两千斤。",
+              "想要的，找晓禾。"
+            ],
+            "info": [
+              "产地：李家畈村 · 地头现摘",
+              "价格、规格、发货方式（按实际填写）"
+            ]
+          }
+        }
       ]
     }
   ]
