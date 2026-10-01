@@ -3,11 +3,13 @@
 //   node pipeline/render.mjs sheet c3 [--n 12]                          -> contact sheet of one chapter (or a beat id)
 //   node pipeline/render.mjs cues                                       -> build/cues.json (sound cues from scenes)
 //   node pipeline/render.mjs video [--from 0 --to end --workers 4]      -> build/video.mp4 (silent)
+//   node pipeline/render.mjs film [--workers 4] [--fresh]               -> build/video.mp4, re-rendering only scenes that changed
 import { chromium } from 'playwright';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -119,8 +121,52 @@ async function main() {
       const out = path.resolve(ROOT, opt('out', 'build/video.mp4'));
       await new Promise(r => spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', out], { stdio: 'inherit' }).on('close', r));
       console.log(`${out} (${((Date.now() - started) / 1000).toFixed(0)}s)`);
+    } else if (mode === 'film') {
+      // whole film, cached per scene: a scene is re-rendered only when its own data (times, steps, voices, text),
+      // its template file or the shared runtime changed. --fresh ignores the cache.
+      const fps = TL.fps, workers = +opt('workers', 4), fresh = args.includes('--fresh');
+      const cacheDir = path.join(ROOT, 'build/scene_cache'); fs.mkdirSync(cacheDir, { recursive: true });
+      const read = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
+      const shared = ['web/index.html', 'web/core.js', 'web/look.js', 'web/film.js', 'web/scene.js', 'web/templates/scenes_a.js'].map(read).join('\n');
+      const tfiles = fs.readdirSync(path.join(ROOT, 'web/templates')).map(f => 'web/templates/' + f);
+      const fileOf = type => tfiles.filter(f => read(f).includes(`T.register('${type}'`)).map(read).join('\n');
+      const root = b => b.visual.ref || b.id;
+      const segs = TL.beats.map((b, i) => {
+        const f0 = Math.round(b.start * fps), f1 = i === TL.beats.length - 1 ? Math.round(TL.duration * fps) : Math.round(TL.beats[i + 1].start * fps);
+        const chain = TL.beats.filter(x => root(x) === root(b));
+        const key = crypto.createHash('md5').update(JSON.stringify([fps, TL.width, TL.height, f0, f1, i === TL.beats.length - 1 ? TL.duration : 0, chain]))
+          .update(shared).update(fileOf(b.visual.type)).digest('hex').slice(0, 16);
+        return { id: b.id, f0, f1, file: path.join(cacheDir, `${b.id}_${key}.mp4`) };
+      });
+      const todo = segs.filter(s => fresh || !fs.existsSync(s.file)).sort((a, b) => (b.f1 - b.f0) - (a.f1 - a.f0));
+      console.log(`scenes: ${segs.length}, to render: ${todo.length} (${todo.map(s => s.id).join(' ') || 'none'})`);
+      const started = Date.now(); let done = 0; const total = todo.reduce((a, s) => a + s.f1 - s.f0, 0);
+      const queue = [...todo];
+      await Promise.all(Array.from({ length: Math.min(workers, todo.length) }, async () => {
+        const page = await openPage(browser, base);
+        for (let s; (s = queue.shift());) {
+          const tmp = s.file + '.part.mp4';
+          const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-i', '-',
+            '-c:v', 'libx264', '-preset', 'medium', '-crf', '15', '-pix_fmt', 'yuv420p', '-r', String(fps), tmp], { stdio: ['pipe', 'inherit', 'inherit'] });
+          for (let f = s.f0; f < s.f1; f++) {
+            const buf = b64(await grab(page, f / fps, 'image/jpeg', 0.96));
+            if (!ff.stdin.write(buf)) await new Promise(r => ff.stdin.once('drain', r));
+            if (++done % 150 === 0) console.log(`${done}/${total} frames, ${((Date.now() - started) / 1000).toFixed(0)}s`);
+          }
+          ff.stdin.end(); await new Promise(r => ff.on('close', r)); fs.renameSync(tmp, s.file);
+          console.log(`  ${s.id} done`);
+        }
+        await page.close();
+      }));
+      const list = path.join(cacheDir, 'list.txt'); fs.writeFileSync(list, segs.map(s => `file '${s.file}'`).join('\n'));
+      const out = path.resolve(ROOT, opt('out', 'build/video.mp4'));
+      await new Promise(r => spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', out], { stdio: 'inherit' }).on('close', r));
+      // drop cache entries no scene uses any more
+      const keep = new Set(segs.map(s => path.basename(s.file)));
+      for (const f of fs.readdirSync(cacheDir)) if (f.endsWith('.mp4') && !keep.has(f)) fs.unlinkSync(path.join(cacheDir, f));
+      console.log(`${out} (${((Date.now() - started) / 1000).toFixed(0)}s, ${todo.length} scene(s) rendered)`);
     } else {
-      console.log('modes: still | sheet | cues | video');
+      console.log('modes: still | sheet | cues | video | film');
     }
   } finally { await browser.close(); srv.close(); }
 }

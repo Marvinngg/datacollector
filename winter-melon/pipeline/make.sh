@@ -11,7 +11,7 @@ echo "== cues";      node pipeline/render.mjs cues
 echo "== sound";     python3 pipeline/audio/sound.py | tail -1
 echo "== frames"
 RANGE=(); [ -n "${FROM:-}" ] && RANGE+=(--from "$FROM"); [ -n "${TO:-}" ] && RANGE+=(--to "$TO")
-node pipeline/render.mjs video --workers "${WORKERS:-4}" "${RANGE[@]}"
+if [ ${#RANGE[@]} -gt 0 ]; then node pipeline/render.mjs video --workers "${WORKERS:-4}" "${RANGE[@]}"; else node pipeline/render.mjs film --workers "${WORKERS:-4}"; fi
 echo "== mux"
 mkdir -p release
 AUD=(-i build/audio/mix.wav); [ -n "${FROM:-}" ] && AUD=(-ss "$FROM" -i build/audio/mix.wav)

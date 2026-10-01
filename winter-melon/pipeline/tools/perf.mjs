@@ -9,6 +9,10 @@ await new Promise(r => srv.on('listening', r));
 const b = await chromium.launch(); const pg = await b.newPage({ viewport: { width: TL.width, height: TL.height } });
 await pg.goto(`http://127.0.0.1:${srv.address().port}/web/index.html`);
 await pg.evaluate(async () => { await E.ready; await document.fonts.ready; });
+if (process.argv.includes('--noblur')) await pg.evaluate(() => {   // experiment: how much of the frame is live blur?
+  const d = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'filter');
+  Object.defineProperty(CanvasRenderingContext2D.prototype, 'filter', { get() { return d.get.call(this); }, set(v) { d.set.call(this, String(v).includes('blur') ? 'none' : v); } });
+});
 const rows = [];
 for (const be of TL.beats) {
   const ts = [0.25, 0.5, 0.75].map(k => be.start + (be.end - be.start) * k);
