@@ -1,6 +1,6 @@
-/* Scene kit for 《秦叔的冬瓜》: a warm, back-lit picture-book look, drawn entirely in code.
+/* Scene kit for 《李叔的冬瓜》: a warm, back-lit picture-book look, drawn entirely in code.
  * - landscape layers (sky, sun, hills, trees, fog, field) cached per scene, parallax by camera
- * - 冬瓜 with frost bloom, a carved 「秦」 that grew into a scar, cracks
+ * - 冬瓜 with frost bloom, a carved 「李」 that grew into a scar, cracks
  * - people as rim-lit silhouettes with a simple skeleton (pose: bend, arms, walk), no faces
  * - spoken lines placed beside the speaker (plain type, no boxes, no subtitle strip)
  * Everything is a pure function of time; static layers are cached offscreen. Canvas is 1080 x 1920 (vertical). */
@@ -158,7 +158,7 @@
     const r = rng(11);
     for (let i = 0; i < 2600; i++) { g.globalAlpha = 0.05 + r() * 0.2; g.fillStyle = '#f4f7ee'; g.beginPath(); g.arc(r() * 256, r() * 256, 0.6 + r() * 1.6, 0, TAU); g.fill(); }
   });
-  /** melon(x, y, len, o): o = {rot, tod, carve:'秦', carveA, crack:0..1, lit:0..1 (front light), dark (silhouette mix), small} */
+  /** melon(x, y, len, o): o = {rot, tod, carve:'李', carveA, crack:0..1, lit:0..1 (front light), dark (silhouette mix), small} */
   function melon(x, y, len, o = {}) {
     const p = TOD[o.tod || 'day'], gr = len * (o.girth || 0.46), rot = o.rot || 0;
     ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
@@ -197,7 +197,7 @@
     const bloomG = ctx.createLinearGradient(0, -gr / 2, 0, gr / 2);
     bloomG.addColorStop(0, 'rgba(226,232,222,0.28)'); bloomG.addColorStop(0.4, 'rgba(226,232,222,0.10)'); bloomG.addColorStop(0.7, 'rgba(226,232,222,0)');
     ctx.globalAlpha = 1; ctx.fillStyle = bloomG; ctx.fillRect(-len / 2, -gr / 2, len, gr);
-    // the carved 「秦」: cut when the melon was small, it grew into a pale, uneven scar
+    // the carved 「李」: cut when the melon was small, it grew into a pale, uneven scar
     if (o.carve && (o.carveA == null || o.carveA > 0)) {
       const a = o.carveA == null ? 1 : o.carveA, cs = gr * 0.36;
       ctx.save(); ctx.translate(-len * 0.04, -gr * 0.06); ctx.scale(1.25, 0.9); ctx.rotate(-0.06);
@@ -455,5 +455,6 @@
     return `rgb(${f(r)},${f(g)},${f(b)})`;
   }
 
-  window.S = { TOD, camera, layer, sky, sun, stars, hills, fog, ground, field, fieldSpots, melon, house, tricycle, person, say, stepAt, P: P_, motes, steam, light, vignette, hand, shade, cached, mk };
+  const SURNAME = '李';   // the old man's surname: carved on his melons, signed on his note
+  window.S = { SURNAME, TOD, camera, layer, sky, sun, stars, hills, fog, ground, field, fieldSpots, melon, house, tricycle, person, say, stepAt, P: P_, motes, steam, light, vignette, hand, shade, cached, mk };
 })();

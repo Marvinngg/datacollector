@@ -1,4 +1,4 @@
-"""Sound for 《秦叔的冬瓜》: score + ambience + effects + mix -> build/audio/mix.wav (-16 LUFS, true peak <= -1 dBTP).
+"""Sound for 《李叔的冬瓜》: score + ambience + effects + mix -> build/audio/mix.wav (-16 LUFS, true peak <= -1 dBTP).
 
 Score (GeneralUser GS SoundFont): a plain folk tune in D, 72 BPM — nylon guitar fingerpicking, a piano melody,
 later a flute and a soft string pad. It stays out of the first act (only a breath of pad at the opening and at

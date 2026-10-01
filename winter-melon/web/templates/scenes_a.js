@@ -21,7 +21,7 @@
   K.handShape = handShape;
 
   // ================================================================ s01 open
-  // dawn, fog over the melon field; a hand knocks on a big melon twice; the carved 「秦」 catches the light; title
+  // dawn, fog over the melon field; a hand knocks on a big melon twice; the carved 「李」 catches the light; title
   T.register('open', {
     draw(ctx, V, lt, api) {
       const tod = 'dawn', hz = 1080;
@@ -39,7 +39,7 @@
       const sx = shake(k1) + shake(k2);
       const carveA = 0.35 + 0.65 * (cv ? ease.inOut(prog(lt, cv.lt, cv.lt + 1.8)) : 0);
       S.layer(1.0, () => {
-        S.melon(540 + sx, 1520, 900, { tod, rot: -0.05, carve: '秦', carveA, lit: 0.6, rim: 0.5 });
+        S.melon(540 + sx, 1520, 900, { tod, rot: -0.05, carve: S.SURNAME, carveA, lit: 0.6, rim: 0.5 });
         // morning light sweeping across the scar
         if (cv) { const k = prog(lt, cv.lt, cv.lt + 2.4); S.light(lerp(260, 820, ease.inOut(k)), 1460, 260, 'rgba(255,226,180,0.35)', Math.sin(k * Math.PI)); }
         // the knock: each tap sends a soft ring of light across the skin
@@ -49,7 +49,7 @@
       S.vignette(0.45);
       if (ti) {
         const k = prog(lt, ti.lt, ti.lt + 1.6);
-        L.serif(V.title || '秦叔的冬瓜', W / 2, 560, { size: 104, color: '#fff7ea', glow: 14, reveal: k, spacing: 16 });
+        L.serif(V.title || '李叔的冬瓜', W / 2, 560, { size: 104, color: '#fff7ea', glow: 14, reveal: k, spacing: 16 });
       }
     },
     cues(V, api) {
@@ -61,7 +61,7 @@
   });
 
   // ================================================================ s05 qin_field
-  // late morning, back-lit from the left. 秦 bends over his melons and does not look up; 晓禾 stops at the field edge.
+  // late morning, back-lit from the left. 李 bends over his melons and does not look up; 晓禾 stops at the field edge.
   T.register('qin_field', {
     draw(ctx, V, lt, api) {
       const tod = 'day', hz = 1020, p = S.TOD[tod];
@@ -75,7 +75,7 @@
       S.layer(0.6, () => S.house(860, hz + 60, 330, tod, { door: true, wall: S.shade(p.mid, 0.25) }));
       const spots = S.fieldSpots(21, 12, { horizon: hz });
       S.layer(0.8, () => { for (const m of spots) if (m.y < 1500) S.melon(m.x, m.y, m.s * 0.9, { tod, rot: m.rot, dark: 0.45, rim: 0.7, lit: 0.35 }); });
-      // 秦: bent over, patting a melon; on "leave" he straightens and walks to the shed
+      // 李: bent over, patting a melon; on "leave" he straightens and walks to the shed
       const lvK = lv ? prog(lt, lv.lt, lv.lt + lv.dur) : 0;
       const qx = lerp(700, 1000, ease.inOut(clamp((lvK - 0.25) / 0.75))), stand = ease.inOut(clamp(lvK / 0.3));
       const pat = Math.max(0, Math.sin(lt * 2.2)) * 0.25 * (1 - stand);
@@ -157,7 +157,7 @@
         const my = 520 + drop, ml = 560;
         ctx.strokeStyle = '#a08560'; ctx.lineWidth = 7;
         ctx.beginPath(); ctx.moveTo(-6, 58); ctx.quadraticCurveTo(-120, my - 160, -ml * 0.42, my - 40); ctx.moveTo(-2, 58); ctx.quadraticCurveTo(120, my - 160, ml * 0.42, my - 40); ctx.stroke();
-        S.melon(0, my, ml, { tod, rot: 0.03, carve: '秦', lit: 0.8, rim: 0.35 });
+        S.melon(0, my, ml, { tod, rot: 0.03, carve: S.SURNAME, lit: 0.8, rim: 0.35 });
         ctx.strokeStyle = '#a08560'; ctx.lineWidth = 8; ctx.beginPath(); ctx.ellipse(0, my + 20, ml * 0.47, 90, 0, 0.15, Math.PI - 0.15); ctx.stroke();
         ctx.restore();
       });
