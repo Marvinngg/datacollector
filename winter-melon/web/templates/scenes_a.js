@@ -163,7 +163,7 @@
       });
       if (rd) { const k = prog(lt, rd.lt, rd.lt + 1.4); L.serif(V.weight || '三十二斤', 860, 860, { size: 60, color: '#fff3dc', glow: 10, reveal: k }); }
       S.vignette(0.3);
-      S.say(api, lt, { xiao: [330, 1300], qin: [750, 1430] });
+      S.say(api, lt, { xiao: [330, 1300], qin: [750, 1430] }, { backing: true });
     },
     cues(V, api) {
       const out = api.steps.filter(s => s.say).map(s => ({ t: s.lt, type: 'say' }));

@@ -398,7 +398,11 @@
       ctx.save(); ctx.font = `500 ${size}px ${F.sans}`; ctx.textBaseline = 'middle';
       const wmax = Math.max(...rows.map(r => ctx.measureText(r).width));
       const cx = clamp(x, 60 + wmax / 2, W - 60 - wmax / 2), ry = y - (rows.length - 1) * size * 0.65 - k * 6;
-      ctx.textAlign = 'center'; ctx.globalAlpha = k;
+      ctx.textAlign = 'center'; ctx.globalAlpha = ctx.globalAlpha * k;
+      if (o.backing) {      // on a bright background: a soft dark haze behind the words (no box)
+        ctx.save(); ctx.filter = 'blur(26px)'; ctx.fillStyle = 'rgba(20,14,8,0.55)';
+        ctx.beginPath(); ctx.ellipse(cx, ry + (rows.length - 1) * size * 0.65, wmax * 0.62 + 30, size * (0.75 + rows.length * 0.55), 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      }
       ctx.shadowColor = 'rgba(0,0,0,0.75)'; ctx.shadowBlur = 14;
       ctx.fillStyle = o.color || '#fff6e6';
       rows.forEach((r, i) => ctx.fillText(r, cx, ry + i * size * 1.3));
