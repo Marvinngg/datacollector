@@ -111,18 +111,18 @@ amb = np.zeros((n, 2))
 # wind / air: everywhere outdoors, very low
 wind = filt(noise(), 'lp', 500, order=2); wind = filt(wind, 'hp', 60)
 wmod = 0.6 + 0.4 * np.sin(2 * np.pi * tt_ * 0.07)[:, None]
-amb += wind * wmod * 0.05 * scene_gain({'s01': 1, 's02': .5, 's04': .6, 's05': .7, 's08': .6, 's09': .7, 's11': .5, 's14': .6, 's15': .8})
+amb += wind * wmod * 0.05 * scene_gain({'s01': 1, 's02': .5, 's04': .6, 's05': .7, 's08': .6, 's09': .7, 's09b': .5, 's11': .5, 's14': .6, 's15': .8})
 # cicadas: band-passed noise, pulsing
 cic = filt(noise(), 'bp', 5200, q=3, order=2)
 pulse = (0.55 + 0.45 * np.sin(2 * np.pi * tt_ * 38)) * (0.7 + 0.3 * np.sin(2 * np.pi * tt_ * 0.21))
-amb += cic * pulse[:, None] * 0.025 * scene_gain({'s02': 1, 's03': .9, 's04': 1, 's05': 1, 's09': 1, 's10': .35, 's11': .9, 's12': .3})
+amb += cic * pulse[:, None] * 0.025 * scene_gain({'s02': 1, 's03': .9, 's04': 1, 's05': 1, 's09': 1, 's09b': .9, 's10': .35, 's11': .9, 's12': .3})
 # birds: short chirps (dawn / morning / dusk)
 birds = np.zeros((n, 2))
 def chirp(t, f0, f1, d, pan):
     k = np.arange(n_of(d)); f = np.linspace(f0, f1, len(k)); ph = 2 * np.pi * np.cumsum(f) / SR
     x = np.sin(ph) * np.sin(np.pi * k / len(k)) ** 2
     place(birds, t, x, 0.06, pan)
-bird_spec = {'s01': 1.0, 's02': .6, 's05': .5, 's08': 1.0, 's09': .4, 's14': .5}
+bird_spec = {'s01': 1.0, 's02': .6, 's05': .5, 's08': 1.0, 's09': .4, 's09b': .5, 's14': .5}
 for bid, dens in bird_spec.items():
     a, b = sec(bid); t = a + R.uniform(0.3, 1.2)
     while t < b - 0.5:
@@ -184,6 +184,11 @@ def box(t):
 def spoon(t):
     k = np.arange(n_of(0.8)); x = sum(np.sin(2 * np.pi * f * k / SR) * np.exp(-k / (d * SR)) * a for f, d, a in [(2480, 0.25, 1), (3710, 0.15, 0.5), (5120, 0.08, 0.3)])
     place(fx, t, x * 0.04, 1, 0.15)
+def chop(t):     # a kitchen knife through 冬瓜 flesh onto a wooden board
+    k = np.arange(n_of(0.3)); m = len(k)
+    x = filt(R.standard_normal(m), 'bp', 2600, q=1.5) * np.exp(-k / (0.006 * SR)) * 0.6
+    x += (np.sin(2 * np.pi * 210 * k / SR) * 0.7 + np.sin(2 * np.pi * 470 * k / SR) * 0.3) * np.exp(-k / (0.035 * SR))
+    place(fx, t, x * 0.28, 1, 0.12)
 def slide(t, d):
     m = n_of(d); x = filt(R.standard_normal(m), 'bp', 1800, q=2) * np.hanning(m) * 0.02
     place(fx, t, x, 1, 0.3)
@@ -199,6 +204,7 @@ for c in tl.cues:
     elif ty == 'spoon': spoon(t)
     elif ty == 'slide': slide(t, c.get('dur', 2.0))
     elif ty == 'door': thud(t, 0.25)
+    elif ty == 'chop': chop(t)
 fx = fx[:n]
 fx = convolve(fx, make_ir(rt60=0.6, bright=0.4, seed=5)) * 0.25 + fx
 

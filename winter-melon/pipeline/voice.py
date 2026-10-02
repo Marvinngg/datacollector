@@ -94,6 +94,7 @@ def asr():
         s = rec.create_stream(); s.accept_waveform(SR, x.tolist()); rec.decode_stream(s); return s.result.text
     return hear
 
+STALE = 0.5   # below this ASR match an override is taken to be an old take of a line that has since been rewritten
 def norm(t): return re.sub(r'[^一-鿿0-9a-zA-Z]', '', t)
 def similar(a, b):
     a, b = norm(a), norm(b)
@@ -157,9 +158,13 @@ def main():
         for b in c['beats']:
             for k, st in enumerate(b['visual'].get('steps', [])):
                 if st.get('say') and st.get('text'): jobs.append((b['id'], k, st['say'], st['text']))
-    synth, hear, out, bad = None, None, {}, []
+    synth, hear, out, bad, stale = None, None, {}, [], []
     api = dashscope_engine() if API else None
     hows = {(b['id'], k): st.get('how', '') for c_ in S['chapters'] for b in c_['beats'] for k, st in enumerate(b['visual'].get('steps', []))}
+    # assets/voice_override/texts.json: the text each override was voiced from. A take of a line that has been
+    # rewritten since is not used (the line is synthesized here until it is voiced again).
+    mpath = f'{ROOT}/assets/voice_override/texts.json'
+    voiced = json.load(open(mpath)) if os.path.exists(mpath) else {}
     for bid, k, who, text in jobs:
         c = API_CAST[who] if API else CAST[who]; spoken = speakable(text)
         ov = f'{ROOT}/assets/voice_override/{bid}_{k}.wav'
@@ -167,13 +172,21 @@ def main():
         how = hows.get((bid, k), '')
         key = hashlib.md5(json.dumps((['api', API_MODEL, who, spoken, c, how] if API else [who, spoken, c, open(f'{REFS}/{who}.wav', 'rb').read().__len__()]) + [os.path.getsize(ov) if ovsig else 0]).encode()).hexdigest()[:12]
         f = f'{OUT}/{bid}_{k}_{key}.wav'
-        if os.path.exists(ov):   # a line voiced elsewhere (local CosyVoice, a recording): trim, level, check
+        use_ov = os.path.exists(ov)
+        if use_ov:   # a line voiced elsewhere (local CosyVoice, a recording): trim, level, check
             x, sr = sf.read(ov, dtype='float32'); x = resample(x.mean(1) if x.ndim > 1 else x, sr)
             x = trim(x, thr=0.02, pad=0.05)
             x = x / (np.sqrt(np.mean(x ** 2)) + 1e-9) * 0.08; x = np.clip(x, -0.98, 0.98)
-            sf.write(f, x, SR); hear = hear or asr(); heard = hear(x); score = similar(spoken, heard)
-            if score < 0.85: bad.append((bid, k, who, text, heard, round(score, 2)))
-            heard = '(外部配音) ' + heard
+            hear = hear or asr(); heard = hear(x); score = similar(spoken, heard)
+            was = voiced.get(f'{bid}_{k}.wav')
+            if (was is not None and was != text) or (was is None and score < STALE):     # it says something else: the line was rewritten after it was voiced. Don't use it.
+                stale.append((bid, k, who, text, was or heard)); use_ov = False
+                f = f'{OUT}/{bid}_{k}_{key}_own.wav'
+            else:
+                sf.write(f, x, SR)
+                if score < 0.85: bad.append((bid, k, who, text, heard, round(score, 2)))
+                heard = '(外部配音) ' + heard
+        if use_ov: pass
         elif os.path.exists(f):
             x, _ = sf.read(f, dtype='float32'); score, heard = 1.0, '(缓存)'
         else:
@@ -193,6 +206,12 @@ def main():
     json.dump(out, open(f'{OUT}/lines.json', 'w'), ensure_ascii=False, indent=1)
     print(f'{len(out)} lines voiced -> build/vo/lines.json')
     for b in bad: print('CHECK', b)
+    for b in stale: print('STALE override (the line was rewritten after it was voiced; synthesized instead)', b)
+    todo = stale + [(bid, k) for bid, k, who, text in jobs if not os.path.exists(f'{ROOT}/assets/voice_override/{bid}_{k}.wav')]
+    for bid, k, *_ in todo:
+        if (bid, k) not in [(b[0], b[1]) for b in stale]: print('NO override yet (synthesized):', f'{bid}:{k}')
+    if todo:
+        print('  re-voice just these with: python tools/cosyvoice_local.py --model pretrained_models/CosyVoice2-0.5B --no-instruct --stale')
 
 if __name__ == '__main__':
     main()

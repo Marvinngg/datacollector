@@ -10,6 +10,7 @@ usage (run inside the CosyVoice checkout, with its environment active):
 options:
   --only s05,s08     only these scenes          --takes 2      write extra takes as <beat>_<step>.take2.wav …
   --no-instruct      plain zero-shot (timbre only, no delivery instructions)
+  --stale            only the lines that are new or were rewritten since they were voiced (see texts.json)
 """
 import argparse, inspect, json, os, re, sys
 
@@ -23,6 +24,7 @@ ap.add_argument('--model', default='pretrained_models/CosyVoice2-0.5B')
 ap.add_argument('--only', default='')
 ap.add_argument('--takes', type=int, default=1)
 ap.add_argument('--no-instruct', action='store_true')
+ap.add_argument('--stale', action='store_true', help='only lines that have no file yet or were rewritten since they were voiced')
 args = ap.parse_args()
 
 sys.path.append(os.path.join(os.getcwd(), 'third_party', 'Matcha-TTS'))   # CosyVoice needs its bundled Matcha-TTS
@@ -54,16 +56,22 @@ def speakable(t):
 S = json.load(open(os.path.join(FILM, 'script', 'film.json'), encoding='utf8'))
 only = set(x for x in args.only.split(',') if x)
 out = os.path.join(FILM, 'assets', 'voice_override'); os.makedirs(out, exist_ok=True)
+mpath = os.path.join(out, 'texts.json')      # which text each file was voiced from (so an old take of a rewritten line is not used)
+voiced = json.load(open(mpath, encoding='utf8')) if os.path.exists(mpath) else {}
 n = 0
 for c in S['chapters']:
     for b in c['beats']:
         if only and b['id'] not in only: continue
         for k, st in enumerate(b['visual'].get('steps', [])):
             if not st.get('say'): continue
+            name = f"{b['id']}_{k}.wav"
+            if args.stale and voiced.get(name) == st['text'] and os.path.exists(os.path.join(out, name)): continue
             for take in range(1, args.takes + 1):
                 x = speak(speakable(st['text']), st['say'], st.get('how', ''))
                 f = os.path.join(out, f"{b['id']}_{k}.wav" if take == 1 else f"{b['id']}_{k}.take{take}.wav")
                 sf.write(f, x, SR); n += 1
+                if take == 1: voiced[f"{b['id']}_{k}.wav"] = st['text']
                 print(f"{os.path.basename(f):<16} {st['say']:<4} {len(x) / SR:4.1f}s  {st['text']}   [{st.get('how', '')}]")
+json.dump(voiced, open(mpath, 'w', encoding='utf8'), ensure_ascii=False, indent=1)
 print(f'{n} files -> {out}')
-print('听一遍，不满意的句子删掉重跑（--only 场景号），或者把 .take2.wav 改名替换。然后 git add assets/voice_override 并推送。')
+print('听一遍，不满意的句子删掉重跑（--only 场景号），或者把 .take2.wav 改名替换（texts.json 里记的是正文，take 改名不用动它）。然后 git add assets/voice_override 并推送。')

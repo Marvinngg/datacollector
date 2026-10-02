@@ -123,7 +123,7 @@
   }
 
   // ================================================================ s12 note
-  // top-down into the gift box: straw, melons, the small one; a rough hand writes the note in pencil; folded, tucked in, flaps closed
+  // top-down into the gift box: straw, bags of 冬瓜干, the small bag for the child; a rough hand writes the note in pencil; folded, tucked in, flaps closed
   const BOX = { x0: 150, y0: 250, x1: 930, y1: 960 }, FLR = { x0: 214, y0: 314, x1: 866, y1: 896 };
   const PAPER = { x: 520, y: 1262, r: -0.045, w: 560, h: 340 };
   const NOTE_IN = { x: 806, y: 612, r: 0.42, s: 0.56 };
@@ -263,18 +263,18 @@
           ctx.drawImage(noteBox(), 0, 0);
           // contents (clipped to the opening)
           ctx.save(); ctx.beginPath(); ctx.rect(BOX.x0 + 4, BOX.y0 + 4, BOX.x1 - BOX.x0 - 8, BOX.y1 - BOX.y0 - 8); ctx.clip();
-          S.melon(522, 458, 560, { tod: 'day', rot: 0.07, lit: 0.55, carve: S.MARK, carveA: 0.8 });
-          S.melon(400, 748, 440, { tod: 'day', rot: -0.12, lit: 0.5 });
+          // bags of 冬瓜干 lying in the box, seen from above
+          for (const [bx, by, br, bs] of [[330, 500, -0.1, 1], [545, 470, 0.05, 2], [760, 505, 0.12, 3], [360, 790, 0.08, 4], [575, 770, -0.06, 5]]) S.bag(bx, by, 230, { rot: br, seed: bs, shadow: 0.6, tint: ['#2c1f15', 0.08] });
           // the small one is lowered in during "straw"
           const pk = P01(lt, s0 + 0.1, s0 + 1.5, ease.out), sc = lerp(1.22, 1, pk);
           ctx.save(); ctx.translate(772, 792); ctx.scale(sc, sc);
-          S.melon(0, 0, 226, { tod: 'day', rot: 0.3, lit: 0.7, carve: S.MARK, shadow: pk, girth: 0.5 });
+          S.bag(0, 0, 160, { rot: 0.22, seed: 7, shadow: pk });
           ctx.restore();
           ctx.drawImage(noteStraw2(), 0, 0);
           // shade cast by the far and left walls
           let g = ctx.createLinearGradient(0, BOX.y0, 0, BOX.y0 + 180); g.addColorStop(0, 'rgba(20,10,4,0.55)'); g.addColorStop(1, 'rgba(20,10,4,0)'); ctx.fillStyle = g; ctx.fillRect(BOX.x0, BOX.y0, BOX.x1 - BOX.x0, 180);
           g = ctx.createLinearGradient(BOX.x0, 0, BOX.x0 + 170, 0); g.addColorStop(0, 'rgba(20,10,4,0.5)'); g.addColorStop(1, 'rgba(20,10,4,0)'); ctx.fillStyle = g; ctx.fillRect(BOX.x0, BOX.y0, 170, BOX.y1 - BOX.y0);
-          // the folded note, once it is tucked in beside the small melon
+          // the folded note, once it is tucked in beside the small bag
           if (ct > 1.4) { ctx.save(); ctx.translate(NOTE_IN.x, NOTE_IN.y); ctx.rotate(NOTE_IN.r); ctx.scale(NOTE_IN.s, NOTE_IN.s); folded(); ctx.restore(); }
           ctx.restore();
           // flaps: the short (side) flaps fold in first, then the long ones meet in the middle
@@ -315,7 +315,7 @@
             }
             ctx.restore();
           } else if (ct < 1.75) {
-            // carried: from the table into the box, beside the small melon
+            // carried: from the table into the box, beside the small bag
             const p0 = toScreen(pw / 4, ph / 4);
             const x = lerp(p0[0], NOTE_IN.x, carry), y = lerp(p0[1], NOTE_IN.y, carry) - Math.sin(carry * Math.PI) * 60;
             const r = lerp(PAPER.r, NOTE_IN.r, carry), sc = lerp(1, NOTE_IN.s, carry) * (1 + Math.sin(carry * Math.PI) * 0.12);
@@ -559,7 +559,7 @@
             const kArmB = unfold > 0 ? reach('kid', kx, ky, kh, ko, lerp(rest[0] - 30, kt[0] - 8, unfold), lerp(rest[1], kt[1] + 24, unfold)) : reach('kid', kx, ky, kh, ko, rest[0] - 30, rest[1]);
             const kid = S.person('kid', kx, ky, kh, { ...pf, ...ko, light: [1, 0.05], armF: kArm, armB: kArmB, head: unfold * 0.2 - lift * 0.12 * (1 - unfold) });
             kidHead = kid.head;
-            // 林姐: opens the near flap and a side flap; while she speaks she lifts the small melon out
+            // 林姐: opens the near flap and a side flap; while she speaks she lifts the small bag of 冬瓜干 out
             const lx = 812, lyy = 1735, lh = 940, mk = P01(lt, l1 - 0.1, l1 + 0.9);
             const lo = { facing: -1, bend: 0.16 + 0.1 * peer + 0.12 * Math.sin(Math.PI * clamp(fOpen * 1.4)) };
             const lsh = shoulderOf('lin', lx, lyy, lh, lo).so, lrest = [lsh[0] - 70, CITY.far - 2];
@@ -580,14 +580,14 @@
             ctx.drawImage(cityTable(), 0, 0);
             cityBox(fOpen, sOpen);
             ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, yf); ctx.clip();
-            S.melon(melonAt[0], melonAt[1], 200, { tod: 'day', rot: lerp(-0.05, -0.12, mk), lit: 0.75, rim: 0.6, carve: S.MARK, color: '#46603f', girth: 0.48 });
+            S.bag(melonAt[0], melonAt[1] - 40, 130, { rot: lerp(-0.05, -0.12, mk), seed: 7, shadow: 0, tint: [CITY.fig, 0.12] });
             ctx.restore();
             if (fOpen > 0.5) S.light(CB.cx + 30, yf - 10, 160, 'rgba(255,220,160,0.16)', P01(lt, o0 + 1.0, o0 + 2.0));
             if (lt > o0 + 2.45) { const nk = kid.hand; cityNote(nk[0] + 8, nk[1] - 18, -0.15 + unfold * 0.1, unfold); }
             lamp();
           } else {
-            // ---------------- set-up B: the soup. The small melon keeps cool on the window sill now, the note beside it.
-            S.melon(400, WIN.y1 - 34, 180, { tod: 'night', rot: 0.02, lit: 0.35, rim: 0.8, carve: S.MARK, carveA: 0.7, girth: 0.48 });
+            // ---------------- set-up B: the soup. The small bag of 冬瓜干 stands on the window sill now, the note beside it.
+            S.bag(400, WIN.y1 - 98, 118, { rot: 0.02, seed: 7, shadow: 0.5, tint: [CITY.fig, 0.3] });
             ctx.save(); ctx.translate(512, WIN.y1 - 22); ctx.rotate(0.1); ctx.fillStyle = '#d6cab0'; ctx.fillRect(-16, -26, 32, 46); ctx.restore();
             const bt = lt - s0, pot = [535, 1420], potTop = pot[1] - 132, bowlAt = [702, 1238];
             const scoop = u => {               // one scoop: from above her bowl into the pot, and back to pour
@@ -686,7 +686,12 @@
           S.ground(tod, hz);
           S.house(-120, 1330, 600, tod, { window: 1, door: true, wall: '#3f3242' });
           ctx.drawImage(duskYard(), 0, 0);
-          for (const [mx, my, ml, mr] of [[430, 1318, 150, 0.05], [560, 1322, 140, -0.08], [495, 1286, 128, 0.1]]) S.melon(mx, my, ml, { tod, rot: mr, dark: 0.55, rim: 0.7, lit: 0.3, carve: S.MARK, carveA: 0.25 });
+          // the next batch of 冬瓜干 drying on a 竹匾 by the wall, in the last of the sun
+          ctx.save(); ctx.translate(150, 1345); ctx.scale(0.7, 0.7);
+          S.tray(0, 0, 130, 38, tod);
+          for (let i = 0; i < 9; i++) { ctx.save(); ctx.translate(-75 + (i % 5) * 36 + (i > 4 ? 16 : 0), -10 + (i > 4 ? 18 : 0)); ctx.scale(1, 0.45); S.slice(0, 0, 44, { dry: 0.7, seed: i, rot: (i - 4) * 0.3, shadow: 0 }); ctx.restore(); }
+          ctx.globalAlpha = 0.6; ctx.fillStyle = p.fig; ctx.beginPath(); ctx.ellipse(0, 0, 136, 44, 0, 0, TAU); ctx.fill();
+          ctx.globalAlpha = 0.7; ctx.strokeStyle = p.rim; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(0, 0, 128, 37, 0, -0.9, 0.5); ctx.stroke(); ctx.restore();
         });
         S.motes(lt, { n: 22, seed: 14, x: 0, y: 900, w: W, h: 700, alpha: 0.35, vy: 2, color: 'rgba(255,200,140,' });
         let qinHead, xiaoHead;
@@ -753,7 +758,7 @@
   });
 
   // ================================================================ s15 end
-  // night falls over the field; one carved melon in a soft pool of light; the closing lines, quietly
+  // night falls over the field; a 竹匾 of 冬瓜干 and one bag in a soft pool of light; the closing lines; how to buy
   const endBg = () => S.cached('d_end_bg', W, H, g => {
     const hz = 560;
     let gr = g.createLinearGradient(0, 0, 0, hz + 40); gr.addColorStop(0, '#070b17'); gr.addColorStop(0.55, '#141a32'); gr.addColorStop(0.86, '#3a2a40'); gr.addColorStop(1, '#6a4248');
@@ -798,13 +803,19 @@
         const lightK = P01(lt, 0, 2.2);
         S.layer(1.0, () => {
           ctx.drawImage(endLeaves(0), 0, 0);
-          // soft warm light from a window off frame, left
-          S.softEllipse(560, 860, 330, 40, 18, 'rgba(0,0,0,0.55)');
-          S.melon(540, 742, 600, { tod: 'night', rot: -0.04, color: '#1a2d21', lit: 0.25, rim: 0.45, dark: 0.3, carve: S.MARK, carveA: 0.3 + 0.3 * lightK, frost: 0.35 });
-          // the lamp-light falls on the near (left) half of the melon only
-          ctx.save(); ctx.beginPath(); ctx.ellipse(540, 742, 292, 126, -0.04, 0, TAU); ctx.clip(); ctx.globalCompositeOperation = 'lighter';
-          const wg = ctx.createRadialGradient(360, 680, 10, 360, 690, 420); wg.addColorStop(0, `rgba(255,180,110,${0.16 * lightK})`); wg.addColorStop(1, 'rgba(255,190,120,0)');
-          ctx.fillStyle = wg; ctx.fillRect(240, 600, 600, 300); ctx.restore();
+          // soft warm light from a window off frame, left: a 竹匾 of 冬瓜干 and one bag standing beside it
+          S.softEllipse(560, 860, 360, 44, 18, 'rgba(0,0,0,0.55)');
+          S.tray(520, 790, 330, 110, 'night');
+          ctx.save(); ctx.fillStyle = 'rgba(12,9,14,0.42)'; ctx.beginPath(); ctx.ellipse(520, 790, 334, 116, 0, 0, TAU); ctx.fill(); ctx.restore();
+          const sp = [[-0.62, -0.1], [-0.38, -0.42], [-0.3, 0.2], [-0.05, -0.15], [0.02, 0.42], [0.22, -0.5], [0.3, 0.12], [0.55, -0.2], [-0.6, 0.38], [0.5, 0.45], [-0.12, -0.6], [0.0, 0.1]];
+          sp.forEach(([u, v], i) => { ctx.save(); ctx.translate(520 + u * 300, 790 + v * 92); ctx.scale(1, 0.5); S.slice(0, 0, 150, { dry: 1, seed: i, rot: (i % 5 - 2) * 0.45, flip: i % 2 === 0, shadow: 0.6 }); ctx.restore(); });
+          S.bag(810, 640, 230, { rot: 0.04, seed: 7, shadow: 0.8, tint: ['#0e0c12', 0.25] });
+          // the lamp-light falls from the left; the right side sinks into the night
+          const dk = ctx.createRadialGradient(330, 690, 60, 420, 740, 720); dk.addColorStop(0, 'rgba(10,8,14,0)'); dk.addColorStop(0.55, 'rgba(10,8,14,0.3)'); dk.addColorStop(1, 'rgba(10,8,14,0.6)');
+          ctx.fillStyle = dk; ctx.fillRect(0, 0, W, H);
+          ctx.save(); ctx.globalCompositeOperation = 'lighter';
+          const wg = ctx.createRadialGradient(360, 700, 10, 360, 710, 460); wg.addColorStop(0, `rgba(255,180,110,${0.18 * lightK})`); wg.addColorStop(1, 'rgba(255,190,120,0)');
+          ctx.fillStyle = wg; ctx.fillRect(0, 0, W, H); ctx.restore();
           ctx.drawImage(endLeaves(1), 0, 0);
           const sw = prog(lt, 0.6, 3.6);
           S.light(lerp(330, 760, ease.inOut(sw)), 720, 200, 'rgba(255,226,180,0.12)', Math.sin(sw * Math.PI));
@@ -813,12 +824,12 @@
         S.vignette(0.5);
         // closing lines: serif, revealed character by character; the purchase details small and quiet underneath
         const ln = V.lines_end || [], info = V.info || [];
-        const r1 = prog(lt, 1.2, 3.6), r2 = prog(lt, 3.4, 4.9), ri = ease.out(prog(lt, 5.1, 6.4));
-        if (ln[0]) L.serif(ln[0], 500, 1090, { size: 58, color: '#fbf1e0', glow: 12, reveal: r1, spacing: 4 });
-        if (ln[1]) L.serif(ln[1], 500, 1180, { size: 46, color: 'rgba(245,232,212,0.86)', glow: 6, reveal: r2, spacing: 6 });
-        if (ri > 0) {
-          ctx.save(); ctx.globalAlpha = ri * 0.5; ctx.fillStyle = '#e8d8bc'; ctx.fillRect(500 - 40, 1262, 80, 1.5); ctx.restore();
-          info.forEach((s, i) => K.text(s, 500, 1330 + i * 48, { size: 28, family: F.sans, color: '#e9dcc6', alpha: ri * (i ? 0.6 : 0.75), align: 'center', spacing: 2 }));
+        const r1 = prog(lt, 1.2, 3.2), r2 = prog(lt, 3.0, 4.6), ri = ease.out(prog(lt, 4.8, 6.0));
+        if (ln[0]) L.serif(ln[0], 540, 1060, { size: 64, color: '#fbf1e0', glow: 12, reveal: r1, spacing: 6 });
+        if (ln[1]) L.serif(ln[1], 540, 1150, { size: 44, color: 'rgba(245,232,212,0.86)', glow: 6, reveal: r2, spacing: 5 });
+        if (ri > 0) {   // how to buy: the contact large enough to read and dial, the rest small and quiet
+          ctx.save(); ctx.globalAlpha = ri * 0.5; ctx.fillStyle = '#e8d8bc'; ctx.fillRect(540 - 40, 1222, 80, 1.5); ctx.restore();
+          info.forEach((s, i) => K.text(s, 540, 1300 + i * 70, { size: i ? 28 : 44, family: F.sans, weight: i ? 400 : 500, color: i ? '#e9dcc6' : '#ffe9c4', alpha: ri * (i ? 0.62 : 0.96), align: 'center', spacing: i ? 2 : 3 }));
         }
       });
     },

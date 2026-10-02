@@ -1,4 +1,4 @@
-/* Scenes, part A (look-dev): open, qin_field, scale. */
+/* Scenes, part A (look-dev): open, qin_field, scale (the 冬瓜干 on the 杆秤). */
 (function () {
   const { W, H, ctx, F, clamp, lerp, prog, ease, rng } = K;
   const TAU = Math.PI * 2;
@@ -108,7 +108,7 @@
   });
 
   // ================================================================ s10 scale (杆秤)
-  // close-up: a big melon in a rope sling on the hook; the weight slides along the beam until it levels; 三十二斤.
+  // close-up: a bag of 冬瓜干 on the hook; the weight slides along the beam until it levels; the weight (V.weight) appears.
   T.register('scale', {
     draw(ctx, V, lt, api) {
       const tod = 'day';
@@ -150,15 +150,14 @@
         const sg = ctx.createLinearGradient(wx - 46, 0, wx + 46, 0); sg.addColorStop(0, '#2b2d2f'); sg.addColorStop(0.35, '#8a8c8c'); sg.addColorStop(1, '#1d1f20');
         ctx.fillStyle = sg; ctx.beginPath(); ctx.moveTo(wx - 18, wy + 108); ctx.lineTo(wx + 18, wy + 108); ctx.lineTo(wx + 46, wy + 190); ctx.quadraticCurveTo(wx, wy + 210, wx - 46, wy + 190); ctx.closePath(); ctx.fill();
         ctx.fillStyle = '#2b2d2f'; ctx.beginPath(); ctx.arc(wx, wy + 104, 10, 0, TAU); ctx.fill();
-        // hook, rope sling, melon
-        const hy = Y(hookX), sway = Math.sin(lt * 1.05) * 0.025 * (1 - settle * 0.7), drop = lerp(120, 0, hangK);
+        // hook and the bag
+        const hy = Y(hookX), sway = Math.sin(lt * 1.05) * 0.025 * (1 - settle * 0.7) + Math.sin(lt * 4.2) * 0.09 * (1 - hangK);   // swings a little once hung
         ctx.save(); ctx.translate(hookX, hy); ctx.rotate(sway);
         ctx.strokeStyle = '#2a2016'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(0, 8); ctx.lineTo(0, 46); ctx.arc(-14, 46, 14, 0, Math.PI * 0.9); ctx.stroke();
-        const my = 520 + drop, ml = 560;
-        ctx.strokeStyle = '#a08560'; ctx.lineWidth = 7;
-        ctx.beginPath(); ctx.moveTo(-6, 58); ctx.quadraticCurveTo(-120, my - 160, -ml * 0.42, my - 40); ctx.moveTo(-2, 58); ctx.quadraticCurveTo(120, my - 160, ml * 0.42, my - 40); ctx.stroke();
-        S.melon(0, my, ml, { tod, rot: 0.03, carve: S.MARK, lit: 0.8, rim: 0.35 });
-        ctx.strokeStyle = '#a08560'; ctx.lineWidth = 8; ctx.beginPath(); ctx.ellipse(0, my + 20, ml * 0.47, 90, 0, 0.15, Math.PI - 0.15); ctx.stroke();
+        // the bag of 冬瓜干 hangs on the hook by its hang hole
+        const bw = 360, bh = bw * 1.42, by = 58 + bh / 2 - bh * 0.038;
+        S.bag(0, by, bw, { shadow: 0 });
+        ctx.strokeStyle = '#2a2016'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(-8, 56, 10, Math.PI * 0.1, Math.PI * 0.95); ctx.stroke();
         ctx.restore();
       });
       if (rd) { const k = prog(lt, rd.lt, rd.lt + 1.4); L.serif(V.weight || '三十二斤', 860, 860, { size: 60, color: '#fff3dc', glow: 10, reveal: k }); }

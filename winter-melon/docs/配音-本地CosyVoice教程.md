@@ -69,6 +69,16 @@ python ../datacollector/winter-melon/tools/cosyvoice_local.py --model pretrained
 | 读错字 | 把台词里那个字换成读音正确的同音字 |
 | 完全不要语气指令 | 加 `--no-instruct`，只按参考音色朗读 |
 
+## 改了台词以后：只补配改过的句子
+
+`assets/voice_override/texts.json` 记着每个文件是按哪句台词配的。脚本里的台词改过以后，旧文件不会再被用上，出片时这几句先用云端的合成声顶着。只补配新加的和改过的句子：
+
+```bash
+python ../datacollector/winter-melon/tools/cosyvoice_local.py --model pretrained_models/CosyVoice2-0.5B --no-instruct --stale
+```
+
+配完照第 6 步推上来，`texts.json` 也要一起提交（它在 `voice_override` 文件夹里，`git add` 那个文件夹就会带上）。
+
 ## 第 6 步：交给我出片
 
 ```bash

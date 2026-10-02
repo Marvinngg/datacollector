@@ -1,4 +1,4 @@
-/* Scenes, part C: phone (s07), show_phone (s08), pick (s09), gift (s11).
+/* Scenes, part C: phone (s07), show_phone (s08), pick (s09), dry (s09b), gift (s11).
  * Local helpers (not in scene.js): kf() keyframes, cam() sets the camera directly, toScreen() maps a world point to the
  * screen for dialogue anchors, armIK() aims a hand at a point (mirrors the arm skeleton of S.person), hand() draws a hand
  * over a carried melon, shed() the old man's 瓜棚, phoneProp(), cardboard(), nearLeaves(). */
@@ -498,8 +498,8 @@
   });
 
   // ================================================================ s11 gift
-  // afternoon at the shed. The tricycle bed is heaped full. He comes out of the doorway with a small melon in his
-  // arms: "这个不要钱，给她家孩子。" and lays it in the cardboard box on 晓禾's tricycle.
+  // afternoon at the shed. The tricycle bed is stacked with bags of 冬瓜干. He comes out of the doorway with one small
+  // bag in his hands: "这包不要钱，给她家孩子。" and lays it in the cardboard box on 晓禾's tricycle.
   function cardboard(x, y, w, h, tod, part) {    // (x, y) = bottom-left of the front face
     const p = S.TOD[tod];
     if (part === 'back') {        // inside of the box and the back flap standing up
@@ -542,7 +542,7 @@
       const o = { tod, facing: 1, light: [1, -0.3] };
       o.bend = lerp(0.04, 0.24, put) * (1 - rise * 0.8) + Math.sin(lt * 1.5) * 0.008; o.crouch = lerp(0, 0.06, put) * (1 - rise);
       o.head = kf(lt, [[0, 0.32], [tF + 2.9, 0.28], [tS + 0.3, 0.04], [tS + 2.8, 0.1], [tB, 0.34], [tB + 1.2, 0.4], [tB + 2.3, 0.12]]);
-      const sl = 104, hold = [qx + 112, gy - qh * 0.53], into = [boxX + boxW / 2 + 4, boxY - boxH + 4];
+      const sl = 96, hold = [qx + 112, gy - qh * 0.53], into = [boxX + boxW / 2 + 4, boxY - boxH + 4];
       const mpos = lt < tB ? [hold[0], hold[1] + (walking ? Math.abs(Math.sin((lt - tF) * 5)) * 3 : 0)] : kf(lt, [[tB, hold], [tB + 0.8, [into[0] - 4, into[1] - 70]], [tB + 1.15, [into[0], into[1] - 6]]]);
       const inBox = lt > tB + 0.85;
       const tgt = lt < tB + 1.2 ? mpos : kf(lt, [[tB + 1.2, [into[0] - 10, into[1] - 30]], [tB + 2.3, [qx + 50, gy - qh * 0.4]]]);
@@ -556,12 +556,12 @@
         xr = S.person('xiao', 880, 1652, xh, { tod, facing: -1, light: [1, -0.3], t: lt, head: kf(lt, [[0, 0.12], [tS + 0.3, 0.04], [tB, 0.24]]), armF: kf(lt, [[tS + 1.4, [0.1, 0.35]], [tS + 2.2, [0.3, 1.5]]]), armB: [0.05, 0.25] });
         // heap of melons in the bed (back rows first)
         const r = rng(41), heap = [];
-        for (let row = 0; row < 3; row++) for (let i = 0; i < 4 - row; i++) heap.push([bedL + 210 + i * 78 + row * 38 + (r() - 0.5) * 14, rail + 22 - row * 46 + (r() - 0.5) * 8, 150 * (0.88 + r() * 0.22), (r() - 0.5) * 0.35]);
+        for (let row = 0; row < 3; row++) for (let i = 0; i < 5 - row; i++) heap.push([bedL + 200 + i * 62 + row * 30 + (r() - 0.5) * 10, rail - 18 - row * 58 + (r() - 0.5) * 8, 84 * (0.92 + r() * 0.14), (r() - 0.5) * 0.3]);
         heap.sort((a, b) => a[1] - b[1]);
         cardboard(boxX, boxY, boxW, boxH, tod, 'back');
-        if (inBox) S.melon(mpos[0], mpos[1], sl, { tod, rot: -0.05, carve: S.MARK, carveA: 0.6, lit: 0.6, rim: 0.5, girth: 0.55, shadow: 0 });
+        if (inBox) S.bag(mpos[0], mpos[1] - 30, sl, { rot: -0.05, shadow: 0, seed: 7 });
         cardboard(boxX, boxY, boxW, boxH, tod, 'front');
-        for (const [mx, my, ml, mr] of heap) S.melon(mx, my, ml, { tod, rot: mr, lit: 0.45, rim: 0.65, dark: 0.2, shadow: 0.25 });
+        for (const [mx, my, ml, mr] of heap) S.bag(mx, my, ml, { rot: mr, shadow: 0.3, seed: Math.round(mx) % 5 + 1, tint: [p.fig, 0.12] });
         S.tricycle(tx, ty, ts, tod, { facing: 1, rim: 0.6, load: 0 });
         // a plank side-board on the bed
         const bh = ty - 150 * ts + 20 - (rail + 6);
@@ -571,7 +571,7 @@
         ctx.globalAlpha = 0.7; ctx.strokeStyle = p.rim; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(bedL, rail + 6); ctx.lineTo(bedR, rail + 6); ctx.stroke(); ctx.globalAlpha = 1;
         qr = S.person('qin', qx, gy, qh, { ...o, rimColor: mixRGB([60, 52, 44], [255, 243, 214], out), halo: 0.08 * out });
         if (!inBox) {
-          S.melon(mpos[0], mpos[1], sl, { tod, rot: -0.05, carve: S.MARK, carveA: 0.6, lit: 0.6, rim: 0.5, girth: 0.55, shadow: 0, dark: lerp(0.5, 0, out) });
+          S.bag(mpos[0], mpos[1] - 30, sl, { rot: -0.05, shadow: 0, seed: 7, tint: [p.fig, lerp(0.6, 0, out)] });
           hand(qr.hand[0] + 2, qr.hand[1] - 10, qh, p.fig, p.rim, 1);
         }
       });
@@ -582,6 +582,195 @@
     cues(V, api) {
       const out = api.steps.filter(s => s.say).map(s => ({ t: s.lt, type: 'say' }));
       const bx = api.steps.find(s => s.show === 'box'); if (bx) out.push({ t: bx.lt + 1.0, type: 'box' });
+      return out;
+    },
+  });
+
+  // ================================================================ s09b dry (冬瓜 → 冬瓜干)
+  // Three shots. A: close-up on the chopping board, the cleaver takes thin slices off a long piece of 冬瓜 (rind on top).
+  // B: the yard; he crouches by a 竹匾 on trestles laying the slices out, 晓禾 asks how long, "三个日头。急不得。"
+  // C: from above, the tray in the sun: three days go by (the light swings, dims to night, comes back) and the slices
+  // shrink, wrinkle and turn the colour of honey.
+  const DRY_BG = () => S.cached('dry_bgA', W, H, g => {
+    const sk = g.createLinearGradient(0, 0, 0, 1100); sk.addColorStop(0, '#f1e3c4'); sk.addColorStop(0.6, '#d8c39a'); sk.addColorStop(1, '#a88f63');
+    g.fillStyle = sk; g.fillRect(0, 0, W, H);
+    g.filter = 'blur(26px)'; const r = rng(77);
+    for (let i = 0; i < 26; i++) { g.fillStyle = `rgba(${60 + r() * 40},${90 + r() * 40},${50 + r() * 20},${0.35 + r() * 0.3})`; g.beginPath(); g.ellipse(r() * W, 120 + r() * 600, 60 + r() * 120, 40 + r() * 90, r() * 3, 0, TAU); g.fill(); }
+    g.fillStyle = 'rgba(255,248,226,0.6)'; g.beginPath(); g.ellipse(760, 380, 260, 200, 0, 0, TAU); g.fill();
+    g.filter = 'none';
+    // the table top (board), seen at a slant
+    const bd = g.createLinearGradient(0, 960, 0, H); bd.addColorStop(0, '#9c7448'); bd.addColorStop(0.5, '#b88a58'); bd.addColorStop(1, '#6e4c2c');
+    g.fillStyle = bd; g.fillRect(0, 960, W, H - 960);
+    g.globalAlpha = 0.22; g.strokeStyle = '#4a321c';
+    for (let i = 0; i < 46; i++) { const y = 975 + i * 21 + r() * 8; g.lineWidth = 1 + r() * 2; g.beginPath(); g.moveTo(0, y); g.bezierCurveTo(W * 0.3, y + (r() - 0.5) * 14, W * 0.7, y + (r() - 0.5) * 14, W, y + (r() - 0.5) * 10); g.stroke(); }
+    g.globalAlpha = 1; g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, 960, W, 10);
+    g.fillStyle = 'rgba(255,240,210,0.25)'; g.fillRect(0, 970, W, 3);
+  });
+  // the long piece of 冬瓜 lying on the board, from its cut end x0 to x1; base on the board at y
+  function melonPiece(x0, x1, y, h) {
+    ctx.save();
+    const top = x => y - h + Math.sin((x - x0) / (x1 - x0) * Math.PI) * 10;
+    const body = () => { ctx.beginPath(); ctx.moveTo(x0, y); for (let x = x0; x <= x1; x += 10) ctx.lineTo(x, top(x)); ctx.quadraticCurveTo(x1 + 40, y - h * 0.5, x1, y); ctx.closePath(); };
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse((x0 + x1) / 2 + 20, y + 8, (x1 - x0) / 2 + 30, 18, 0, 0, TAU); ctx.fill();
+    const fg = ctx.createLinearGradient(0, y - h, 0, y); fg.addColorStop(0, '#dfe9cf'); fg.addColorStop(0.35, '#eef2e2'); fg.addColorStop(0.8, '#e5e3c6'); fg.addColorStop(1, '#c8c49c');
+    body(); ctx.fillStyle = fg; ctx.fill();
+    ctx.save(); body(); ctx.clip();
+    // seed side at the bottom: soft yellow fibres
+    ctx.globalAlpha = 0.5; ctx.fillStyle = '#e8dca8'; ctx.fillRect(x0, y - h * 0.22, x1 - x0 + 60, h * 0.22);
+    ctx.globalAlpha = 0.25; ctx.strokeStyle = '#b9ad78'; ctx.lineWidth = 2; const r = rng(3);
+    for (let i = 0; i < 18; i++) { const xx = x0 + r() * (x1 - x0); ctx.beginPath(); ctx.moveTo(xx, y); ctx.quadraticCurveTo(xx + 10, y - h * 0.12, xx + (r() - 0.5) * 30, y - h * 0.24); ctx.stroke(); }
+    // rind: pale green layer under the dark skin, frost bloom on top
+    ctx.globalAlpha = 1;
+    const rind = (off, w, col) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); for (let x = x0 - 10; x <= x1 + 40; x += 10) ctx.lineTo(x, top(Math.min(x, x1)) + off); ctx.stroke(); };
+    rind(18, 30, '#bcd59c'); rind(4, 16, '#33573a'); rind(-2, 5, '#9fb6a0');
+    // the fresh cut end: lighter, wet
+    const cg = ctx.createLinearGradient(x0, 0, x0 + 34, 0); cg.addColorStop(0, '#fbfdf2'); cg.addColorStop(1, 'rgba(251,253,242,0)');
+    ctx.fillStyle = cg; ctx.fillRect(x0, y - h - 20, 34, h + 20);
+    ctx.restore();
+    ctx.globalAlpha = 0.6; ctx.strokeStyle = '#fffbe8'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x0 + 2, y - 4); ctx.lineTo(x0 + 2, top(x0) + 6); ctx.stroke();
+    ctx.restore();
+  }
+  // a Chinese cleaver (菜刀) at 3/4 view: blade edge bottom at (x, y)
+  function cleaver(x, y, tod) {
+    const p = S.TOD[tod], bw = 74, bh = 250, dx = 64, dy = -44;
+    ctx.save();
+    const sg = ctx.createLinearGradient(x, 0, x + dx + bw * 0.2, 0); sg.addColorStop(0, '#e9ecec'); sg.addColorStop(0.5, '#9aa2a4'); sg.addColorStop(1, '#4b5153');
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + dx, y + dy); ctx.lineTo(x + dx, y + dy - bh); ctx.lineTo(x, y - bh); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#2f3436'; ctx.beginPath(); ctx.moveTo(x, y - bh); ctx.lineTo(x + dx, y + dy - bh); ctx.lineTo(x + dx + 8, y + dy - bh - 4); ctx.lineTo(x + 8, y - bh - 4); ctx.closePath(); ctx.fill();   // spine
+    ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = 0.8; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + dx, y + dy); ctx.stroke();
+    ctx.globalAlpha = 1;
+    // handle out to the right, toward the hand
+    ctx.lineCap = 'round'; ctx.strokeStyle = '#5a3b22'; ctx.lineWidth = 34; ctx.beginPath(); ctx.moveTo(x + dx * 0.5, y + dy * 0.5 - bh + 8); ctx.lineTo(x + dx * 0.5 + 170, y + dy * 0.5 - bh - 12); ctx.stroke();
+    ctx.strokeStyle = '#8a6440'; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(x + dx * 0.5 + 10, y + dy * 0.5 - bh - 6); ctx.lineTo(x + dx * 0.5 + 165, y + dy * 0.5 - bh - 24); ctx.stroke();
+    ctx.restore();
+    return [x + dx * 0.5 + 110, y + dy * 0.5 - bh - 6];
+  }
+  // a slice lying flat on a surface seen at a slant (fy = vertical foreshortening)
+  const flatSlice = (x, y, len, fy, o) => { ctx.save(); ctx.translate(x, y); ctx.scale(1, fy); S.slice(0, 0, len, o); ctx.restore(); };
+  // spots on the 竹匾 (unit ellipse), stable order
+  const TRAY_SPOTS = (() => { const r = rng(91), out = []; for (let j = 0; j < 5; j++) for (let i = 0; i < 6; i++) { const u = (i - 2.5) / 3.1 + (r() - 0.5) * 0.08, v = (j - 2) / 2.7 + (r() - 0.5) * 0.08; if (u * u + v * v < 0.86) out.push({ u, v, rot: (r() - 0.5) * 1.4, seed: Math.floor(r() * 12), flip: r() < 0.5 }); } return out; })();
+  T.register('dry', {
+    draw(ctx, V, lt, api) {
+      const tod = 'day', p = S.TOD[tod];
+      const sl = S.stepAt(api, 'slice'), la = S.stepAt(api, 'lay'), dy_ = S.stepAt(api, 'days');
+      const says = api.steps.filter(s => s.say);
+      const tS = sl ? sl.lt : 0, tB = says.length ? says[0].lt : tS + 4.2, tL = la ? la.lt : tB + 5, tD = dy_ ? dy_.lt : tL + 3, dD = dy_ ? dy_.dur : 6.5;
+      if (lt < tB) {
+        // ---------------------------------------------------------------- A: slicing
+        S.camera(lt, { dur: tB, z0: 1.02, z1: 1.09, x0: -10, x1: 20, y0: 0, y1: 40 });
+        S.layer(0.4, () => ctx.drawImage(DRY_BG(), 0, 0));
+        const chops = [0, 1, 2, 3, 4].map(i => tS + 0.55 + i * 0.7), step = 30, x0 = 360, base = 1160;
+        const done = chops.filter(c => lt > c + 0.1).length;
+        const cutX = x0 + done * step;
+        S.layer(1.0, () => {
+          // slices already cut, flat on the board in front of the piece
+          const pile = [[230, 1250, -0.3], [300, 1300, 0.25], [190, 1330, 0.1], [270, 1370, -0.15], [350, 1250, 0.4]];
+          for (let i = 0; i < 3; i++) flatSlice(pile[i][0], pile[i][1], 230, 0.6, { dry: 0, rot: pile[i][2], seed: i + 3, shadow: 0.6 });
+          for (let i = 0; i < 5; i++) {
+            const c = chops[i]; if (lt < c + 0.1) continue;
+            const k = ease.out(prog(lt, c + 0.1, c + 0.45)), q = [[420, 1330, 0.5], [160, 1420, -0.2], [380, 1410, 0.2], [250, 1460, -0.45], [470, 1450, 0.1]][i];
+            const sx = x0 + i * step - 8, sy = base - 90;
+            const x = lerp(sx, q[0], k), y = lerp(sy, q[1], k);
+            flatSlice(x, y, 230, lerp(0.15, 0.6, k), { dry: 0, rot: lerp(-1.4, q[2], k), seed: i + 6, shadow: k * 0.6 });
+          }
+          melonPiece(cutX, 1000, base, 190);
+          // the cleaver: comes down through the flesh, lifts, moves on one slice's width
+          const nxt = chops.find(c => lt < c + 0.25);
+          let ky = -230, kx = cutX;
+          if (nxt != null) {
+            const d = lt - nxt;
+            ky = d < -0.22 ? -230 : d < 0 ? lerp(-230, -60, ease.in(prog(d, -0.22, 0))) : d < 0.1 ? lerp(-60, 0, prog(d, 0, 0.1)) : lerp(0, -40, prog(d, 0.1, 0.25));
+            kx = x0 + chops.indexOf(nxt) * step;
+          }
+          const grip = cleaver(kx - 4, base + ky + 4, tod);
+          // his forearm in a dark work sleeve from the right edge, the fist around the handle
+          ctx.save(); ctx.lineCap = 'round';
+          ctx.strokeStyle = '#353c48'; ctx.lineWidth = 120; ctx.beginPath(); ctx.moveTo(W + 140, grip[1] - 210); ctx.lineTo(grip[0] + 170, grip[1] - 40); ctx.stroke();
+          ctx.strokeStyle = '#a77a58'; ctx.lineWidth = 78; ctx.beginPath(); ctx.moveTo(grip[0] + 170, grip[1] - 40); ctx.lineTo(grip[0] + 70, grip[1] - 4); ctx.stroke();
+          ctx.globalAlpha = 0.5; ctx.strokeStyle = p.rim; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(W + 140, grip[1] - 270); ctx.lineTo(grip[0] + 150, grip[1] - 98); ctx.stroke(); ctx.globalAlpha = 1;
+          ctx.fillStyle = '#b98b66'; ctx.beginPath(); ctx.ellipse(grip[0] + 20, grip[1] + 4, 62, 48, -0.25, 0, TAU); ctx.fill();
+          ctx.strokeStyle = 'rgba(80,50,30,0.55)'; ctx.lineWidth = 3;
+          for (let i = 0; i < 4; i++) { const fx = grip[0] - 22 + i * 22; ctx.beginPath(); ctx.moveTo(fx, grip[1] + 18 - i * 6); ctx.quadraticCurveTo(fx + 4, grip[1] + 40 - i * 6, fx + 14, grip[1] + 44 - i * 7); ctx.stroke(); }
+          ctx.fillStyle = 'rgba(255,236,200,0.35)'; ctx.beginPath(); ctx.ellipse(grip[0] + 8, grip[1] - 22, 34, 12, -0.25, 0, TAU); ctx.fill();
+          ctx.restore();
+          for (const c of chops) { const d = lt - c - 0.1; if (d > 0 && d < 0.5) S.light(kx + 20, base - 20, 80 + d * 160, 'rgba(255,250,230,0.25)', 1 - d / 0.5); }
+        });
+        S.motes(lt, { n: 22, seed: 12, x: 300, y: 200, w: 700, h: 700, alpha: 0.35, vy: 3 });
+        S.vignette(0.4);
+        return;
+      }
+      if (lt < tD) {
+        // ---------------------------------------------------------------- B: laying out in the yard
+        const hz = 1060, lb = lt - tB;
+        const C = S.camera(lb, { dur: tD - tB, z0: 1.0, z1: 1.05, x0: 0, x1: 20, y0: 0, y1: 20 });
+        S.layer(0.05, () => { S.sky(tod, { horizon: hz }); S.sun(900, 470, 48, tod, 0.95); });
+        S.layer(0.2, () => S.hills(tod, 13, { horizon: hz }));
+        S.layer(0.5, () => { S.ground(tod, hz); S.house(-160, hz + 120, 720, tod, { door: true, wall: '#d8d0bf' }); });
+        S.layer(0.6, () => { const yg = ctx.createLinearGradient(0, hz, 0, H); yg.addColorStop(0, 'rgba(160,140,100,0.25)'); yg.addColorStop(1, 'rgba(80,64,44,0.55)'); ctx.fillStyle = yg; ctx.fillRect(-300, hz, W + 600, H); });
+        const tx = 500, ty = 1310, rx = 320, ry = 100;
+        const nAll = TRAY_SPOTS.length, n0 = 9, nLay = la ? Math.floor(n0 + (nAll - n0) * prog(lt, tL + 0.2, tL + la.dur - 0.2)) : n0;
+        const qh = 600, qx = 840, gy = 1540, xh = 700;
+        const o = { tod, facing: -1, light: [1, -0.3], bend: 0.5, crouch: 0.55, head: 0.18 };
+        // his hands: holding a slice during the talk, then basin → tray, one slice each 0.7 s or so
+        const basin = [950, 1470];
+        let tgt = [720, 1300], hold = true;
+        if (la && lt > tL) {
+          const per = la.dur / Math.max(1, nAll - n0), u = ((lt - tL) / per) % 1, idx = Math.min(nAll - 1, nLay);
+          const sp = TRAY_SPOTS[idx], dst = [tx + sp.u * rx, ty + sp.v * ry];
+          tgt = u < 0.5 ? [lerp(basin[0], dst[0], ease.inOut(u * 2)), lerp(basin[1] - 30, dst[1], ease.inOut(u * 2)) - Math.sin(u * 2 * Math.PI) * 60] : [lerp(dst[0], basin[0], ease.inOut(u * 2 - 1)), lerp(dst[1], basin[1] - 30, ease.inOut(u * 2 - 1))];
+          hold = u < 0.5;
+        }
+        const says1 = says[1] ? says[1].lt : tB + 2;
+        o.head = kf(lt, [[tB, 0.3], [says1 - 0.2, 0.3], [says1 + 0.3, 0.05], [tL, 0.05], [tL + 0.5, 0.3]]);
+        o.armF = armIK('qin', qx, gy, qh, o, tgt[0], tgt[1]).ang; o.armB = armIK('qin', qx, gy, qh, o, tgt[0] + 60, tgt[1] + 50).ang;
+        let qr, xr;
+        S.layer(1.0, () => {
+          // trestles and the tray
+          ctx.fillStyle = '#3a2c1f';
+          for (const lx of [tx - 230, tx + 230]) { ctx.fillRect(lx - 70, ty + 10, 12, 230); ctx.fillRect(lx + 58, ty + 10, 12, 230); ctx.fillRect(lx - 70, ty + 60, 140, 10); }
+          S.tray(tx, ty, rx, ry, tod);
+          for (let i = 0; i < nLay; i++) { const sp = TRAY_SPOTS[i]; flatSlice(tx + sp.u * rx, ty + sp.v * ry, 92, 0.42, { dry: 0, rot: sp.rot, seed: sp.seed, flip: sp.flip, shadow: 0.5 }); }
+          // enamel basin of fresh slices beside him
+          ctx.fillStyle = '#e9ece8'; ctx.beginPath(); ctx.ellipse(basin[0], basin[1] + 30, 100, 34, 0, 0, Math.PI); ctx.lineTo(basin[0] - 100, basin[1]); ctx.fill();
+          ctx.fillStyle = '#f4f6f2'; ctx.beginPath(); ctx.ellipse(basin[0], basin[1], 104, 30, 0, 0, TAU); ctx.fill();
+          ctx.strokeStyle = '#2f5d8a'; ctx.lineWidth = 6; ctx.stroke();
+          for (let i = 0; i < 5; i++) flatSlice(basin[0] - 60 + i * 28, basin[1] - 4 + (i % 2) * 8, 70, 0.4, { dry: 0, rot: (i - 2) * 0.4, seed: i + 1, shadow: 0 });
+          xr = S.person('xiao', 190, gy, xh, { tod, facing: 1, light: [1, -0.3], t: lt, head: kf(lt, [[tB, 0.05], [tL, 0.18]]), armF: [0.15, 0.4], armB: [0.05, 0.25] });
+          qr = S.person('qin', qx, gy, qh, o);
+          if (hold) { ctx.save(); ctx.translate(qr.hand[0] - 8, qr.hand[1] + 4); ctx.rotate(-0.4); flatSlice(0, 0, 80, 0.6, { dry: 0, seed: 4, shadow: 0 }); ctx.restore(); }
+        });
+        S.motes(lt, { n: 24, seed: 17, x: 0, y: 400, w: W, h: 900, alpha: 0.3, vy: 2, vx: 2 });
+        S.vignette(0.4);
+        S.say(api, lt, { xiao: keepSafe(toScreen(C, xr.head[0] + 70, xr.head[1] - 150)), qin: keepSafe(toScreen(C, qr.head[0] - 60, qr.head[1] - 170)) });
+        return;
+      }
+      // ---------------------------------------------------------------- C: three days in the sun, from above
+      const lc = lt - tD, u = clamp(lc / dD) * 3, day = Math.min(2, Math.floor(u)), f = u - day;
+      const dry = ease.inOut(clamp(lc / (dD * 0.92)));
+      const bright = (day === 0 && f < 0.5) || (day === 2 && f > 0.5) ? 1 : clamp(Math.sin(clamp(f) * Math.PI) * 1.7);   // nights only between the days
+      S.camera(lc, { dur: dD, z0: 1.0, z1: 1.08, y0: 0, y1: -20 });
+      S.layer(0.6, () => {
+        ctx.drawImage(S.cached('dry_earth', W, H, g => {
+          g.fillStyle = '#8b7556'; g.fillRect(0, 0, W, H); const r = rng(5);
+          for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(${r() < 0.5 ? '60,45,30' : '200,180,140'},${0.08 + r() * 0.12})`; g.beginPath(); g.ellipse(r() * W, r() * H, 2 + r() * 10, 1 + r() * 5, r() * 3, 0, TAU); g.fill(); }
+        }), 0, 0);
+        const tx = 540, ty = 900, rx = 470, ry = 390;
+        S.tray(tx, ty, rx, ry, tod);
+        for (const sp of TRAY_SPOTS) flatSlice(tx + sp.u * rx * 1.02, ty + sp.v * ry * 1.02, 170, 0.82, { dry, rot: sp.rot, seed: sp.seed, flip: sp.flip, shadow: 0.55 * bright });
+      });
+      // the shadow of the eave pole sweeps across each day; warm noon light; short blue nights between the days
+      ctx.save(); ctx.translate(lerp(-260, W + 260, f), H / 2); ctx.rotate(0.35); ctx.globalAlpha = 0.22 * bright; S.softRect(-40, -H, 80, H * 2, 24, '#1c140c'); ctx.restore();
+      ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.35 * bright; ctx.fillStyle = '#ffcf80'; ctx.fillRect(0, 0, W, H); ctx.restore();
+      ctx.save(); ctx.globalAlpha = 0.62 * (1 - bright); ctx.fillStyle = '#121a2e'; ctx.fillRect(0, 0, W, H); ctx.restore();
+      S.light(lerp(200, 880, f), 300, 700, 'rgba(255,240,200,0.18)', bright);
+      // which day it is, in his hand, small, top left
+      const lab = ['第一天', '第二天', '第三天'][day], la_ = Math.min(ease.out(prog(f, 0.05, 0.25)), 1 - ease.in(prog(f, 0.82, 0.98)));
+      if (la_ > 0) { S.hand(lab, 102, 404, 58, 1, { color: '#000', alpha: 0.35 * la_, seed: 2 + day }); S.hand(lab, 98, 400, 58, 1, { color: '#fff6e8', alpha: la_, seed: 2 + day }); }
+      S.vignette(0.45);
+    },
+    cues(V, api) {
+      const out = api.steps.filter(s => s.say).map(s => ({ t: s.lt, type: 'say' }));
+      const sl = api.steps.find(s => s.show === 'slice'); if (sl) for (let i = 0; i < 5; i++) out.push({ t: sl.lt + 0.55 + i * 0.7, type: 'chop' });
       return out;
     },
   });

@@ -308,6 +308,159 @@
     ctx.restore();
   }
 
+  // ---------------------------------------------------------------- 冬瓜干: dried slices and the bag they are sold in
+  /* sliceShape(g, L, Wd, seed, shrink): one slice of 冬瓜 flesh, a long wavy strip with the rind along its top edge.
+     Drawn centred, L along x. shrink 0..1 makes it narrower and more wrinkled (how it dries in the sun). */
+  function slicePts(L, Wd, seed, shrink) {
+    const r = rng(seed * 7 + 1), n = 40, pts = [];
+    const ph = [r() * 6, r() * 6, r() * 6], bow = (r() - 0.3) * 0.25;
+    for (let i = 0; i < n; i++) {
+      const a = i / n * TAU, c = Math.cos(a), s = Math.sin(a);
+      const ex = Math.sign(c) * Math.pow(Math.abs(c), 0.55) * L / 2, ey = Math.sign(s) * Math.pow(Math.abs(s), 0.75) * Wd / 2;
+      const wob = 1 + (0.06 + 0.12 * shrink) * Math.sin(a * 5 + ph[0]) + (0.04 + 0.1 * shrink) * Math.sin(a * 9 + ph[1]);
+      pts.push([ex * (1 + 0.03 * Math.sin(a * 3 + ph[2])), ey * wob + bow * L * (1 - (2 * ex / L) ** 2) * 0.35]);
+    }
+    return pts;
+  }
+  const pathPts = (g, pts) => { g.beginPath(); pts.forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.closePath(); };
+  function drawSlice(g, L, seed, dry) {
+    const shrink = dry, Wd = L * lerp(0.44, 0.36, shrink), pts = slicePts(L, Wd, seed, shrink), r = rng(seed * 13 + 5);
+    // flesh: fresh = white-green and wet; dried = cream to honey, a little translucent
+    const c0 = [lerp(238, 222, dry), lerp(242, 196, dry), lerp(222, 132, dry)], c1 = [lerp(205, 176, dry), lerp(222, 138, dry), lerp(190, 84, dry)];
+    const fg = g.createLinearGradient(0, -Wd / 2, 0, Wd / 2);
+    fg.addColorStop(0, `rgb(${c1.map(Math.round)})`); fg.addColorStop(0.35, `rgb(${c0.map(Math.round)})`); fg.addColorStop(1, `rgb(${c1.map(v => Math.round(v * 0.92))})`);
+    g.save(); pathPts(g, pts); g.fillStyle = fg; g.fill(); g.clip();
+    // seed cavity side (bottom): a softer, more yellow band
+    g.globalAlpha = 0.35; g.fillStyle = `rgb(${Math.round(lerp(240, 214, dry))},${Math.round(lerp(236, 180, dry))},${Math.round(lerp(196, 110, dry))})`;
+    g.fillRect(-L / 2, Wd * 0.18, L, Wd);
+    // fibres along the length
+    g.globalAlpha = 0.18 + 0.12 * dry; g.strokeStyle = `rgb(${Math.round(lerp(190, 150, dry))},${Math.round(lerp(200, 110, dry))},${Math.round(lerp(170, 60, dry))})`; g.lineWidth = Math.max(1, L * 0.006);
+    for (let i = 0; i < 9; i++) { const y = (r() - 0.5) * Wd * 0.8; g.beginPath(); g.moveTo(-L / 2, y); g.bezierCurveTo(-L * 0.2, y + (r() - 0.5) * Wd * 0.2, L * 0.2, y + (r() - 0.5) * Wd * 0.2, L / 2, y + (r() - 0.5) * Wd * 0.1); g.stroke(); }
+    // wrinkles (more as it dries)
+    const nw = Math.round(3 + dry * 10);
+    for (let i = 0; i < nw; i++) {
+      const x = (r() - 0.5) * L * 0.85, y = (r() - 0.5) * Wd * 0.6, l = Wd * (0.25 + r() * 0.4);
+      g.globalAlpha = 0.12 + 0.3 * dry; g.strokeStyle = '#5a3c18'; g.lineWidth = Math.max(1, L * 0.008);
+      g.beginPath(); g.moveTo(x, y - l / 2); g.quadraticCurveTo(x + (r() - 0.5) * l * 0.6, y, x + (r() - 0.5) * l * 0.3, y + l / 2); g.stroke();
+      g.globalAlpha = 0.15 + 0.2 * dry; g.strokeStyle = '#fff3d0'; g.translate(L * 0.006, 0); g.stroke(); g.translate(-L * 0.006, 0);
+    }
+    // the rind along the top: dark green skin, a pale-green layer under it
+    g.globalAlpha = 1;
+    const top = pts.filter((q, i) => i > 20 && i < 40 || i === 0).sort((a, b) => a[0] - b[0]);
+    const rindW = Wd * lerp(0.14, 0.18, dry);
+    const band = (w, col) => { g.strokeStyle = col; g.lineWidth = w; g.lineJoin = 'round'; g.beginPath(); top.forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.stroke(); };
+    band(rindW * 2.6, `rgb(${Math.round(lerp(190, 168, dry))},${Math.round(lerp(214, 170, dry))},${Math.round(lerp(150, 90, dry))})`);
+    band(rindW * 1.2, `rgb(${Math.round(lerp(62, 74, dry))},${Math.round(lerp(104, 92, dry))},${Math.round(lerp(58, 44, dry))})`);
+    g.restore();
+    // edge: a thin darker outline, the dried edge curls a little
+    g.globalAlpha = 0.35 + 0.3 * dry; g.strokeStyle = `rgb(${Math.round(lerp(150, 120, dry))},${Math.round(lerp(160, 84, dry))},${Math.round(lerp(130, 36, dry))})`;
+    g.lineWidth = Math.max(1, L * 0.01); pathPts(g, pts); g.stroke();
+    // a wet / glossy highlight
+    g.globalAlpha = 0.35 - 0.2 * dry; g.strokeStyle = '#ffffff'; g.lineWidth = Math.max(1, L * 0.012); g.beginPath();
+    g.moveTo(-L * 0.3, -Wd * 0.05); g.quadraticCurveTo(0, -Wd * 0.15, L * 0.28, -Wd * 0.02); g.stroke();
+    g.globalAlpha = 1;
+  }
+  /** slice(x, y, len, o): one slice of 冬瓜. o: rot, seed, dry 0 (fresh cut) .. 1 (dried 冬瓜干), shadow, flip */
+  function slice(x, y, len, o = {}) {
+    const A0 = ctx.globalAlpha, seed = o.seed || 1, dq = Math.round(clamp(o.dry || 0) * 10) / 10, lq = qn(len * ctmScale(), 8);
+    const pad = lq * 0.12, sw = lq + pad * 2, sh = lq * 0.6 + pad * 2;
+    const spr = cached(`slice|${seed % 12}|${dq}|${lq}`, sw, sh, g => { g.translate(sw / 2, sh / 2); drawSlice(g, lq, seed % 12, dq); });
+    const s = len / lq * (1 - 0.12 * (o.dry || 0));
+    ctx.save(); ctx.translate(x, y); ctx.rotate(o.rot || 0);
+    if (o.shadow !== 0) { ctx.globalAlpha = A0 * 0.28 * (o.shadow == null ? 1 : o.shadow); softEllipse(len * 0.03, len * 0.08, len * 0.46, len * 0.13, Math.max(2, Math.round(len * 0.05)), '#1a1208'); ctx.globalAlpha = A0; }
+    ctx.scale(s * (o.flip ? -1 : 1), s); ctx.drawImage(spr, -sw / 2, -sh / 2);
+    ctx.restore();
+  }
+  /** bamboo tray (竹匾) seen from above at a slant: ellipse (cx, cy, rx, ry), woven. */
+  function tray(cx, cy, rx, ry, tod = 'day') {
+    const A0 = ctx.globalAlpha, key = `tray|${qn(rx, 4)}|${qn(ry, 4)}`;
+    const spr = cached(key, rx * 2 + 40, ry * 2 + 60, g => {
+      g.translate(rx + 20, ry + 20);
+      g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(6, 22, rx, ry, 0, 0, TAU); g.fill();
+      g.fillStyle = '#6e5430'; g.beginPath(); g.ellipse(0, 10, rx, ry, 0, 0, TAU); g.fill();              // rim side
+      const bg = g.createRadialGradient(-rx * 0.2, -ry * 0.3, 0, 0, 0, rx); bg.addColorStop(0, '#d9b97a'); bg.addColorStop(1, '#a3824c');
+      g.fillStyle = bg; g.beginPath(); g.ellipse(0, 0, rx * 0.96, ry * 0.94, 0, 0, TAU); g.fill();
+      g.save(); g.clip();
+      g.globalAlpha = 0.25; g.strokeStyle = '#5c4422'; g.lineWidth = 1.5;
+      for (let i = -rx; i < rx; i += 9) { g.beginPath(); g.moveTo(i, -ry); g.lineTo(i + ry * 0.3, ry); g.stroke(); }
+      for (let j = -ry; j < ry; j += 9) { g.beginPath(); g.moveTo(-rx, j); g.lineTo(rx, j - rx * 0.05); g.stroke(); }
+      g.restore();
+      g.lineWidth = Math.max(6, ry * 0.08); g.strokeStyle = '#8a6a3a'; g.beginPath(); g.ellipse(0, 0, rx * 0.97, ry * 0.95, 0, 0, TAU); g.stroke();
+      g.lineWidth = 2; g.strokeStyle = '#e8cf98'; g.beginPath(); g.ellipse(0, -2, rx * 0.97, ry * 0.95, 0, Math.PI * 1.05, Math.PI * 1.95); g.stroke();
+    });
+    ctx.save(); ctx.globalAlpha = A0; ctx.drawImage(spr, cx - rx - 20, cy - ry - 20); ctx.restore();
+  }
+  /* bag(x, y, w, o): the clear bag of 冬瓜干, (x, y) = its centre, height = w * 1.42. A heat-sealed top with a hang hole,
+     slices showing through, a printed label (纯手工制作 · 传统工艺 · 良心手作 · 无添加), and 「李」 written on it in marker.
+     o: rot, mark (default S.MARK), label (false hides it), seed, tod (rim/tint), small (simpler label for small sizes) */
+  function drawBag(g, w, seed, o) {
+    const h = w * 1.42, r = rng(seed * 31 + 3);
+    const outline = () => {
+      g.beginPath(); g.moveTo(-w / 2, -h / 2 + w * 0.02);
+      g.lineTo(w / 2, -h / 2 + w * 0.02);
+      g.bezierCurveTo(w * 0.53, -h * 0.1, w * 0.54, h * 0.25, w * 0.47, h / 2 - w * 0.06);
+      g.quadraticCurveTo(0, h / 2 + w * 0.03, -w * 0.47, h / 2 - w * 0.06);
+      g.bezierCurveTo(-w * 0.54, h * 0.25, -w * 0.53, -h * 0.1, -w / 2, -h / 2 + w * 0.02); g.closePath();
+    };
+    // slices inside (heaped at the bottom, a few up the sides)
+    g.save(); outline(); g.clip();
+    g.fillStyle = 'rgba(232,226,210,0.9)'; g.fillRect(-w, -h, w * 2, h * 2);
+    const n = 44;
+    for (let i = 0; i < n; i++) {
+      const fy = Math.pow(r(), 0.6), y = lerp(-h * 0.3, h * 0.47, fy), x = (r() - 0.5) * w * 0.98, L = w * (0.3 + r() * 0.22);
+      g.save(); g.translate(x, y); g.rotate((r() - 0.5) * 2.4); drawSlice(g, L, (i * 5 + seed) % 12, 0.85 + r() * 0.15); g.restore();
+    }
+    // plastic: milky haze, crinkle highlights, side shading
+    g.fillStyle = 'rgba(250,250,247,0.18)'; g.fillRect(-w, -h, w * 2, h * 2);
+    const sg = g.createLinearGradient(-w / 2, 0, w / 2, 0); sg.addColorStop(0, 'rgba(40,40,40,0.28)'); sg.addColorStop(0.15, 'rgba(0,0,0,0)'); sg.addColorStop(0.8, 'rgba(0,0,0,0)'); sg.addColorStop(1, 'rgba(40,40,40,0.32)');
+    g.fillStyle = sg; g.fillRect(-w, -h, w * 2, h * 2);
+    g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineCap = 'round';
+    for (let i = 0; i < 7; i++) { const x = (r() - 0.5) * w * 0.8, y = (r() - 0.5) * h * 0.7; g.lineWidth = w * (0.006 + r() * 0.012); g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + w * 0.05, y + h * 0.08, x + (r() - 0.5) * w * 0.1, y + h * (0.1 + r() * 0.15)); g.stroke(); }
+    g.lineWidth = w * 0.03; g.strokeStyle = 'rgba(255,255,255,0.35)'; g.beginPath(); g.moveTo(-w * 0.38, -h * 0.3); g.quadraticCurveTo(-w * 0.44, h * 0.05, -w * 0.36, h * 0.38); g.stroke();
+    g.restore();
+    // outline
+    g.strokeStyle = 'rgba(255,255,255,0.6)'; g.lineWidth = Math.max(1.5, w * 0.008); outline(); g.stroke();
+    // heat-sealed top band with ribbing and a hang hole
+    const tb = h * 0.085, ty = -h / 2;
+    g.fillStyle = 'rgba(245,244,238,0.92)'; g.fillRect(-w / 2, ty, w, tb);
+    g.strokeStyle = 'rgba(160,160,150,0.5)'; g.lineWidth = Math.max(1, w * 0.004);
+    for (let i = 1; i < 6; i++) { const yy = ty + tb * i / 6; g.beginPath(); g.moveTo(-w / 2, yy); g.lineTo(w / 2, yy); g.stroke(); }
+    g.fillStyle = 'rgba(60,50,40,0.55)'; g.beginPath(); g.ellipse(0, ty + tb * 0.45, w * 0.07, tb * 0.2, 0, 0, TAU); g.fill();
+    // printed label
+    if (o.label !== false) {
+      const lw = w * 0.82, lh = h * 0.24, ly = -h * 0.24;
+      g.fillStyle = 'rgba(255,255,252,0.9)'; g.beginPath(); g.roundRect(-lw / 2, ly, lw, lh, w * 0.03); g.fill();
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = '#c4332c'; g.font = `700 ${w * 0.11}px ${F.serif}`; g.fillText('纯手工制作', 0, ly + lh * 0.3);
+      g.fillStyle = '#3f7a3a'; g.font = `500 ${w * 0.052}px ${F.sans}`; g.fillText('传统工艺 · 良心手作', 0, ly + lh * 0.62);
+      g.fillStyle = '#c4332c'; g.font = `500 ${w * 0.045}px ${F.sans}`; g.fillText('无添加 · 匠心品质', 0, ly + lh * 0.85);
+    }
+    // 「李」 in marker, on the lower part where the slices show
+    const mark = o.mark === undefined ? MARK : o.mark;
+    if (mark) {
+      g.save(); g.translate(w * 0.18, h * 0.2); g.rotate(-0.12);
+      g.font = `400 ${w * 0.26}px ${F.hand}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = 'rgba(255,255,255,0.55)'; g.fillText(mark, w * 0.008, w * 0.01);
+      g.fillStyle = '#1d1a18'; g.fillText(mark, 0, 0); g.restore();
+    }
+  }
+  /** bag(x, y, w, o): draws the bag (cached sprite at the device size, so it stays crisp). */
+  function bag(x, y, w, o = {}) {
+    const A0 = ctx.globalAlpha, seed = o.seed || 1, wq = qn(w * ctmScale(), 8), h = wq * 1.42;
+    const fok = document.fonts.check(`400 40px ${F.hand}`, MARK) && document.fonts.check(`700 40px ${F.serif}`, '纯');
+    const key = `bag|${seed}|${wq}|${o.mark === undefined ? MARK : o.mark}|${o.label !== false}|${fok}`;
+    const spr = cached(key, wq * 1.2, h * 1.15, g => { g.translate(wq * 0.6, h * 0.575); drawBag(g, wq, seed, o); });
+    const s = w / wq;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(o.rot || 0);
+    if (o.shadow !== 0) { ctx.globalAlpha = A0 * 0.35 * (o.shadow == null ? 1 : o.shadow); softEllipse(w * 0.05, w * 0.7, w * 0.5, w * 0.08, Math.max(2, Math.round(w * 0.05)), '#000'); }
+    ctx.globalAlpha = A0; ctx.scale(s, s); ctx.drawImage(spr, -wq * 0.6, -h * 0.575);
+    if (o.tint && o.tint[1] > 0) {   // darken toward a colour (in shadow): the bag's silhouette in that colour, over it
+      const sil = cached(`${key}|sil|${o.tint[0]}`, spr.width, spr.height, g => { g.drawImage(spr, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = o.tint[0]; g.fillRect(0, 0, spr.width, spr.height); });
+      ctx.globalAlpha = A0 * o.tint[1]; ctx.drawImage(sil, -wq * 0.6, -h * 0.575);
+    }
+    ctx.restore();
+  }
+
   // ---------------------------------------------------------------- buildings & props (silhouettes with warm windows)
   function house(x, y, w, tod, o = {}) {           // 白墙黑瓦: (x, y) = bottom-left
     const p = TOD[tod], h = w * 0.62, roof = w * 0.28;
@@ -552,5 +705,5 @@
   const SURNAME = '李';   // everyone in 李家畈村 is a 李
   const MARK = '李';      // carved on his melons; in 李家畈村 only 李德厚 has the habit of carving, so 「李」 still means his melons
   const VILLAGE = '李家畈村';
-  window.S = { SURNAME, MARK, VILLAGE, TOD, camera, layer, sky, sun, stars, hills, fog, ground, field, fieldSpots, melon, house, tricycle, person, say, stepAt, P: P_, motes, steam, light, vignette, hand, shade, cached, mk, soft, softEllipse, softRect, blurred };
+  window.S = { SURNAME, MARK, VILLAGE, TOD, camera, layer, sky, sun, stars, hills, fog, ground, field, fieldSpots, melon, slice, tray, bag, house, tricycle, person, say, stepAt, P: P_, motes, steam, light, vignette, hand, shade, cached, mk, soft, softEllipse, softRect, blurred };
 })();
