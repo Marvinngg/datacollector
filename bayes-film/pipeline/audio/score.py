@@ -143,16 +143,32 @@ class Bus:
         s.dry = np.zeros((NN, 2), np.float32); s.hall = np.zeros((NN, 2), np.float32); s.big = np.zeros((NN, 2), np.float32)
     def add(s, t, x, g=1.0, pan=0.0, rv=0.0, bg=0.0):
         if t >= D + 1.0 or g == 0: return
+        if s.name == 'fx': g *= fxg(t)
+        if s.name != 'post':            # nothing rings on through a freeze: cut at the next gate
+            gs = next((a for a, _ in sorted(GATE) if a > t + 1e-6), None)
+            if gs is not None and t + len(x) / SR > gs:
+                k = max(1, n_of(gs - t)); x = to_stereo(x)[:k].copy(); f = min(k, n_of(0.003))
+                x[k - f:] *= np.linspace(1, 0, f)[:, None]
         place(s.dry, t, x, g, pan)
         if rv: place(s.hall, t, x, g * rv, pan)
         if bg: place(s.big, t, x, g * bg, pan)
     def render(s):
         print(f'  reverb {s.name} ...', flush=True)
         y = s.dry.astype(np.float64)
-        if np.abs(s.hall).max() > 0: y += convolve(s.hall, IR_HALL) * 0.55
-        if np.abs(s.big).max() > 0: y += convolve(s.big, IR_BIG) * 0.6
+        # reverb per gate-delimited segment: a freeze also kills the room (tails never resurface after it)
+        cuts = [0] + sorted(set(n_of(a) for a, _ in GATE if 0 < n_of(a) < NN)) + [NN]
+        for i0, i1 in zip(cuts[:-1], cuts[1:]):
+            for arr, ir, k in ((s.hall, IR_HALL, 0.55), (s.big, IR_BIG, 0.6)):
+                seg = arr[i0:i1]
+                if np.abs(seg).max() > 0: y[i0:i1] += convolve(seg, ir) * k
         return y
 MUS, FX, POST = Bus('music'), Bus('fx'), Bus('post')
+FXG = {'e0': 1.0, 'e1': 0.75, 'e2': 0.7, 'e3': 0.85, 'e4': 0.75, 'e5': 1.0, 'e6': 0.6}
+def fxg(t):
+    """sync hits sit under the music: how loud they may be depends on where we are (the last step: barely)"""
+    last = BEATS[-1]; ls = steps(last)
+    if ls and t >= ls[-1]['t'] - 1e-6: return 0.18
+    return FXG.get(tl.chapter_of(t)['id'], 0.8)
 IR_HALL = make_ir(rt60=2.6, bright=0.5, seed=11, width=0.85)
 IR_BIG = make_ir(rt60=7.0, bright=0.62, seed=23, width=0.95, predelay=0.03)
 
@@ -265,7 +281,7 @@ def h_type(t, dur=1.0, **_):
 
 def h_click(t, **_):
     if gated(t):                    # caret / keys in a frozen silence: a tiny soft click only
-        POST.add(t, tick(2400, 0.003, 1, body=0.4), 0.03, 0.0, rv=0.1); return
+        POST.add(t, tick(2400, 0.003, 1, body=0.4), 0.014, 0.0, rv=0.1); return
     if seen('click', t, 0.05): return
     FX.add(t, tick(3800, 0.0025, 2, body=0.3), 0.05, 0.1, rv=0.2)
     up = CHORDS[chord_at(t)][1]; k = len(DONE['click']) % len(up)
@@ -273,10 +289,14 @@ def h_click(t, **_):
 
 def h_chip(t, i=0, **_):
     if seen('chip', t): return
-    up = sorted(set([p % 12 for p in CHORDS[chord_at(t)][1]]))
-    seq = [m('A5'), m('C6'), m('D6'), m('F6'), m('A6')]
-    k = seq[int(i) % len(seq)] if i is not None else seq[0]
-    note(GLK, k, t, 0.4, 84, 0.42, -0.3 + 0.3 * (int(i) % 3), rv=0.45, bus=FX)
+    j = int(i) if isinstance(i, (int, float)) else len(DONE['chip']) - 1
+    if tl.btype(beat_of(t)) == 'pitch':
+        seq = [m('A5'), m('C6'), m('D6'), m('F6'), m('A6')]; k = seq[j % len(seq)]
+    else:
+        up = CHORDS[chord_at(t)][1]
+        k = up[j % len(up)] + 24
+        while k > m('A6'): k -= 12
+    note(GLK, k, t, 0.4, 84, 0.42, -0.3 + 0.3 * (j % 3), rv=0.45, bus=FX)
     note(CEL, k - 12, t, 0.5, 80, 0.32, 0.0, rv=0.45, bus=FX)
     FX.add(t, bell(mtof(k), 2.0, 0.5), 0.05, 0.2, rv=0.4)
 
@@ -291,7 +311,13 @@ def h_punch(t, **_):
 
 def h_hush(t, dur=None, **_):
     if seen('hush', t, 0.3): return
-    b = beat_of(t); t1 = t + dur if dur else b['end']
+    b = beat_of(t)
+    if tl.btype(b) != 'pitch':          # a sudden drop that breathes back in two beats
+        DUCK.append((t, t + (dur or 1.5 * BT), 0.4, 1.5 * BT))
+        a = air(0.4, 5000, 1500, seed=19)[::-1] * np.linspace(0, 1, n_of(0.4))[:, None] ** 2
+        FX.add(t - 0.4, a, 0.03, 0, rv=0.3)
+        return
+    t1 = t + dur if dur else b['end']
     DUCK.append((t, t1 - 0.06, 0.02, 0.06))   # back to full exactly at t1
     # the single sustained note (fx bus: not ducked), a breath that leans into what comes next
     L = t1 - t
@@ -379,12 +405,18 @@ def h_gather(t, dur=4.0, **_):
     wet = convolve(loc, IR_BIG) * 1.2 + loc * 0.2
     r = wet[:n_of(dur)][::-1].copy()
     r *= local_env(len(r), [(0, 0), (dur * 0.5, 0.25), (dur - 0.03, 1.0), (dur, 0.0)])[:, None]
-    MUS.add(t, r, 0.28 if big else 0.3, 0)
+    (MUS if big else FX).add(t, r, 0.28 if big else 0.16, 0)
 
 def h_title(t, **_):
     """the title chord: one low piano note + a soft D minor add9 pad, long tail; the theme's head on celesta"""
     if seen('title', t, 0.3): return
-    b = beat_of(t); L = max(3.0, b['end'] - t) + 2.0
+    b = beat_of(t)
+    if tl.btype(b) != 'title':
+        k = CHORDS[chord_at(t)][1][0] + 24
+        FX.add(t, bell(mtof(k), 3.5, 1.1), 0.04, 0.3, rv=0.5, bg=0.7)
+        note(CEL, k, t, 0.8, 56, 0.14, 0.3, rv=0.5, bg=0.7, bus=FX)
+        return
+    L = max(3.0, b['end'] - t) + 2.0
     note(PNO, m('D1'), t, 6.0, 96, 0.55, -0.05, rv=0.4, bg=0.7, tail=8)
     note(PNO, m('D2'), t, 6.0, 72, 0.32, 0.05, rv=0.4, bg=0.7, tail=8)
     for k, p in zip(['D3', 'A3', 'E4', 'F4', 'A4'], [-0.4, -0.2, 0.0, 0.2, 0.4]):
@@ -402,7 +434,7 @@ def theme_head(t, preset, vel, g, bus=None, bg=0.5, oct=0, unit=BT):
 def h_ticks(t, dur=1.0, n=8, p0=0.2, p1=0.8, **_):
     """a run of n soft ticks (beads lighting): musical (32nd grid, D minor pentatonic), never a machine-gun"""
     n = int(max(1, n or 1)); dur = max(0.0, float(dur or 0)); p0 = float(p0 if p0 is not None else 0.2); p1 = float(p1 if p1 is not None else p0)
-    div = S16 / 2
+    div = S16 if dur > 1.5 else S16 / 2
     mm = int(min(n, max(1, dur / div)))
     slots = sorted(set(int(round((t + (dur * i / mm if mm > 1 else 0)) / div)) for i in range(mm)))
     ch = chap_of(t); g0 = 0.11 / np.sqrt(max(1.0, len(slots) / 6))
@@ -498,21 +530,23 @@ def h_glitch(t, **_):
     x = filt(x, 'lp', 9000) * np.hanning(len(x)) ** 0.3
     (POST if gated(t) else FX).add(t, x, 0.035, rng.uniform(-0.7, 0.7), rv=0.1)
 
-def h_stream(t, dur=2.0, **_):
-    dur = max(0.2, dur); rng = np.random.default_rng(int(t * 31))
+def h_stream(t, dur=2.0, level=1.0, **_):
+    dur = max(0.2, dur); lv = float(level if level is not None else 1.0); rng = np.random.default_rng(int(t * 31))
     if chap_of(t) == 'e5':        # data: rapid quiet blips
         x = t
         while x < t + dur:
             f = mtof(scale_note(int(rng.integers(14, 30)), m('D4'), PENT))
-            FX.add(x, sine(f, 0.04, 0.01), 0.018, rng.uniform(-0.8, 0.8), rv=0.15)
+            FX.add(x, sine(f, 0.04, 0.01), 0.018 * lv, rng.uniform(-0.8, 0.8), rv=0.15)
             x += S16 / 2
     else:                         # light: soft glitter on the pentatonic, drifting across
-        cnt = int(dur * 5)
+        cnt = max(1, int(dur * 2.5 * lv))
         for i in range(cnt):
-            u = i / max(1, cnt - 1)
-            k = scale_note(int(rng.integers(10, 20)), m('D4'), PENT)
-            note(CEL if i % 3 else HARP, k, t + u * dur, 0.4, 44, 0.08, -0.7 + 1.4 * u, rv=0.5, bg=0.4, bus=FX)
-        FX.add(t, air(dur, 3000, 6000, q=2, seed=2) * np.hanning(n_of(dur))[:, None], 0.012, 0, rv=0.4)
+            u = (i + rng.uniform(0, 0.6)) / cnt
+            tt = snap(t + u * dur, S16)
+            up = CHORDS[chord_at(tt)][1]; k = up[int(rng.integers(len(up)))] + 24
+            while k > m('A6'): k -= 12
+            note(CEL if i % 3 else HARP, k, tt, 0.4, 44, 0.07 * (0.5 + 0.5 * lv), -0.7 + 1.4 * u, rv=0.5, bg=0.4, bus=FX)
+        FX.add(t, air(dur, 3000, 6000, q=2, seed=2) * np.hanning(n_of(dur))[:, None], 0.01 * lv, 0, rv=0.4)
 
 def h_resolve(t, **_):
     if seen('resolve', t, 0.3): return
@@ -665,6 +699,9 @@ print('composing ...', flush=True)
 for c in CUES:                      # the silences first, so every hit knows where the film is frozen
     if c.get('type') == 'freeze': h_freeze(float(c['t']), dur=c.get('dur'))
     if c.get('type') == 'silence': h_silence(float(c['t']), dur=c.get('dur', 1.5)); c['_done'] = 1
+for b_ in BEATS:                    # ... and every step named 'freeze', cued or not
+    for s_ in steps(b_):
+        if s_.get('show') == 'freeze' and not cue_in('freeze', s_['t'], s_['t'] + s_['dur']): h_freeze(s_['t'])
 
 # ---------------------------------------------------------------- e0 · b01 pitch: the confident "sales" groove
 if B('pitch'):
@@ -795,7 +832,6 @@ if B('missing'):
             note(SSTR, m(k) + 12, t_rv, L2 + 0.4, 54, 0.14, -p, rv=0.5, bg=0.7, env=env, tail=4)
         note(SSTR, m('Bb1') + 12, t_rl, L2 - L + 0.4, 60, 0.3, 0, rv=0.5, bg=0.6, env=[(0, 0), (1.5, 1)])
         note(PNO, m('Bb1'), t_rl, 3.0, 60, 0.4, 0, rv=0.4, bg=0.6)
-        anchor('swell', 'missing', 'reveal', dur=L * 0.5)
     if ok(t_hm):        # humble: thinner, an unresolved suspension leaning into e3
         pads(t_hm, b, SSTR, 50, 0.22, rv=0.5, bg=0.5, fi=1.0, fo=1.2, which=[0, 2])
         ostinato(t_hm, b, HARP, [0, None, 2, None, 1, None], 46, 0.22, -0.2, rv=0.5, bg=0.4, div=BT, dur=BT * 2, seed=12)
@@ -970,7 +1006,7 @@ if B('human'):
         for a_, b_, nm in chord_spans(t_who, b):
             bs, up = CHORDS[nm]
             for j, k in enumerate([bs + 12, bs + 24] + up + [up[-1] + 12]):
-                note(SSTR, k, a_, b_ - a_ + 0.6, 76, 0.24, -0.6 + 0.2 * j, rv=0.5, bg=0.5, env=[(0, 0.3), (b_ - a_, 1.0), (b_ - a_ + 0.6, 0.5)])
+                note(SSTR, k, a_, b_ - a_ + 0.6, 76, 0.19, -0.6 + 0.2 * j, rv=0.5, bg=0.5, env=[(0, 0.3), (b_ - a_, 1.0), (b_ - a_ + 0.6, 0.5)])
             note(CELLO, bs + 12, a_, b_ - a_ + 0.6, 72, 0.32, 0, rv=0.4, bg=0.4)
         note(CHOIR, m('A4'), t_who, L, 56, 0.12, 0, rv=0.5, bg=0.6, env=[(0, 0), (L * 0.7, 1), (L, 0.3)])
         melody(t_who + 2 * BT, [('D5', 2), ('C5', 1), ('A4', 3)], PNO, 58, 0.3, 0.15, rv=0.4, bg=0.5)
@@ -990,8 +1026,8 @@ if B('recall'):
         bs, up = CHORDS[nm]
         note(PNO, bs + 12, a_, b_ - a_ + 0.5, 62, 0.26, -0.1, rv=0.4, bg=0.6, tail=4)
         if b_ - a_ >= 2 * BT - 1e-3: note(PNO, up[1] if len(up) > 1 else up[0], a_ + 2 * BT, b_ - a_ - 2 * BT + 0.5, 50, 0.19, 0.1, rv=0.4, bg=0.6, tail=4)
-    pads(t_sl, body_end, SSTR, 52, 0.13, rv=0.5, bg=0.6, fi=2.0, octave=-1)
-    pads(t_sl, body_end, CHOIR, 44, 0.05, rv=0.5, bg=0.6, fi=3.0, which=[0, 2])
+    pads(t_sl, body_end, SSTR, 52, 0.13, rv=0.5, bg=0.6, fi=2.0, fo=0.8, octave=-1)
+    pads(t_sl, body_end, CHOIR, 44, 0.05, rv=0.5, bg=0.6, fi=3.0, fo=0.8, which=[0, 2])
     basses(t_sl, body_end, CELLO, 54, 0.15, 1, rv=0.5)
     # the theme, in half-time (1 theme beat = 2 film beats), phrased to the step lines
     TH = [('recall', 's1', [('F5', 2), ('E5', 2)]), ('recall', 's2', [('A4', 4)]), ('recall', 's3', [('Bb4', 1), ('C5', 1), ('D5', 2)]),
@@ -1002,17 +1038,17 @@ if B('recall'):
         if t is None: continue
         melody(t, seq, PNO, 64, 0.32, 0.1, rv=0.45, bg=0.7, legato=1.0, tail=4)
         melody(t, seq, SSTR, 56, 0.13, -0.15, rv=0.5, bg=0.6, legato=1.1, oct=-1)
-        # each step line lands with a soft bell
-        MUS.add(t, bell(mtof(CHORDS[chord_at(t)][1][0] + 24), 3.0, 1.0), 0.022, 0.35, rv=0.5, bg=0.7)
+        # each step line lands with a soft bell (the template's own 'title' cues ring it at the exact landing)
+        if not cue_in('title', t, E(vt, nm)): MUS.add(t, bell(mtof(CHORDS[chord_at(t)][1][0] + 24), 3.0, 1.0), 0.022, 0.35, rv=0.5, bg=0.7)
     if ok(fin):     # 先别急: D major with a ninth. The longest, quietest tail; silence by the end
         L = end_t - fin
         env = [(0, 1), (L * 0.35, 0.75), (L - 0.4, 0.0)]
         for j, k in enumerate(ms('D2', 'A2', 'D3', 'F#3', 'A3', 'E4', 'F#4', 'A4')):
-            note(PNO, k, fin + 0.03 * j, L, 58 - j, 0.19, -0.4 + 0.1 * j, rv=0.4, bg=0.9, tail=2, env=env)
-            note(SSTR, k + 12, fin + 0.3, L, 48, 0.08, 0.4 - 0.1 * j, rv=0.5, bg=0.9, tail=2, env=[(0, 0), (2.0, 1), (L * 0.6, 0.5), (L - 0.4, 0.0)])
-        note(PNO, m('F#5'), fin + 2 * BT, L - 2 * BT, 56, 0.25, 0.15, rv=0.4, bg=1.0, tail=2, env=[(0, 1), (L - 2 * BT - 0.6, 0)])
-        note(CEL, m('F#6'), fin + 2 * BT, 2.0, 50, 0.14, 0.2, rv=0.4, bg=1.0)
-        MUS.add(fin, bell(mtof(m('D6')), 6.0, 2.0) * local_env(n_of(6.0), [(0, 1), (5.5, 0)]), 0.025, -0.2, rv=0.5, bg=0.9)
+            note(PNO, k, fin + 0.03 * j, L, 58 - j, 0.12, -0.4 + 0.1 * j, rv=0.4, bg=0.9, tail=2, env=env)
+            note(SSTR, k + 12, fin + 0.3, L, 48, 0.05, 0.4 - 0.1 * j, rv=0.5, bg=0.9, tail=2, env=[(0, 0), (2.0, 1), (L * 0.6, 0.5), (L - 0.4, 0.0)])
+        note(PNO, m('F#5'), fin + 2 * BT, L - 2 * BT, 56, 0.16, 0.15, rv=0.4, bg=1.0, tail=2, env=[(0, 1), (L - 2 * BT - 0.6, 0)])
+        note(CEL, m('F#6'), fin + 2 * BT, 2.0, 50, 0.09, 0.2, rv=0.4, bg=1.0)
+        MUS.add(fin, bell(mtof(m('D6')), 6.0, 2.0) * local_env(n_of(6.0), [(0, 1), (5.5, 0)]), 0.016, -0.2, rv=0.5, bg=0.9)
 
 # ================================================================ SYNC: every cue in cues.json
 used = {}
@@ -1069,7 +1105,7 @@ mix = mix * G + post
 mix = mix[:NOUT]
 # the last bar fades to digital silence at the end of the final step (no click)
 end_t = E('end') if B('end') else D
-mix *= env_points(len(mix), [(0, 1), (end_t - 0.6, 1), (end_t - 0.05, 0)])[:, None]
+mix *= env_points(len(mix), [(0, 1), (end_t - 4.0, 1), (end_t - 0.05, 0)])[:, None]
 L0 = lufs(mix); gain = 10 ** ((-16.0 - L0) / 20); mix *= gain
 mix = limiter(mix, ceiling_db=-1.3)
 for _ in range(3):                     # tiny correction loop after limiting
@@ -1087,7 +1123,7 @@ def rms_db(a, b):
 print('section RMS (dBFS):')
 for b_ in BEATS:
     print(f"  {b_['id']} {tl.btype(b_):12s} {b_['start']:6.1f}-{b_['end']:6.1f}  {rms_db(b_['start'], b_['end']):6.1f}")
-for a, b_ in GATE:
+for a, b_ in sorted(set(GATE)):
     x = mix[n_of(a + 0.45):n_of(b_)]
     pk = np.abs(x).max() if len(x) else 0.0
     print(f'  freeze/silence {a:.2f}-{b_:.2f}: peak after the crack {db(pk) if pk > 0 else -999:.1f} dBFS ({"digital zero" if pk == 0 else "tiny post-bus clicks"})')
