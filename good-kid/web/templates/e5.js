@@ -70,8 +70,9 @@
     return {
       tP, tW,
       feed: [[tP + 0.35, 0], [tP + 1.3, 158], [tP + 1.6, 158], [tP + 2.05, 262], [tP + 3.25, 262], [tP + 3.7, 368],
-        [tP + 4.85, 368], [tP + 5.6, 488], [tW + 2.0, 488], [tW + 2.35, 520], [tW + 4.1, 712], [tW + 4.55, RCP.tail]],
-      write: [tP + 2.2, tP + 3.85], wordA: tW + 2.35, wordB: tW + 4.1, stop: tW + 4.55,
+        [tP + 4.85, 368], [tP + 5.25, 404], [tW + 0.25, 404], [tW + 1.55, 474], [tW + 2.35, 474], [tW + 2.6, 520],
+        [tW + 4.3, 712], [tW + 4.75, RCP.tail]],
+      write: [tP + 2.2, tP + 3.85], costA: tW + 0.25, wordA: tW + 2.6, wordB: tW + 4.3, stop: tW + 4.75,
     };
   }
   // dashed hairline across the paper
@@ -117,7 +118,8 @@
       const rows = V.lines.rows;
       billRow(rows[0][0], RCP.row1); billRow(rows[1][0], RCP.row2);
       rule(RCP.rule2);
-      text('合计', PX0 + 50, RCP.total, { size: 25, family: F.sans, weight: 400, color: ink(0.44), spacing: 6 });
+      // the bill says it itself: the last line before the total, printed slowly (the printer hesitates after 叫)
+      text(V.lines.cost, PX0 + 50, RCP.total + 8, { size: 40, family: F.serif, weight: 400, color: ink(0.9), spacing: 3 });
       rule(RCP.rule3);
       ctx.restore();
       // the hand-written 不是 (written onto the paper after it was printed)
@@ -147,7 +149,7 @@
         PX.points(SX, SY, j, RED, { a: onA * 0.52 * (1 + breathe), A: SA, glow: 0.22 });
       }
       if (printing) {
-        const redK = lt > S.wordA - 0.2 && lt < S.wordB + 0.2 ? 1 : 0, hk = onA * (1 - prog(lt, S.stop - 0.05, S.stop + 0.3));
+        const redK = lt > S.wordA - 0.1 && lt < S.wordB + 0.2 ? 1 : 0, hk = onA * (1 - prog(lt, S.stop - 0.05, S.stop + 0.3));
         const n = 1000; scratch(n);
         for (let i = 0; i < n; i++) { SX[i] = sx(PX0 + 5) + (PW - 10) * SC * (i + PX.rand(i, 5)) / n; SY[i] = head + (PX.rand(i, 6) - 0.5) * 1.6; SA[i] = 0.6 + 0.4 * PX.rand(i, 7); }
         PX.points(SX, SY, n, mix(LAMP, RED, redK * 0.55), { a: 0.22 * hk, A: SA, glow: 0.5 });
@@ -155,14 +157,14 @@
       PX.flush({ exposure: 1.5, glow: 0.9 });
 
       // ---------- the voice
-      cap(V.lines.cost, lt, S.tW + 0.3, null, { dur: 1.7 });
     },
     cues(V, api) {
       const S = billTimes(api);
       return [
         { t: S.feed[0][0], type: 'print', dur: 5.25 },
         { t: S.write[0], type: 'pen' }, { t: S.write[1], type: 'pen' },
-        { t: S.tW + 0.1, type: 'hush' },
+        { t: S.costA, type: 'print', dur: 1.3 },
+        { t: S.costA + 1.35, type: 'hush' },
         { t: S.wordA - 0.35, type: 'print', dur: +(S.stop - S.wordA + 0.35).toFixed(3) },
       ];
     },
@@ -262,8 +264,14 @@
       const D = PX.disc(260, 0, 0, 1); scratch(D.n);
       for (let i = 0; i < D.n; i++) { SX[i] = bx + D.X[i] * 7; SY[i] = LINE_Y + D.Y[i] * 7; SA[i] = 0.4 + 0.8 * Math.exp(-(D.X[i] ** 2 + D.Y[i] ** 2) * 3); }
       PX.points(SX, SY, D.n, [0.78, 0.8, 0.84], { a: 0.16 * ba, A: SA, glow: 0.5 });
+      // past 25, where you are now: the sentence gathers out of the bead, under the end of the line
+      const nk = prog(lt, t[3] + 1.5, t[3] + 3.6);
+      if (nk > 0) KIT.ptext(V.lines.never, 742, 1118, { size: 76, family: F.hand, weight: 400, k: nk, from: [bx, LINE_Y], color: [0.93, 0.9, 0.85], a: 0.55, drift: 0.5, t: lt, seed: 7, crisp: 0.75, glow: 0.3 });
       PX.flush({ exposure: 1.4, glow: 0.9 });
-      cap(V.lines.never, lt, t[3] + 1.0, null, { dur: 1.5 });
+      if (nk > 0) {                                           // a hairline from the bead down to the words
+        ctx.save(); ctx.strokeStyle = ink(0.28 * ease.out(clamp(nk * 2))); ctx.lineWidth = 1; ctx.setLineDash([2, 5]);
+        ctx.beginPath(); ctx.moveTo(bx, LINE_Y + 14); ctx.lineTo(bx, lerp(LINE_Y + 14, 1040, ease.out(clamp(nk * 1.5)))); ctx.stroke(); ctx.restore();
+      }
     },
     cues(V, api) {
       const t = ['a18', 'a20', 'a25', 'never'].map(n => at(api, n));

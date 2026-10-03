@@ -39,18 +39,10 @@
     PX.points(SB.X, SB.Y, k, o.col || null, { ...o, A: SB.A, C: CC ? SB.C : undefined });
   }
 
-  // a calm caption: reveal after t0, leave before t1
-  function cap(lines, lt, t0, t1, o = {}) {
-    const n = [lines].flat().join('').length, d = o.delay == null ? 0.3 : o.delay;
-    const k = prog(lt, t0 + d, t0 + d + Math.min(2.0, 0.5 + n * 0.075));
-    if (k <= 0) return;
-    KIT.caption(lines, k, { ...o, out: t1 == null ? 0 : prog(lt, t1 - 0.55, t1) });
-  }
-
   // ================================================================ the motorbike (line art)
   /* Local coordinates: facing right, ground at y = 0, wheel centres at x = ±310. Placed on screen by BIKE. */
   const BIKE = { x: 548, y: 1130, s: 0.93 };
-  const ZOOM = { cx: 540, cy: 880, z1: 1.045 };                 // the slow push-in during 'bike' + 'q'
+  const ZOOM = { cx: 540, cy: 1130, z1: 1.045 };                // the slow push-in during 'bike' + 'q' (about the road line)
   const STY = { m: [1.9, 0.9], d: [1.25, 0.55], f: [1.0, 0.32] };  // main / detail / faint: [width, alpha]
 
   function arc(cx, cy, r, a0 = 0, a1 = TAU, ry = r, rot = 0) {
@@ -88,7 +80,8 @@
   function bike() {
     if (BK) return BK;
     const S = [];
-    const add = (pts, st = 'm') => S.push({ raw: pts, st });
+    let tagH = false;                                                // strokes of the helmet (it leaves first)
+    const add = (pts, st = 'm') => S.push({ raw: pts, st, helmet: tagH });
     const RW = [-310, -150], FW = [310, -150];
     // wheels
     for (const [wx, wy] of [RW, FW]) {
@@ -137,10 +130,12 @@
     add(spline([[-374, -436], [-300, -424], [-160, -425], [-42, -430]]), 'd');
     add(arc(-383, -433, 7), 'd');
     // a helmet resting on the seat (waiting for a rider)
+    tagH = true;
     add(spline([[-252, -452], [-256, -498], [-228, -542], [-178, -556], [-134, -532], [-118, -490], [-122, -452]]));
     add(seg(-252, -452, -122, -452), 'd');
     add(spline([[-160, -462], [-160, -496], [-146, -522], [-126, -526]]), 'd');   // visor opening
     add(spline([[-238, -515], [-206, -537], [-172, -541]]), 'f');
+    tagH = false;
     // frame: steering head -> down tube -> cradle -> seat post; subframe; swingarm; shock
     add(spline([[200, -436], [162, -344], [128, -260], [104, -190], [70, -152], [-50, -146], [-118, -160], [-138, -230], [-148, -330], [-158, -430]]));
     add(seg(-148, -330, -330, -432), 'd');
@@ -178,7 +173,7 @@
       const p = resample(s.raw, 1);
       const X = new Float32Array(p.length), Y = new Float32Array(p.length); p.forEach((q, i) => { X[i] = q[0]; Y[i] = q[1]; });
       total += p.length;
-      return { X, Y, n: p.length, st: s.st, si, seq: si / S.length };
+      return { X, Y, n: p.length, st: s.st, si, seq: si / S.length, helmet: s.helmet };
     });
     // pieces and their particles (2 per px of line, jittered across the line's width)
     const pc = [], pxl = [], pyl = [], ppc = [];
@@ -198,7 +193,7 @@
     }
     // release order: the wind comes from the front (right) — the front lets go first
     let x0 = 1e9, x1 = -1e9; for (const p of pc) { x0 = Math.min(x0, p.mx); x1 = Math.max(x1, p.mx); }
-    pc.forEach((p, i) => { p.ord = clamp(0.82 * (x1 - p.mx) / (x1 - x0) + 0.18 * R(i, 5)); });
+    pc.forEach((p, i) => { p.ord = p.s.helmet ? -0.13 + 0.08 * R(i, 5) : clamp(0.82 * (x1 - p.mx) / (x1 - x0) + 0.18 * R(i, 5)); });   // the helmet first: it becomes 「大概不会。」
     const n = pxl.length, m = { strokes, pieces: pc, n, LX: Float32Array.from(pxl), LY: Float32Array.from(pyl), PC: Int32Array.from(ppc) };
     // each mote's drift (downwind = left, lifting a little) and its hanging place
     m.DX = new Float32Array(n); m.DY = new Float32Array(n); m.TD = new Float32Array(n); m.HX = new Float32Array(n); m.HY = new Float32Array(n);
@@ -396,8 +391,6 @@
       ];
     },
   });
-  // split a sentence after its first comma, for two calm lines
-  function splitQ(s) { const i = s.indexOf('，'); return i > 0 && i < s.length - 1 ? [s.slice(0, i + 1), s.slice(i + 1)] : [s]; }
 
   // ================================================================ b11 freedom
   const NS = 2600;                                                   // sparks from an unseen campfire below
