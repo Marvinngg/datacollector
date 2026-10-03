@@ -611,8 +611,8 @@
     ctx.globalAlpha *= 0.75; ctx.beginPath(); ctx.moveTo(x0, y50); ctx.lineTo(lerp(x0, x1, k), y50); ctx.stroke();
     ctx.restore();
     const la = A * ease.out(prog(t, S.gh + 0.7, S.gh + 1.3));
-    K.text('60%', x1g + 14, y60 + 9, { size: 26, family: F.mono, color: C.ember, alpha: la * 0.85 });
-    K.text('50%', x1 + 14, y50 + 9, { size: 26, family: F.mono, color: C.ember, alpha: la * 0.6 });
+    K.text('60%', x1g, y60 - 10, { size: 26, family: F.mono, color: C.ember, alpha: la * 0.85, align: 'right' });
+    K.text('50%', x1, y50 - 10, { size: 26, family: F.mono, color: C.ember, alpha: la * 0.6, align: 'right' });
     L.serif(label, PILE.gx, y60 - 34, { size: 44, weight: 600, color: C.ember, glow: 10, alpha: A, reveal: prog(t, S.gh + 0.6, S.gh + 1.4), spacing: 6 });
   }
 
