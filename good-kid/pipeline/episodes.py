@@ -5,9 +5,10 @@ import json, os, subprocess
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 tl = json.load(open(f'{ROOT}/build/timeline.json'))
 ch = {c['id']: c for c in tl['chapters']}
-EPS = [('ep1', ['e0', 'e1'], '你以为有五成把握'),
-       ('ep2', ['e2', 'e3'], '一次乘法'),
-       ('ep3', ['e4', 'e5', 'e6'], '谁来拍板')]
+EPS = [('ep1', ['e0', 'e1'], '你没有变差，只是打分的人走了'),
+       ('ep2', ['e2', 'e3'], '好孩子思维'),
+       ('ep3', ['e4', 'e5'], '试错权'),
+       ('ep4', ['e6'], 'Have a try')]
 src = f'{ROOT}/release/dafen.mp4'
 for name, ids, title in EPS:
     a, b = ch[ids[0]]['start'], (ch[ids[-1]]['end'] if ids[-1] != tl['chapters'][-1]['id'] else tl['duration'])
