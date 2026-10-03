@@ -232,13 +232,15 @@
       // the sentence rises out of the bills: particles leave the unknown totals (未知) and gather under the strips,
       // the first clause hung from the left strip's edge, the second from the right one's
       const [s1, s2] = splitAt(V.lines.pay, '，');
-      PX.begin(); fullFrame();
       const ya = SLOT_Y + RL[2] + 120, yb = ya + 92;
+      if (k1 > 0) {
+      PX.begin(); fullFrame();
       // the ink lifts off the lower part of all three strips (around 合计 · 未知)
       const src = [0, 1, 2].map(i => [RX[i] - RW / 2 + 12, SLOT_Y + RL[i] - 150, RW - 24, 110]);
       gatherText(s1, RX[0] - RW / 2, ya, { align: 'left', size: 56, k: k1, src, t, tag: 1, seed: 5 });
       gatherText(s2, RX[2] + RW / 2, yb, { align: 'right', size: 56, k: k2, src, t, tag: 2, seed: 7 });
       PX.flush({ exposure: 1.4, glow: 0.8 });
+      }
     },
     cues(V, api) {
       const tP = at(api, 'print'), out = [];
