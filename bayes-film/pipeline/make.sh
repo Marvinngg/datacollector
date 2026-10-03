@@ -10,7 +10,9 @@ echo "== score";    python3 pipeline/audio/score.py | tail -3
 echo "== frames";   node pipeline/render.mjs film --workers "${WORKERS:-4}" ${FRESH:+--fresh}
 echo "== mux"
 mkdir -p release
-ffmpeg -y -loglevel error -i build/video.mp4 -i build/audio/mix.wav -map 0:v -map 1:a \
-  -c:v libx264 -preset slow -crf 20 -pix_fmt yuv420p -c:a aac -b:a 192k -shortest -movflags +faststart release/xianbieji.mp4
+# two passes at 1.9 Mb/s keep the 5.8-minute film under GitHub's 100 MB file limit (the particle grain is expensive)
+( cd build && ffmpeg -y -loglevel error -i video.mp4 -vf hqdn3d=2:2:4:4 -c:v libx264 -preset slow -b:v 1900k -pass 1 -an -f null /dev/null )
+( cd build && ffmpeg -y -loglevel error -i video.mp4 -i audio/mix.wav -map 0:v -map 1:a -vf hqdn3d=2:2:4:4 -c:v libx264 -preset slow \
+  -b:v 1900k -pass 2 -pix_fmt yuv420p -c:a aac -b:a 160k -shortest -movflags +faststart ../release/xianbieji.mp4 )
 echo "== episodes"; python3 pipeline/episodes.py
 echo "done: release/xianbieji.mp4"

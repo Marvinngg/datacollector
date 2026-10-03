@@ -16,6 +16,12 @@ for name, ids, title in EPS:
     vf = f"fade=t=in:st=0:d=0.4,fade=t=out:st={d - 0.6:.3f}:d=0.6"
     af = f"afade=t=in:st=0:d=0.3,afade=t=out:st={d - 0.8:.3f}:d=0.8"
     subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-ss', f'{a:.3f}', '-i', src, '-t', f'{d:.3f}', '-vf', vf, '-af', af,
-                    '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k',
-                    '-movflags', '+faststart', out], check=True)
+                    '-c:v', 'libx264', '-preset', 'slow', '-crf', '22', '-maxrate', '3M', '-bufsize', '6M', '-pix_fmt', 'yuv420p',
+                    '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', out], check=True)
+    # a 720p preview small enough to send in chat (<= ~27 MB): bitrate from the length
+    prev = f'{ROOT}/build/{name}-720.mp4'
+    kbps = int(27 * 8 * 1024 / d) - 140
+    subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', out, '-vf', 'scale=720:1280', '-c:v', 'libx264', '-preset', 'slow',
+                    '-b:v', f'{min(kbps, 2500)}k', '-maxrate', f'{min(kbps, 2500) * 2}k', '-bufsize', f'{min(kbps, 2500) * 2}k',
+                    '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', prev], check=True)
     print(f'{name}  {title}  {a:6.1f} -> {b:6.1f}  ({d:5.1f}s)  {os.path.relpath(out, ROOT)}')
