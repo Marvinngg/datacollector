@@ -146,7 +146,7 @@
        },
        {
         "show": "fall",
-        "beats": 6
+        "beats": 8
        },
        {
         "show": "count",
@@ -212,7 +212,7 @@
        },
        {
         "show": "rare",
-        "beats": 6
+        "beats": 8
        }
       ]
      }
@@ -241,7 +241,7 @@
       "steps": [
        {
         "show": "stop",
-        "beats": 4
+        "beats": 6
        },
        {
         "show": "form",
@@ -321,7 +321,7 @@
        },
        {
         "show": "rel",
-        "beats": 4
+        "beats": 6
        }
       ]
      }
@@ -355,7 +355,7 @@
        },
        {
         "show": "cancel",
-        "beats": 4
+        "beats": 6
        },
        {
         "show": "only",
@@ -389,7 +389,7 @@
        },
        {
         "show": "stream",
-        "beats": 6
+        "beats": 7
        },
        {
         "show": "ratio",
@@ -464,7 +464,7 @@
        },
        {
         "show": "chain",
-        "beats": 6
+        "beats": 8
        }
       ]
      }
@@ -535,7 +535,7 @@
        },
        {
         "show": "both",
-        "beats": 6
+        "beats": 7
        }
       ]
      }
@@ -628,7 +628,7 @@
        },
        {
         "show": "decide",
-        "beats": 6
+        "beats": 8
        },
        {
         "show": "rope",
