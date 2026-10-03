@@ -166,6 +166,7 @@
     ctx.save(); ctx.beginPath(); ctx.rect(-HW, -HH, 2 * HW, HH - 40); ctx.clip();
     circ(95, -40, 44); ctx.save(); ctx.fillStyle = 'rgba(255,154,92,0.10)'; ctx.fill(); ctx.restore(); st(FREE, 1.8, 0.85);
     ctx.restore();
+    for (let c = 0; c < 3; c++) { const cx = ((c * 170 - t * (4 + c * 2)) % 620 + 620) % 620 - 310, cy = -250 + c * 70; curve([cx - 90, cy, cx - 20, cy - 5, cx + 60, cy - 2, cx + 110, cy + 2]); st(c === 2 ? '#e8b49a' : INK, 1, 0.16 + c * 0.05); }
     curve(HILL); st(INK, 1.3, 0.38);
     L2(-HW, -40, HW, -40, INK, 1.2, 0.55);
     // the sea: wave glints in rows, denser and slower toward the horizon (parallax)
@@ -226,7 +227,7 @@
     ctx.beginPath(); ctx.ellipse(66, -66, 7, 10, -0.4, 0, TAU); st(C1, 1.4, 0.8);    // headlight
     curve([60, -40, 76, -46, 108, -36]); st(C1, 1.3, 0.55);                         // fender
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; const gb = ctx.createLinearGradient(70, 0, 250, 0);
-    gb.addColorStop(0, 'rgba(255,205,150,0.12)'); gb.addColorStop(1, 'rgba(255,205,150,0)'); ctx.fillStyle = gb;
+    gb.addColorStop(0, 'rgba(255,205,150,0.06)'); gb.addColorStop(1, 'rgba(255,205,150,0)'); ctx.fillStyle = gb;
     ctx.beginPath(); ctx.moveTo(72, -68); ctx.lineTo(250, -100); ctx.lineTo(250, -8); ctx.closePath(); ctx.fill(); ctx.restore();
     // rider: one silhouette leaning into the wind; tank in front of his knee
     const hip = [-52, -62], sh = [0, -118], hd = [22, -139], kn = [12, -56], ft = [-4, -18];
@@ -247,8 +248,8 @@
     for (let i = 0; i < 170; i++) {
       const ph = frac(t * (0.8 + R(i, 61) * 0.9) + R(i, 62)), x0 = 0 + (R(i, 63) - 0.5) * 40, y0 = -110 + (R(i, 64) - 0.5) * 70;
       const x = x0 - ph * (200 + R(i, 65) * 140), y = y0 - ph * 12 * R(i, 66) + Math.sin(ph * 7 + R(i, 67) * 20) * 5 * ph;
-      const a = Math.pow(1 - ph, 1.4) * (0.4 + 0.6 * R(i, 68));
-      for (let s = 0; s < 3; s++) bp(x + s * 2.6, y, a * (1 - s * 0.3), mix3(GOLD, FREEL, ph));
+      const a = Math.pow(1 - ph, 1.2) * (0.5 + 0.7 * R(i, 68));
+      for (let s = 0; s < 4; s++) bp(x + s * 2.6, y, a * (1 - s * 0.22), mix3(GOLD, FREEL, ph));
     }
   }
 
@@ -260,7 +261,9 @@
     // the window, evening light through it
     g = ctx.createLinearGradient(0, -340, 0, -70); g.addColorStop(0, 'rgba(110,110,150,0.10)'); g.addColorStop(1, 'rgba(255,160,100,0.22)');
     ctx.fillStyle = g; ctx.fillRect(-175, -340, 350, 270);
-    path(SKY2); st(INK, 1.1, 0.28);
+    glowDisc(70, -78, 120, '255,170,110', 0.18);
+    ctx.save(); ctx.beginPath(); ctx.rect(-175, -340, 350, 270); ctx.clip(); circ(70, -70, 30); st('#ffb27a', 1.4, 0.55);
+    curve([-160, -150, -100, -156, -30, -152]); st(INK, 1, 0.22); curve([0, -238, 70, -244, 150, -238]); st(INK, 1, 0.18); ctx.restore();
     ctx.beginPath(); ctx.rect(-175, -340, 350, 270); st(INK, 1.5, 0.55);
     path([-58, -340, -58, -70]); st(INK, 1.2, 0.4); path([58, -340, 58, -70]); st(INK, 1.2, 0.4); path([-175, -205, 175, -205]); st(INK, 1.2, 0.4);
     L2(-185, -64, 185, -64, INK, 1.1, 0.3);
@@ -291,9 +294,9 @@
     const th = 0.14 + 0.56 * sq, sh = [hip[0] + Math.sin(th) * 74, hip[1] - Math.cos(th) * 74];
     const nk = [sh[0] + Math.sin(th) * 12 + 2, sh[1] - Math.cos(th) * 12 - 2], hd = [sh[0] + Math.sin(th) * 26 + 5, sh[1] - Math.cos(th) * 26 - 5];
     fig([cap(hip, knee, 12.5, 9), cap(knee, ank, 8.5, 6), cap(ank, [ank[0] + 22, ank[1] + 5], 5, 4), cap(hip, sh, 14, 16), cap(sh, nk, 6.5, 6), disc(hd, 13)], fill, col, 1.7);
-    const pc = [sh[0] - 4, sh[1] - 4];
-    circ(pc[0], pc[1], 34); ctx.save(); ctx.fillStyle = fill; ctx.fill(); ctx.restore(); st(col, 1.8, 0.95);
-    circ(pc[0], pc[1], 26); st(col, 1, 0.4); circ(pc[0], pc[1], 4.5); st(col, 1.4, 0.8);
+    const pc = [sh[0] - 16, sh[1] - 4];
+    circ(pc[0], pc[1], 27); ctx.save(); ctx.fillStyle = fill; ctx.fill(); ctx.restore(); st(col, 1.8, 0.95);
+    circ(pc[0], pc[1], 20); st(col, 1, 0.4); circ(pc[0], pc[1], 4.5); st(col, 1.4, 0.8);
     const el = [sh[0] + 20 + 4 * sq, sh[1] + 18], hn = [pc[0] + 13, pc[1] + 3];
     fig([cap([sh[0] + 2, sh[1] + 2], el, 6.5, 5.5), cap(el, hn, 5, 4)], fill, col, 1.6);
     // the coach: front-facing, laughing, loose; one hand counting the reps, the other on the hip
@@ -309,9 +312,9 @@
     fig([cap([cx + 22, 76], [cx + 40, 106], 7, 6), cap([cx + 40, 106], [cx + 20, 130], 5.5, 4.5)], fill, warm, 1.6);
     ctx.save(); ctx.translate(cx, 38 + lb); ctx.rotate(-0.16);
     ctx.beginPath(); ctx.arc(0, -2, 18.5, Math.PI * 1.08, Math.PI * 1.96); st(warm, 3.2, 0.75);   // hair
-    ctx.beginPath(); ctx.arc(-6.5, 0, 3.4, Math.PI * 1.1, Math.PI * 1.9); st(warm, 1.4, 0.95);    // eyes closed with laughing
-    ctx.beginPath(); ctx.arc(6.5, 0, 3.4, Math.PI * 1.1, Math.PI * 1.9); st(warm, 1.4, 0.95);
-    ctx.beginPath(); ctx.arc(0, 4.5, 7.5, Math.PI * 0.12, Math.PI * 0.88); st(warm, 1.6, 0.95);  // the smile
+    ctx.beginPath(); ctx.arc(-6.5, 0, 2.8, Math.PI * 1.15, Math.PI * 1.85); st(warm, 1.2, 0.85);    // eyes closed with laughing
+    ctx.beginPath(); ctx.arc(6.5, 0, 2.8, Math.PI * 1.15, Math.PI * 1.85); st(warm, 1.2, 0.85);
+    ctx.beginPath(); ctx.arc(0, 4.5, 7, Math.PI * 0.15, Math.PI * 0.85); st(warm, 1.4, 0.9);  // the smile
     ctx.restore();
     glowDisc(cx, 40, 130, '255,190,130', 0.08);
   }
@@ -343,14 +346,14 @@
     curve([-180, 208, -112, 204, -48, 210]); st(INK, 1.5, 0.65); curve([-180, 220, -112, 218, -48, 222]); st(INK, 1.2, 0.45);   // the log
     ctx.beginPath(); ctx.ellipse(-48, 216, 4, 6, 0, 0, TAU); st(INK, 1.2, 0.55);
     // her (behind), leaning her head on his shoulder; long hair down her back
-    const hipG = [-128, 202], shG = [-104, 142], hdG = [-89, 122], knG = [-82, 184], ftG = [-86, 224];
-    fig([cap(hipG, shG, 12, 13.5), cap([-96, 132], [-92, 126], 5, 5), disc(hdG, 12.5), cap([-95, 116], [-110, 160], 9, 5), cap(hipG, knG, 11, 8.5), cap(knG, ftG, 7.5, 5.5), cap(ftG, [-73, 227], 4.5, 4)], fill, col, 1.6);
+    const hipG = [-140, 202], shG = [-114, 144], hdG = [-97, 125], knG = [-94, 184], ftG = [-98, 224];
+    fig([cap(hipG, shG, 12, 13.5), cap([-108, 136], [-101, 129], 5, 5), disc(hdG, 12.5), cap([-104, 118], [-122, 162], 9, 5), cap(hipG, knG, 11, 8.5), cap(knG, ftG, 7.5, 5.5), cap(ftG, [-85, 227], 4.5, 4)], fill, col, 1.6);
     // him
     const hipM = [-86, 200], shM = [-74, 134], hdM = [-59, 106], knM = [-34, 180], ftM = [-30, 224];
     fig([cap(hipM, shM, 13.5, 15), cap([-71, 126], [-64, 116], 6, 5.5), disc(hdM, 14), cap(hipM, knM, 12, 9), cap(knM, ftM, 8, 6), cap(ftM, [-16, 227], 5, 4)], fill, col, 1.7);
     const elM = [-52, 166];
     fig([cap([-72, 138], elM, 6.5, 5.5), cap(elM, [-38, 178], 5, 4)], fill, col, 1.6);
-    fig([cap([-102, 146], [-84, 166], 6, 5), cap([-84, 166], [-62, 160], 4.8, 4)], fill, col, 1.5);   // her arm through his
+    fig([cap([-112, 148], [-92, 168], 6, 5), cap([-92, 168], [-66, 162], 4.8, 4)], fill, col, 1.5);   // her arm through his
     // the fire lights their faces and knees (warm rim on the fire side)
     ctx.beginPath(); ctx.arc(hdM[0], hdM[1], 14.8, -1.25, 1.2); st(rim, 2.1, 0.95 * fl);
     ctx.beginPath(); ctx.arc(hdG[0], hdG[1], 13.3, -1.0, 1.0); st(rim, 1.9, 0.8 * fl);
@@ -363,7 +366,7 @@
     // flame (PX): particles rise and narrow, hot at the root, orange at the tips
     for (let i = 0; i < 1100; i++) {
       const r1 = R(i, 91), r2 = R(i, 92), r3 = R(i, 93), r4 = R(i, 94), r5 = R(i, 95);
-      const ph = frac(t * (1.25 + r1 * 1.1) + r2), h = ph * (34 + 58 * r3 * r3), wd = Math.pow(1 - ph, 0.9) * (12 + 13 * r4);
+      const ph = frac(t * (1.25 + r1 * 1.1) + r2), h = ph * (40 + 74 * r3 * r3), wd = Math.pow(1 - ph, 0.9) * (12 + 13 * r4);
       const x = FX + (r5 - 0.5) * 2 * wd + Math.sin(t * 6.5 + r1 * 20) * 3.5 * ph + Math.sin(t * 2.1) * 2 * ph;
       bp(x, FY + 2 - h, Math.pow(1 - ph, 1.3) * (0.35 + 0.65 * r4) * fl, mix3(HOT, FREEL, Math.min(1, ph * 1.4)));
     }
@@ -372,7 +375,7 @@
       const ph = frac(t * (0.2 + 0.28 * r1) + r2), rise = ph * (160 + 190 * r3);
       const x = FX + (r4 - 0.5) * 24 + Math.sin(ph * 5 + r5 * 10) * (12 + 24 * r3) * ph, y = FY - 20 - rise;
       const a = Math.pow(Math.sin(Math.PI * Math.min(1, ph * 1.15)), 0.7) * (0.5 + 0.5 * Math.sin(t * 9 + i)) * (0.6 + 0.4 * r5);
-      for (let s = 0; s < 3; s++) bp(x, y + s * 2, a * (1 - s * 0.32) * 1.6, mix3(GOLD, FREEL, ph));
+      bp(x, y, a * 1.5, mix3(GOLD, FREEL, ph)); bp(x + 0.6, y + 0.8, a * 0.9, mix3(GOLD, FREEL, ph));
     }
     for (let i = 0; i < 60; i++) {                                     // embers on the logs
       const x = FX + (R(i, 111) - 0.5) * 54, y = FY + 2 + (R(i, 112) - 0.5) * 12;
@@ -496,7 +499,7 @@
       V.lines.facts.forEach((f, i) => {
         const ti = tF + 0.3 + i * 1.25, k = prog(lt, ti, ti + 0.9);
         if (k <= 0) return;
-        const xa = 490, ya = 800 + i * 130, xb = 210 + i * 290 + 34, yb = 352;
+        const xa = 490, ya = 800 + i * 130, xb = 192 + i * 290, yb = 352;
         const x = lerp(xa, xb, up), y = lerp(ya, yb, up), sc = lerp(1, 0.62, up);
         ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc);
         KIT.type(f, 0, 0, { size: 56, family: F.serif, weight: 400, align: 'left', color: gray > 0 ? `rgb(${mix3(KIT.rgb(C.ink), KIT.rgb(C.gray), gray * 0.8).map(v => Math.round(v * 255)).join(',')})` : C.ink, k, alpha: lerp(1, 0.8, up), spacing: 4 });
@@ -506,7 +509,7 @@
       // the answer sheet fills itself, row by row, every bubble right
       const sk = ease.out(prog(lt, tFi + 0.25, tFi + 1.1));
       const fill = prog(lt, tFi + 1.0, tFi + 4.0);
-      KIT.sheet(SH.x, SH.y, SH.w, SH.h, { rows: 20, k: sk, fill, marks: clamp(fill - 0.03), gray, title: '答题卡 · 人生' });
+      KIT.sheet(SH.x, SH.y, SH.w, SH.h, { rows: 20, k: sk, fill, marks: prog(lt, tFi + 1.12, tFi + 4.12), gray, title: '答题卡 · 人生' });
       KIT.pen('score', SH.x + SH.w - 92, SH.y + 50, 42, prog(lt, tFi + 4.2, tFi + 4.9), { text: '100', gray, seed: 11 });
       ctx.restore();
       // the drain: a cold veil over the paper (never over the voice)

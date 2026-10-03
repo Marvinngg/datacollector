@@ -380,7 +380,7 @@
         }
         streaks(n, b.X, b.Y, b1.X, b1.Y, b.A, b.C, { a: 0.55, glow: 0.25 });
       }
-      PX.flush({ exposure: 1.5, glow: 0.9 });
+      PX.flush({ exposure: 1.6, glow: 0.9 });
       // the voice
       cap(splitQ(V.lines.q), lt, tQ, tNo);
       cap(V.lines.no, lt, tNo, tWhat, { family: F.hand, size: 58 });
@@ -559,7 +559,7 @@
         CCx = m.CB; CCx.set(m.CC);
         for (let j = 0; j < m.NA; j++) { const k = smooth(m.EG[j]); for (let c = 0; c < 3; c++) CCx[j * 3 + c] = lerp(m.C10[j * 3 + c], m.CC[j * 3 + c], k); }
       }
-      streaks(N, B.X, B.Y, B1.X, B1.Y, B.A, CCx, { a: 0.4, glow: 0.38 });
+      streaks(N, B.X, B.Y, B1.X, B1.Y, B.A, CCx, { a: 0.4, glow: lerp(0.25, 0.38, smooth(prog(lt, 0, 3))) });
       // the wind fades out as it is gathered (its motes are part of the material above)
       PX.flush({ exposure: 1.6, glow: 0.9 });
 
