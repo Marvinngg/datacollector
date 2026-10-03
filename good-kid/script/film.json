@@ -106,7 +106,7 @@
       "steps": [
        {
         "show": "off",
-        "beats": 6
+        "beats": 7
        },
        {
         "show": "dark",
@@ -156,7 +156,7 @@
        },
        {
         "show": "stories",
-        "beats": 8
+        "beats": 10
        },
        {
         "show": "wait",
@@ -239,7 +239,7 @@
        },
        {
         "show": "title",
-        "beats": 8
+        "beats": 10
        },
        {
         "show": "lamp",
@@ -317,7 +317,7 @@
        },
        {
         "show": "fork",
-        "beats": 8
+        "beats": 9
        }
       ]
      }
@@ -426,11 +426,11 @@
        },
        {
         "show": "stamp",
-        "beats": 6
+        "beats": 5
        },
        {
         "show": "free",
-        "beats": 6
+        "beats": 8
        },
        {
         "show": "need",
@@ -496,7 +496,7 @@
        },
        {
         "show": "climb",
-        "beats": 4
+        "beats": 5
        },
        {
         "show": "back",
@@ -535,7 +535,7 @@
        },
        {
         "show": "empty",
-        "beats": 8
+        "beats": 10
        }
       ]
      }
@@ -716,7 +716,7 @@
        },
        {
         "show": "t2",
-        "beats": 4
+        "beats": 5
        },
        {
         "show": "t3",
@@ -768,11 +768,11 @@
        },
        {
         "show": "try",
-        "beats": 6
+        "beats": 4
        },
        {
         "show": "life",
-        "beats": 10
+        "beats": 12
        }
       ]
      }

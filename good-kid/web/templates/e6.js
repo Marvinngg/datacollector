@@ -333,7 +333,7 @@
         { t: S.up + 0.3, type: 'swell', dur: 5.5 },
         { t: S.up + 0.5, type: 'whoosh', dur: 4.5 },
         { t: S.given + 0.5, type: 'tick' },
-        { t: S.kid + 0.8, type: 'glow' },
+        { t: S.kid + 0.8, type: 'tick' },
       ];
     },
   });
@@ -365,7 +365,7 @@
         x += ws[i]; return c;
       });
       // timing: a hand writes, with a pause before the slip is struck through
-      let t = 0; const tt = cs.map((c, i) => { const t0 = t; t += CPS * (0.8 + 0.5 * R(i + li * 31, 6)); if (i === strike) t += 0.55; return t0; });
+      let t = 0; const tt = cs.map((c, i) => { const t0 = t; t += CPS * (0.8 + 0.5 * R(i + li * 31, 6)); if (i === strike) t += 0.42; return t0; });
       const wob = L.kind === 'wobble' ? chars.indexOf('不') : -1;
       return { ...L, cs, tt, dur: t, strike, wob, end: x };
     });
@@ -424,7 +424,7 @@
 
   function triesState(ct, S, V) {
     const Ls = layout(V), tk = ['t1', 't2', 't3', 't4'].map(n => S[n]);
-    const t0 = tk.map(t => t + 0.25), done = Ls.map((L, i) => t0[i] + L.dur), kin = done.map(d => d + 0.95);
+    const t0 = tk.map(t => t + 0.25), done = Ls.map((L, i) => t0[i] + L.dur), kin = done.map(d => d + 0.8);
     return { Ls, t0, done, kin };
   }
   function drawChain(ctx, V, ct, S, api, lt) {
@@ -454,7 +454,7 @@
         fallK = (c, i) => {
           const d = tf + 0.12 * i + R(i, 61) * 0.35, k = clamp((ct - d) / 1.7); if (k <= 0) return null;
           // it lands on the paper behind and right of 你, lying flat
-          const lu = 800 + (c.x - 600) * 0.22 + (R(i, 62) - 0.5) * 50, lv = 790 + R(i, 63) * 120;
+          const lu = clamp(530 + (c.x + c.w * 0.5 - 540) / 0.85 + (R(i, 62) - 0.5) * 40, 60, 850), lv = 690 + R(i, 63) * 100;   // straight down, onto the paper (behind 你 they vanish behind its body)
           const p = P(cm, lu, lv, 0, {}), e = k * k * (3 - 2 * k), fallE = Math.min(1, k * k * 1.25);
           const bounce = k > 0.8 ? Math.sin((k - 0.8) / 0.2 * Math.PI) * 5 : 0;
           return { x: lerp(c.x, p.x, e) + Math.sin(k * 5 + i) * 10 * (1 - k), y: lerp(c.y, p.y, fallE) - bounce,
@@ -493,7 +493,7 @@
         LCc[m * 3] = lerp(LC.lamp[0], LC.warm[0], w); LCc[m * 3 + 1] = lerp(LC.lamp[1], LC.warm[1], w); LCc[m * 3 + 2] = lerp(LC.lamp[2], LC.warm[2], w);
         m++;
       }
-      PX.points(LX, LY, m, null, { a: 0.55, A: LA, C: LCc, glow: 0.6 });
+      PX.points(LX, LY, m, null, { a: 1.0, A: LA, C: LCc, glow: 0.6, size: 2 });
     }
     PX.flush({ exposure: 1.4 });
     halo(Y.x, Y.y, 260 * Y.s / 0.7, own * 0.9 + 0.25 * kOwn * (0.9 + 0.1 * Math.sin(ct * 1.3)));
