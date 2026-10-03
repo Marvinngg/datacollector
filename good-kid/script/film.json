@@ -1,0 +1,780 @@
+{
+ "title": "打分的人走了",
+ "mode": "silent",
+ "subtitles": false,
+ "width": 1080,
+ "height": 1920,
+ "bpm": 72,
+ "pace": {
+  "lead": 0,
+  "tail": 0,
+  "card": 0
+ },
+ "chapters": [
+  {
+   "id": "e0",
+   "num": "",
+   "title": "深夜",
+   "beats": [
+    {
+     "id": "b01",
+     "visual": {
+      "type": "feed",
+      "fadeIn": 0,
+      "lines": {
+       "clock": "01:00",
+       "cards": [
+        "骑机车冲上海边公路",
+        "在健身房带学员，笑得很松弛",
+        "山顶露营，篝火映着脸"
+       ],
+       "stare": [
+        "你没有点赞，",
+        "也没有划走。"
+       ]
+      },
+      "steps": [
+       {
+        "show": "clock",
+        "beats": 4
+       },
+       {
+        "show": "swipe1",
+        "beats": 6
+       },
+       {
+        "show": "swipe2",
+        "beats": 6
+       },
+       {
+        "show": "swipe3",
+        "beats": 6
+       },
+       {
+        "show": "stare",
+        "beats": 6
+       }
+      ]
+     }
+    },
+    {
+     "id": "b02",
+     "visual": {
+      "type": "answers",
+      "fadeIn": 0,
+      "lines": {
+       "facts": [
+        "工作体面",
+        "收入稳定",
+        "履历干净"
+       ],
+       "right": "每一步都对，",
+       "gray": "但整张卷子是灰色的。"
+      },
+      "steps": [
+       {
+        "show": "facts",
+        "beats": 6
+       },
+       {
+        "show": "fill",
+        "beats": 6
+       },
+       {
+        "show": "right",
+        "beats": 4
+       },
+       {
+        "show": "gray",
+        "beats": 6
+       }
+      ]
+     }
+    },
+    {
+     "id": "b03",
+     "visual": {
+      "type": "darkq",
+      "lines": {
+       "off": "别想了，明天还要早起。",
+       "q": [
+        "为什么我什么都做对了，",
+        "却觉得自己活得很暗？"
+       ]
+      },
+      "steps": [
+       {
+        "show": "off",
+        "beats": 6
+       },
+       {
+        "show": "dark",
+        "beats": 4
+       },
+       {
+        "show": "q",
+        "beats": 10
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "e1",
+   "num": "一",
+   "title": "打分的人走了",
+   "beats": [
+    {
+     "id": "b04",
+     "visual": {
+      "type": "reunion",
+      "lines": {
+       "him": "他",
+       "stories": [
+        "辞职开店",
+        "亏掉一笔钱，又赚回来",
+        "一个人骑车去了西藏"
+       ],
+       "wait": "你坐在那里，等着有人问你一句。",
+       "none": "没有人问。",
+       "honors": [
+        "第一名",
+        "满分",
+        "三好学生"
+       ]
+      },
+      "steps": [
+       {
+        "show": "table",
+        "beats": 4
+       },
+       {
+        "show": "arrive",
+        "beats": 6
+       },
+       {
+        "show": "stories",
+        "beats": 8
+       },
+       {
+        "show": "wait",
+        "beats": 6
+       },
+       {
+        "show": "none",
+        "beats": 6
+       }
+      ]
+     }
+    },
+    {
+     "id": "b05",
+     "visual": {
+      "type": "scorer",
+      "lines": {
+       "school": "在学校里，",
+       "seen": [
+        "你的每一份努力",
+        "都会被看见、被计分、被表扬。"
+       ],
+       "items": [
+        "作业",
+        "考试",
+        "竞赛",
+        "排名"
+       ],
+       "holders": [
+        "老师",
+        "排名",
+        "奖状"
+       ]
+      },
+      "steps": [
+       {
+        "show": "school",
+        "beats": 4
+       },
+       {
+        "show": "marks",
+        "beats": 8
+       },
+       {
+        "show": "seen",
+        "beats": 6
+       },
+       {
+        "show": "held",
+        "beats": 6
+       }
+      ]
+     }
+    },
+    {
+     "id": "b06",
+     "visual": {
+      "type": "leave",
+      "ref": "b05",
+      "lines": {
+       "none": "社会不发奖状。",
+       "title": [
+        "你没有变差，",
+        "是给你打分的人走了。"
+       ],
+       "lamp": [
+        "曾经让你发光的那盏灯，",
+        "不是你自己的灯。"
+       ],
+       "held": "它是别人举着的。"
+      },
+      "steps": [
+       {
+        "show": "go",
+        "beats": 8
+       },
+       {
+        "show": "none",
+        "beats": 4
+       },
+       {
+        "show": "title",
+        "beats": 8
+       },
+       {
+        "show": "lamp",
+        "beats": 6
+       },
+       {
+        "show": "held",
+        "beats": 6
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "e2",
+   "num": "二",
+   "title": "好孩子思维",
+   "beats": [
+    {
+     "id": "b07",
+     "visual": {
+      "type": "fuel",
+      "lines": {
+       "name": "好孩子思维",
+       "praise": [
+        "懂事",
+        "聪明",
+        "让人省心",
+        "真乖",
+        "第一名",
+        "别人家的孩子"
+       ],
+       "rule": [
+        "你的自我价值，",
+        "押在了别人的评价上。"
+       ]
+      },
+      "steps": [
+       {
+        "show": "name",
+        "beats": 6
+       },
+       {
+        "show": "praise",
+        "beats": 8
+       },
+       {
+        "show": "rule",
+        "beats": 8
+       }
+      ]
+     }
+    },
+    {
+     "id": "b08",
+     "visual": {
+      "type": "weightless",
+      "lines": {
+       "std": "标准",
+       "met": "标准满足了，就觉得自己有价值；",
+       "gone": "标准消失了，就开始失重。",
+       "safe": "有把握的事",
+       "risk": "可能出丑的事",
+       "fear": "被夸聪明的孩子，更怕失败。"
+      },
+      "steps": [
+       {
+        "show": "met",
+        "beats": 6
+       },
+       {
+        "show": "gone",
+        "beats": 8
+       },
+       {
+        "show": "fork",
+        "beats": 8
+       }
+      ]
+     }
+    },
+    {
+     "id": "b09",
+     "visual": {
+      "type": "rules",
+      "lines": {
+       "rules": [
+        "先想“这样对不对”，而不是“我想不想”",
+        "习惯走被验证过的路，因为那条路有人打分",
+        "对没有标准答案的东西，本能地紧张"
+       ],
+       "self": "个性",
+       "zero": "0",
+       "end": [
+        "你不是没有个性。",
+        "你只是太早学会了，个性在打分表上不加分。"
+       ]
+      },
+      "steps": [
+       {
+        "show": "r1",
+        "beats": 4
+       },
+       {
+        "show": "r2",
+        "beats": 4
+       },
+       {
+        "show": "r3",
+        "beats": 4
+       },
+       {
+        "show": "score",
+        "beats": 6
+       },
+       {
+        "show": "end",
+        "beats": 8
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "e3",
+   "num": "三",
+   "title": "你羡慕的",
+   "beats": [
+    {
+     "id": "b10",
+     "visual": {
+      "type": "honest",
+      "lines": {
+       "q": "如果明天真给你一辆机车，你会骑吗？",
+       "no": "大概不会。",
+       "what": "那你到底在羡慕什么？"
+      },
+      "steps": [
+       {
+        "show": "bike",
+        "beats": 4
+       },
+       {
+        "show": "q",
+        "beats": 6
+       },
+       {
+        "show": "no",
+        "beats": 4
+       },
+       {
+        "show": "what",
+        "beats": 6
+       }
+      ]
+     }
+    },
+    {
+     "id": "b11",
+     "visual": {
+      "type": "freedom",
+      "lines": {
+       "word": "不在乎",
+       "items": [
+        "靠不靠谱",
+        "父母会不会担心",
+        "有没有人打分"
+       ],
+       "stamp": "批准",
+       "free": "不需要被批准的自由",
+       "need": "你真正缺的，从来不是一辆机车。"
+      },
+      "steps": [
+       {
+        "show": "word",
+        "beats": 6
+       },
+       {
+        "show": "items",
+        "beats": 8
+       },
+       {
+        "show": "stamp",
+        "beats": 6
+       },
+       {
+        "show": "free",
+        "beats": 6
+       },
+       {
+        "show": "need",
+        "beats": 6
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "e4",
+   "num": "四",
+   "title": "账单不同",
+   "beats": [
+    {
+     "id": "b12",
+     "visual": {
+      "type": "bills",
+      "lines": {
+       "pay": "他们也在付账，只是账单不同。",
+       "bills": [
+        [
+         "机车",
+         "信用卡分期，还没还完"
+        ],
+        [
+         "健身教练",
+         "三十五岁以后，还没想好"
+        ],
+        [
+         "开店",
+         "父母大半辈子的积蓄"
+        ]
+       ]
+      },
+      "steps": [
+       {
+        "show": "print",
+        "beats": 10
+       },
+       {
+        "show": "pay",
+        "beats": 6
+       }
+      ]
+     }
+    },
+    {
+     "id": "b13",
+     "visual": {
+      "type": "trap",
+      "lines": {
+       "relief": "还好，他们其实也没那么好，我的路更稳。",
+       "back": "你又回到了那张打分表上。",
+       "rank": "它连安慰你的方式，都是排名。"
+      },
+      "steps": [
+       {
+        "show": "relief",
+        "beats": 6
+       },
+       {
+        "show": "climb",
+        "beats": 4
+       },
+       {
+        "show": "back",
+        "beats": 6
+       },
+       {
+        "show": "rank",
+        "beats": 6
+       }
+      ]
+     }
+    },
+    {
+     "id": "b14",
+     "visual": {
+      "type": "exchange",
+      "lines": {
+       "pair": [
+        "稳定",
+        "自由"
+       ],
+       "trade": [
+        "每一条路都是一次交换，",
+        "没有哪一条路被正确打分。"
+       ],
+       "empty": "根本就没有阅卷人。"
+      },
+      "steps": [
+       {
+        "show": "scale",
+        "beats": 8
+       },
+       {
+        "show": "trade",
+        "beats": 6
+       },
+       {
+        "show": "empty",
+        "beats": 8
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "e5",
+   "num": "五",
+   "title": "试错权",
+   "beats": [
+    {
+     "id": "b15",
+     "visual": {
+      "type": "yourbill",
+      "lines": {
+       "rows": [
+        [
+         "钱",
+         "不是"
+        ],
+        [
+         "前途",
+         "不是"
+        ]
+       ],
+       "cost": "你付出的代价，叫",
+       "word": "试错权"
+      },
+      "steps": [
+       {
+        "show": "print",
+        "beats": 8
+       },
+       {
+        "show": "word",
+        "beats": 8
+       }
+      ]
+     }
+    },
+    {
+     "id": "b16",
+     "visual": {
+      "type": "never",
+      "lines": {
+       "ages": [
+        [
+         "18",
+         "为一件蠢事熬过通宵"
+        ],
+        [
+         "20",
+         "爱错过一个人"
+        ],
+        [
+         "25",
+         "做过一个所有人都反对的决定"
+        ]
+       ],
+       "never": "你没有摔过。"
+      },
+      "steps": [
+       {
+        "show": "a18",
+        "beats": 4
+       },
+       {
+        "show": "a20",
+        "beats": 4
+       },
+       {
+        "show": "a25",
+        "beats": 4
+       },
+       {
+        "show": "never",
+        "beats": 6
+       }
+      ]
+     }
+    },
+    {
+     "id": "b17",
+     "visual": {
+      "type": "fall",
+      "lines": {
+       "cliff": "每一个新选择，看起来都像悬崖。",
+       "alive": "原来摔一跤，人是不会死的。",
+       "floor": [
+        "他们不是比你更勇敢。",
+        "他们只是早就摔过很多次，知道底下有地。"
+       ]
+      },
+      "steps": [
+       {
+        "show": "cliff",
+        "beats": 6
+       },
+       {
+        "show": "step",
+        "beats": 4
+       },
+       {
+        "show": "drop",
+        "beats": 8
+       },
+       {
+        "show": "land",
+        "beats": 6
+       },
+       {
+        "show": "floor",
+        "beats": 10
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "e6",
+   "num": "六",
+   "title": "Have a try",
+   "beats": [
+    {
+     "id": "b18",
+     "visual": {
+      "type": "stand",
+      "lines": {
+       "not": "不是推翻自己，",
+       "up": "而是从那张打分表上站起来，看一眼它。",
+       "given": "它是别人发给你的。",
+       "kid": "那个深夜让你难受的，是心里那个始终在等分数的小孩。"
+      },
+      "steps": [
+       {
+        "show": "not",
+        "beats": 4
+       },
+       {
+        "show": "up",
+        "beats": 8
+       },
+       {
+        "show": "given",
+        "beats": 6
+       },
+       {
+        "show": "kid",
+        "beats": 8
+       }
+      ]
+     }
+    },
+    {
+     "id": "b19",
+     "visual": {
+      "type": "tries",
+      "lines": {
+       "try": "去试一件没人给你打分的事。",
+       "list": [
+        "报一个你完全不会的课",
+        "一个人去一座陌生的城市",
+        "在会上说一句没准备好的话",
+        "学一样你注定学不好的东西"
+       ],
+       "fine": "做得不好，世界也没有塌。"
+      },
+      "steps": [
+       {
+        "show": "try",
+        "beats": 6
+       },
+       {
+        "show": "t1",
+        "beats": 4
+       },
+       {
+        "show": "t2",
+        "beats": 4
+       },
+       {
+        "show": "t3",
+        "beats": 4
+       },
+       {
+        "show": "t4",
+        "beats": 4
+       },
+       {
+        "show": "fine",
+        "beats": 6
+       }
+      ]
+     }
+    },
+    {
+     "id": "b20",
+     "visual": {
+      "type": "lamp",
+      "ref": "b19",
+      "lines": {
+       "take": [
+        "每试一次，你就从别人手里，",
+        "拿回一点属于自己的灯。"
+       ]
+      },
+      "steps": [
+       {
+        "show": "take",
+        "beats": 10
+       }
+      ]
+     }
+    },
+    {
+     "id": "b21",
+     "visual": {
+      "type": "end",
+      "lines": {
+       "years": "你已经做了很多年的好孩子了。",
+       "try": "Have a try",
+       "life": "试试不一样的生活。"
+      },
+      "steps": [
+       {
+        "show": "years",
+        "beats": 8
+       },
+       {
+        "show": "try",
+        "beats": 6
+       },
+       {
+        "show": "life",
+        "beats": 10
+       }
+      ]
+     }
+    }
+   ]
+  }
+ ]
+}
