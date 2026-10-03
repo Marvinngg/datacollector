@@ -428,10 +428,10 @@
       out.push({ t: 0.2, type: 'hush' }, { t: 1.55, type: 'chip' });
       WD.forEach((w, wi) => {
         out.push({ t: w.wave, type: 'whoosh', dur: SPREAD + FLY * 0.6, world: wi });
-        out.push({ t: s.landStart[wi], type: 'ticks', dur: s.landEnd[wi] - s.landStart[wi], n: 16 + wi * 4, p0: 0.75 - wi * 0.2, p1: 0.55 - wi * 0.2 });
+        out.push({ t: +s.landStart[wi].toFixed(3), type: 'ticks', dur: +(s.landEnd[wi] - s.landStart[wi]).toFixed(3), n: 16 + wi * 4, p0: +(0.75 - wi * 0.2).toFixed(2), p1: +(0.55 - wi * 0.2).toFixed(2) });
       });
-      out.push({ t: s.landEnd[2], type: 'resolve' });
-      SWIN.forEach((ws, si) => ws.forEach(([a, b]) => { if (a < 18) out.push({ t: a, type: 'stream', dur: Math.min(b, 18) - a + TRAVEL, stream: si }); }));
+      out.push({ t: +s.landEnd[2].toFixed(3), type: 'resolve' });
+      SWIN.forEach((ws, si) => ws.forEach(([a, b]) => { if (a < 18) out.push({ t: a, type: 'stream', dur: +(Math.min(b, 18) - a + TRAVEL).toFixed(2), stream: si }); }));
       return out;
     },
   });
@@ -439,7 +439,7 @@
     draw(ctx, V, lt, api) { drawWorlds(ctx, chainT(lt, api), api.beat.start + lt); },
     cues(V, api) {
       const c0 = -api.chainStart, out = [];   // chain time -> local time: ct - c0
-      SWIN.forEach((ws, si) => ws.forEach(([a, b]) => { if (a >= 18 && a < 30) out.push({ t: a - c0, type: 'stream', dur: Math.min(b, 39) - a, stream: si }); }));
+      SWIN.forEach((ws, si) => ws.forEach(w => { const [a, b] = w; if (a >= 18 && a < 30) out.push({ t: +(a - c0).toFixed(2), type: 'stream', dur: +(Math.min(b, 39) - a).toFixed(2), stream: si, level: ws.indexOf(w) > 1 ? 0.4 : 0.8 }); }));
       out.push({ t: T_PULL0 - c0, type: 'whoosh', dur: 2.5 }, { t: T_PULL0 - c0, type: 'swell', dur: 7.5 });
       out.push({ t: 27.0 - c0, type: 'gather', dur: 2.3 }, { t: 27.9 - c0, type: 'chip' });
       out.push({ t: 30.0 - c0, type: 'hush' }, { t: 34.5 - c0, type: 'resolve' });

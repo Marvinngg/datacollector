@@ -304,7 +304,7 @@ def h_hush(t, dur=None, **_):
 
 def h_heartbeat(t, k=0, **_):
     if seen('heartbeat', t, 0.1): return
-    k = float(k or 0); g = 0.42 + 0.05 * min(k, 11)
+    k = float(k or 0); g = 0.26 + 0.03 * min(k, 11)
     x = filt(kick(85, 46, 0.13, 0.6, 0.0), 'lp', 260)
     y = filt(kick(78, 44, 0.11, 0.6, 0.0), 'lp', 240)
     bus = POST if gated(t) else FX
@@ -1045,6 +1045,13 @@ def env_from(spans, kind):
             g[i0:i1] *= env_points(i1 - i0, [(x - i0 / SR, y) for x, y in pts], curve='cos')
     return g
 G = env_from(GATE, 'gate')[:, None]; HD = env_from(DUCK, 'duck')[:, None]
+# section trims on the music bus (dB, by visual type), 80 ms cosine moves on the beat lines
+TRIM = {'pitch': 1.5, 'ai': 3.5}
+pts = []
+for b_ in BEATS:
+    g_ = 10 ** (TRIM.get(tl.btype(b_), 0.0) / 20)
+    pts += [(b_['start'] + 0.04, g_), (b_['end'] - 0.04, g_)]
+HD = HD * env_points(nn, pts)[:, None]
 if '--stems' in sys.argv:        # debug: loudness of each bus per step
     import pyloudnorm as pyln
     M_ = pyln.Meter(SR, block_size=0.4)
