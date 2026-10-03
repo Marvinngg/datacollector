@@ -267,8 +267,6 @@
     draw(W / 2 - 520 * k, hz, W / 2 + 520 * k, hz, 0.3, 1.1);             // the horizon
     draw(W / 2 - 520 * k, BIKE.y, W / 2 + 520 * k, BIKE.y, 0.42, 1.3);     // the road under the wheels
     draw(W / 2 - 520 * k, BIKE.y + 92, W / 2 + 520 * k, BIKE.y + 92, 0.13, 1);
-    // lane dashes
-    for (let i = -4; i <= 4; i++) { const x = W / 2 + i * 130 + 30; draw(x - 34 * k, BIKE.y + 46, x + 34 * k, BIKE.y + 46, 0.12 * (1 - Math.abs(i) / 5), 1.2); }
     // the sea: a few short swells, closer together toward the horizon
     for (let r = 0; r < 7; r++) {
       const y = hz + 18 + Math.pow(r / 6, 1.7) * 300, cnt = 2 + (r % 2);
@@ -336,8 +334,28 @@
   let MB = null;
   const mk2 = n => ({ X: new Float32Array(n), Y: new Float32Array(n), A: new Float32Array(n), C: new Float32Array(n * 3) });
   function moteBuf(n) { return MB || (MB = [mk2(n), mk2(n)]); }
-  function motesAt(m, lt, T, tRel, s, out) {
-    const n = m.n, { X, Y, A } = out;
+  /* 「那你到底在羡慕什么？」 is written by the bike's own motes: the share that would burn out (DIE) leave their drift and
+     gather into the glyphs, left to right. They stay as that sentence until b11 gathers everything into 不在乎. */
+  const QL = { size: 64, y: 905 };
+  let QM = null;
+  function qmap() {
+    if (QM) return QM;
+    const b = bike(), hb = window.T.TL.beats.find(x => x.visual.type === 'honest'), str = hb.visual.lines.what;
+    const ids = []; for (let j = 0; j < b.n; j++) if (R(j, 26) < DIE) ids.push(j);
+    const cl = PX.fit(PX.text(str, { size: QL.size, family: F.serif, weight: 600, x: W / 2, y: QL.y, step: 1.05, spacing: 5, seed: 41 }), ids.length);
+    const ci = Array.from({ length: cl.n }, (_, i) => i).sort((p, q) => (cl.X[p] + R(p, 77) * 40) - (cl.X[q] + R(q, 77) * 40));
+    ids.sort((p, q) => (b.HX[p] + R(p, 78) * 160) - (b.HX[q] + R(q, 78) * 160));
+    let x0 = 1e9, x1 = -1e9; for (let i = 0; i < cl.n; i++) { x0 = Math.min(x0, cl.X[i]); x1 = Math.max(x1, cl.X[i]); }
+    const QX = new Float32Array(b.n), QY = new Float32Array(b.n), QO = new Float32Array(b.n);
+    ids.forEach((j, k) => { const i = ci[k]; QX[j] = cl.X[i]; QY[j] = cl.Y[i]; QO[j] = (cl.X[i] - x0) / (x1 - x0); });
+    QM = { QX, QY, QO }; return QM;
+  }
+  const qShimX = (j, T) => Math.sin(T * (0.7 + 0.5 * R(j, 79)) + R(j, 80) * 30) * 0.9;
+  const qShimY = (j, T) => Math.cos(T * (0.6 + 0.5 * R(j, 81)) + R(j, 82) * 30) * 0.9;
+  const qA = (j, T) => 1.15 * (0.8 + 0.2 * Math.sin(T * 1.3 + R(j, 83) * 20));
+  const qK = (Q, j, lt, tWhat) => ease.inOut(clamp((lt - (tWhat + 0.2 + 1.1 * Q.QO[j] + 0.35 * R(j, 84))) / (0.9 + 0.4 * R(j, 85))));
+  function motesAt(m, lt, T, tRel, s, out, tWhat) {
+    const n = m.n, { X, Y, A } = out, Q = qmap();
     for (let j = 0; j < n; j++) {
       const tr = tRel(m.pieces[m.PC[j]].ord), t = lt - s, f = prog(t, tr - 0.35, tr - 0.05);
       if (f <= 0) { A[j] = 0; continue; }
@@ -346,15 +364,25 @@
       const hv = smooth(u);
       X[j] = m.SX[j] + m.DX[j] * e + hovX(j, T - s) * hv;
       Y[j] = m.SY[j] + m.DY[j] * e - lift + hovY(j, T - s) * hv;
-      const flash = u > 0 ? Math.exp(-u * 4) * 0.2 : 0, live = R(j, 26) < DIE ? 1 - smooth(u) : 1;
-      A[j] = f * live * (lerp(1, hangA(j, T - s), smooth(clamp(u * 1.6))) + flash);
+      const flash = u > 0 ? Math.exp(-u * 4) * 0.2 : 0;
+      if (R(j, 26) < DIE) {                                            // a writer of the question
+        const kq = qK(Q, j, t, tWhat), dim = 1 - 0.55 * smooth(u);
+        A[j] = f * lerp(dim + flash, qA(j, T - s), kq);
+        if (kq > 0) {
+          const sw = Math.sin(Math.PI * kq) * (20 + 50 * R(j, 86)) * (R(j, 87) < 0.5 ? -1 : 1);
+          X[j] = lerp(X[j], Q.QX[j] + qShimX(j, T - s), kq); Y[j] = lerp(Y[j], Q.QY[j] + qShimY(j, T - s), kq) + sw;
+        }
+      } else A[j] = f * (lerp(1, hangA(j, T - s), smooth(clamp(u * 1.6))) + flash);
     }
   }
 
+  const QCOL = [1, 0.8, 0.55];
+  const HELM = { x: 368, y: 684 };                                   // on the seat, where the helmet rests
+  // split a sentence after its first comma
+  function splitAt(s) { const i = s.indexOf('，'); return i > 0 && i < s.length - 1 ? [s.slice(0, i + 1), s.slice(i + 1)] : [s, '']; }
   T.register('honest', {
     draw(ctx, V, lt, api) {
       const T0 = api.beat.start, T = T0 + lt, tQ = at(api, 'q'), tNo = at(api, 'no'), tWhat = at(api, 'what'), dur = api.dur;
-      if (lt > dur - 0.5) ctx.globalAlpha = 1;            // b10 -> b11 is one continuous picture (see the header)
       const m = bike();
       const z = lerp(1, ZOOM.z1, ease.inOut(prog(lt, 0, tNo)));
       const r0 = tNo + 0.55, r1 = tWhat + 0.35;
@@ -366,21 +394,24 @@
       // light: wind + loosened motes
       PX.begin();
       drawWind(T, ease.inOut(prog(lt, 0, 1.4)) * lerp(1, WIND_CALM, smooth(prog(lt, tWhat - 1, tWhat + 1.5))));
-      if (lt > r0 - 0.4) {
-        const [b, b1] = moteBuf(m.n), n = m.n;
-        motesAt(m, lt, T, tRel, 0, b); motesAt(m, lt, T, tRel, 0.045, b1);
+      if (lt > tNo - 0.3) {
+        const [b, b1] = moteBuf(m.n), n = m.n, Q = qmap();
+        motesAt(m, lt, T, tRel, 0, b, tWhat); motesAt(m, lt, T, tRel, 0.045, b1, tWhat);
         // colour: ink-white while still a line, warming to the wind's orange as it drifts
         for (let j = 0; j < n; j++) {
           const u = clamp((lt - tRel(m.pieces[m.PC[j]].ord)) / 1.2), w = smooth(u) * (0.75 + 0.25 * R(j, 24));
           b.C[j * 3] = lerp(INK[0], FREE[0], w); b.C[j * 3 + 1] = lerp(INK[1], lerp(FREE[1], WARM[1], R(j, 25) * 0.6), w); b.C[j * 3 + 2] = lerp(INK[2], FREE[2], w);
+          if (R(j, 26) < DIE) { const kq = qK(Q, j, lt, tWhat); if (kq > 0) for (let c = 0; c < 3; c++) b.C[j * 3 + c] = lerp(b.C[j * 3 + c], QCOL[c], kq); }
         }
         streaks(n, b.X, b.Y, b1.X, b1.Y, b.A, b.C, { a: 0.55, glow: 0.16 });
       }
+      // the question arrives on the wind and lies along the road; it blows away when the answer comes
+      const [q1, q2] = splitAt(V.lines.q), qo = prog(lt, tNo - 0.2, tNo + 1.4);
+      KIT.ptext(q1, W / 2, 1192, { size: 40, weight: 500, k: prog(lt, tQ + 0.15, tQ + 2.0), out: qo, from: [W + 80, 1150], color: INK, a: 0.55, t: T, crisp: 0.75, spacing: 3, tag: 1, seed: 5 });
+      KIT.ptext(q2, W / 2, 1318, { size: 66, weight: 600, k: prog(lt, tQ + 1.3, tQ + 2.9), out: clamp(qo * 1.2 - 0.1), from: [W + 80, 1240], color: INK, a: 0.55, t: T, crisp: 0.85, spacing: 6, tag: 2, seed: 6 });
+      // the honest answer sits on the seat where the helmet was (the helmet's motes become it)
+      KIT.ptext(V.lines.no, HELM.x, HELM.y, { size: 44, family: F.hand, weight: 400, k: prog(lt, tNo + 0.25, tNo + 1.5), out: prog(lt, tWhat - 0.2, tWhat + 1.3), from: [HELM.x, HELM.y - 40], color: WARM, a: 0.6, t: T, crisp: 0.9, spacing: 2, tag: 3, seed: 7 });
       PX.flush({ exposure: 1.6, glow: 0.9 });
-      // the voice
-      cap(splitQ(V.lines.q), lt, tQ, tNo);
-      cap(V.lines.no, lt, tNo, tWhat, { family: F.hand, size: 58 });
-      cap(V.lines.what, lt, tWhat, dur - 0.15);
     },
     cues(V, api) {
       const t = n => at(api, n);
@@ -403,7 +434,8 @@
     const b = bike(), NA = b.n, N = NA + NW + NS, m = { NA, N };
     // sources at b11's start (rest positions; wind and sparks move on in time)
     const sx = new Float32Array(N), sy = new Float32Array(N), o = [0, 0];
-    for (let j = 0; j < NA; j++) { sx[j] = b.HX[j]; sy[j] = b.HY[j]; }
+    const Q = qmap();
+    for (let j = 0; j < NA; j++) { if (R(j, 26) < DIE) { sx[j] = Q.QX[j]; sy[j] = Q.QY[j]; } else { sx[j] = b.HX[j]; sy[j] = b.HY[j]; } }
     for (let i = 0; i < NW; i++) { windPos(i, T0 + 1.2, o); sx[NA + i] = o[0]; sy[NA + i] = o[1]; }
     for (let i = 0; i < NS; i++) { sx[NA + NW + i] = 540 + (R(i, 41) + R(i, 76) - 1) * 640; sy[NA + NW + i] = 1900; }
     // the word, and the phrase
@@ -425,6 +457,7 @@
     for (let j = 0; j < NA; j++) {
       const w = 0.75 + 0.25 * R(j, 24);
       m.C10[j * 3] = lerp(INK[0], FREE[0], w); m.C10[j * 3 + 1] = lerp(INK[1], lerp(FREE[1], WARM[1], R(j, 25) * 0.6), w); m.C10[j * 3 + 2] = lerp(INK[2], FREE[2], w);
+      if (R(j, 26) < DIE) for (let c = 0; c < 3; c++) m.C10[j * 3 + c] = QCOL[c];
     }
     for (let j = 0; j < N; j++) {
       const up = clamp((WORD.bot - m.WY[j]) / (WORD.bot - WORD.top)), h = clamp(0.25 + 0.75 * R(j, 46) * (1 - up * 0.8));
@@ -436,7 +469,10 @@
   // free flight of each source before it is gathered (T absolute, lt local)
   function srcPos(m, j, T, lt, o) {
     const NA = m.NA;
-    if (j < NA) { const b = bike(); o[0] = b.HX[j] + hovX(j, T); o[1] = b.HY[j] + hovY(j, T); return R(j, 26) < DIE ? 0 : hangA(j, T) * 0.55 / 0.4; }
+    if (j < NA) {
+      if (R(j, 26) < DIE) { const Q = qmap(); o[0] = Q.QX[j] + qShimX(j, T); o[1] = Q.QY[j] + qShimY(j, T); return qA(j, T) * 0.55 / 0.4; }
+      const b = bike(); o[0] = b.HX[j] + hovX(j, T); o[1] = b.HY[j] + hovY(j, T); return hangA(j, T) * 0.55 / 0.4;
+    }
     if (j < NA + NW) { windPos(j - NA, T, o); return 0; }        // (their light is drawn as streaks until gathered)
     const i = j - NA - NW, sp = 300 + 240 * R(i, 47), t = lt - 0.25 * R(i, 48);
     const y = 1960 + R(i, 50) * 900 - sp * t, rise = clamp((1990 - y) / 800);
@@ -483,7 +519,10 @@
     // 1. gather into the word
     // each mote leaves its drift at its own moment and flies in quickly: the word fills in grain by grain
     let d, tr = 0.85 + 0.55 * R(j, 61);
-    if (j < m.NA) d = 0.25 + 2.9 * Math.pow(R(j, 60), 0.85);
+    if (j < m.NA) {
+      if (R(j, 26) < DIE) { d = 0.1 + 1.0 * qmap().QO[j] + 0.3 * R(j, 60); tr = 0.9 + 0.4 * R(j, 61); }   // the question becomes its answer first
+      else d = 0.25 + 2.9 * Math.pow(R(j, 60), 0.85);
+    }
     else if (j < m.NA + NW) d = 0.2 + 1.8 * R(j, 60);
     else { const i = j - m.NA - NW; d = (1960 + R(i, 50) * 900 - (1250 + 150 * R(i, 74))) / (330 + 260 * R(i, 47)) + 0.25 * R(i, 48); tr = 0.7 + 0.4 * R(j, 61); }
     const eg = ease.inOut(clamp((t - d) / tr));
@@ -521,7 +560,7 @@
       if (u >= 1) {
         x += Math.sin(t * 1.3 + R(j, 68) * 30) * 1.2; y += Math.cos(t * 1.1 + R(j, 69) * 30) * 1.2;
         // a flock lifting off: each leaves at its own moment, so the phrase thins like embers rising
-        const t3 = tF + 3.7 + 1.1 * Math.pow(R(j, 70), 0.8) + 0.15 * Math.abs(px - 540) / 420, ue = clamp((t - t3) / (1.9 + 0.7 * R(j, 71)));
+        const t3 = tF + 4.4 + 1.1 * Math.pow(R(j, 70), 0.8) + 0.15 * Math.abs(px - 540) / 420, ue = clamp((t - t3) / (1.9 + 0.7 * R(j, 71)));
         if (ue > 0) {
           const th = -Math.PI / 2 + (px - 540) / 540 * 0.9 + (R(j, 72) - 0.5) * 0.8, dist = 1600 * Math.pow(ue, 1.8);
           const curl = Math.sin(ue * 3 + R(j, 73) * 6) * 50 * ue;
@@ -537,7 +576,6 @@
     draw(ctx, V, lt, api) {
       const T0 = api.beat.start, T = T0 + lt, dur = api.dur;
       const tI = at(api, 'items'), tS = at(api, 'stamp'), tF = at(api, 'free'), tN = at(api, 'need');
-      if (lt < 0.5) ctx.globalAlpha = 1;                    // continuous from b10 (see the header)
       const m = mat11(V, T0), N = m.N, B = m.B, o = [0, 0];
       // strikes feed the flame
       const strikeT = [0, 1, 2].map(i => tI + 2.3 + i * 1.25);
@@ -589,7 +627,17 @@
         ctx.drawImage(sl.c, -STAMP.w / 2 - sl.pad, -STAMP.h / 2 - sl.pad);
         ctx.restore();
       }
-      cap(splitQ(V.lines.need), lt, tN, dur - 0.1);
+      // the last line is the frame's image, under the seal that is still waiting: small, then the key words larger
+      PX.begin();
+      const [n1, n2] = splitAt(V.lines.need), sp2 = 6, s2 = 70, key = '一辆机车', ki = n2.indexOf(key);
+      KIT.ptext(n1, W / 2, 990, { size: 46, weight: 400, k: prog(lt, tN + 0.3, tN + 1.8), color: INK, a: 0.5, t: T, crisp: 0.8, spacing: 4, tag: 4, seed: 8, drift: 0.4 });
+      if (ki > 0) {
+        const pre = n2.slice(0, ki), post = n2.slice(ki), w1 = K.measure(pre, { size: s2, family: F.serif, weight: 600, spacing: sp2 }) + sp2, w2 = K.measure(post, { size: s2, family: F.serif, weight: 600, spacing: sp2 });
+        const x0 = W / 2 - (w1 + w2) / 2, k2 = prog(lt, tN + 1.3, tN + 2.9);
+        KIT.ptext(pre, x0, 1108, { size: s2, weight: 600, align: 'left', k: k2, color: INK, a: 0.55, t: T, crisp: 0.85, spacing: sp2, tag: 5, seed: 9, drift: 0.4 });
+        KIT.ptext(post, x0 + w1, 1108, { size: s2, weight: 600, align: 'left', k: prog(lt, tN + 1.8, tN + 3.4), color: FREE, a: 0.6, t: T, crisp: 0.7, spacing: sp2, tag: 6, seed: 10, drift: 0.6 });
+      } else KIT.ptext(n2, W / 2, 1108, { size: s2, weight: 600, k: prog(lt, tN + 1.3, tN + 2.9), color: INK, a: 0.55, t: T, crisp: 0.85, spacing: sp2, tag: 5, seed: 9 });
+      PX.flush({ exposure: 1.6, glow: 0.9 });
     },
     cues(V, api) {
       const t = n => at(api, n), tI = t('items');

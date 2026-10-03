@@ -462,3 +462,215 @@
     PX.flush({ exposure: 1.4 });
   }
 
+
+  // ---------------------------------------------------------------- the voice, inside the picture
+  // handwriting: a line revealed left to right as if written (a soft-edged wipe), k 0..1
+  function written(str, x, y, o) {
+    const k = o.k; if (k <= 0) return;
+    const fo = { size: o.size, family: o.family || F.hand, weight: o.weight || 400, spacing: o.spacing || 0 };
+    const w = K.measure(str, fo), x0 = o.align === 'center' ? x - w / 2 : x, edge = o.size * 0.6;
+    const g = ctx.createLinearGradient(x0 + (w + edge) * k - edge, 0, x0 + (w + edge) * k, 0);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x0 - 4, y - o.size * 1.2, (w + edge) * k + 4, o.size * 1.6); ctx.clip();
+    text(str, x0, y, { ...fo, color: o.color, alpha: o.alpha == null ? 1 : o.alpha });
+    ctx.restore();
+    return w;
+  }
+  // the words of the stare, gathering out of the video's night sky, on the glass
+  function stareWords(lines, lt, tSt) {
+    const sx = x => SCX + x * CS, sy = y => SCY + y * CS, size = Math.round(40 * CS);
+    lines.forEach((l, i) => {
+      const t0 = tSt + 0.5 + i * 1.5;
+      KIT.ptext(l, sx(-178 + i * 52), sy(-262 + i * 66), { size, family: F.hand, weight: 400, align: 'left', color: [0.86, 0.91, 1], a: 0.42,
+        k: prog(lt, t0, t0 + 2.4), crisp: 0.95, t: lt, drift: 0.4, seed: 7 + i, tag: 3 + i, glow: 0.35 });
+    });
+  }
+
+  // ================================================================ b01 feed
+  T.register('feed', {
+    draw(ctx, V, lt, api) {
+      const tS = ['swipe1', 'swipe2', 'swipe3'].map(n => at(api, n)), tSt = at(api, 'stare'), tAbs = api.beat.start + lt;
+      const on = ease.out(prog(lt, 0.35, 1.05));
+      const dim = 1 - 0.22 * sm(prog(lt, tSt + 2.4, tSt + 5.0));         // the screen auto-dims while you stare
+      const light = on * dim;
+      const s = tS.reduce((a, t0) => a + mom(lt - t0), 0);
+      spill(light);
+      you(lt, light, { a: on });
+      phoneFrame(on);
+      screen({ light, s, t: tAbs, lt, swipes: tS, clock: V.lines.clock, caps: V.lines.cards, on: prog(lt, 0.45, 1.6), cardT0: tS.map(x => x + api.beat.start),
+        extra: lt > tSt ? () => stareWords(V.lines.stare, lt, tSt) : null });
+    },
+    cues(V, api) {
+      const t = n => at(api, n);
+      return [
+        { t: 0.35, type: 'click' },
+        ...['swipe1', 'swipe2', 'swipe3'].map(n => ({ t: t(n), type: 'swipe' })),
+        { t: t('stare'), type: 'hush' },
+      ];
+    },
+  });
+
+  // ================================================================ b02 answers
+  /* One paper: an info header (the facts, written by your hand, ticked by the scorer), the answer sheet, and a 评语 box
+     where the scorer writes "每一步都对，". When the colour drains, the last sentence condenses across the paper. */
+  const PAP = { x: 150, y: 300, w: 780, hdr: 440, sb: 1400, bot: 1560 };
+  T.register('answers', {
+    draw(ctx, V, lt, api) {
+      const tF = at(api, 'facts'), tFi = at(api, 'fill'), tR = at(api, 'right'), tG = at(api, 'gray');
+      const gray = sm(prog(lt, tG + 0.3, tG + 2.8));
+      const pk = ease.out(prog(lt, tF + 0.1, tF + 1.1));                 // the paper draws on
+      const pull = 1 - 0.03 * sm(prog(lt, tG, tG + 4.5));
+      const grayCol = (hex, k) => css(mix3(KIT.rgb(hex), KIT.rgb(C.gray), k));
+      ctx.save(); ctx.translate(W / 2, 930); ctx.scale(pull, pull); ctx.translate(-W / 2, -930);
+      // paper: outline, header box, 评语 box
+      ctx.save(); ctx.globalAlpha *= pk;
+      ctx.strokeStyle = C.line; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.rect(PAP.x, PAP.y, PAP.w * Math.min(1, pk * 1.4), PAP.bot - PAP.y); ctx.stroke();
+      text('评语', PAP.x + 24, PAP.sb + 40, { size: 22, family: F.sans, weight: 500, color: C.faint, spacing: 4 });
+      ctx.restore();
+      // the facts, written in your hand across the header; each gets the scorer's tick
+      V.lines.facts.forEach((f, i) => {
+        const ti = tF + 1.1 + i * 1.2, cx = PAP.x + 130 + i * 260 + 22;
+        written(f, cx, PAP.y + 92, { k: prog(lt, ti, ti + 0.75), size: 40, align: 'center', color: grayCol(C.ink, gray * 0.7), alpha: 0.92, spacing: 3 });
+        KIT.pen('check', cx - 124, PAP.y + 76, 34, prog(lt, ti + 0.8, ti + 1.1), { gray, seed: 3 + i, width: 3.8 });
+      });
+      // the answer sheet fills itself, row by row, every bubble right
+      const sk = ease.out(prog(lt, tF + 0.4, tF + 1.6));
+      const fill = prog(lt, tFi + 0.3, tFi + 3.1);
+      KIT.sheet(PAP.x, PAP.hdr, PAP.w, PAP.sb - PAP.hdr, { rows: 20, k: sk, fill, marks: prog(lt, tFi + 0.42, tFi + 3.22), gray, title: '答题卡 · 人生' });
+      KIT.pen('score', PAP.x + PAP.w - 96, PAP.hdr + 50, 42, prog(lt, tFi + 3.4, tFi + 4.0), { text: '100', gray, seed: 11 });
+      // the scorer's comment
+      written(V.lines.right, PAP.x + 150, PAP.sb + 104, { k: ease.inOut(prog(lt, tR + 0.1, tR + 1.5)), size: 58, color: grayCol(C.red, gray), alpha: 0.95, spacing: 4 });
+      ctx.restore();
+      // the drain: the paper sinks back, and the colour that left it condenses into the last sentence
+      if (gray > 0) {
+        ctx.save(); ctx.globalAlpha *= 0.35 * gray; ctx.fillStyle = '#06080d'; ctx.fillRect(0, 0, W, H); ctx.restore();
+        const gk = prog(lt, tG + 1.0, tG + 3.4);
+        if (gk > 0) {
+          const y = 960, g = ctx.createLinearGradient(0, y - 150, 0, y + 90);
+          g.addColorStop(0, 'rgba(6,8,13,0)'); g.addColorStop(0.35, 'rgba(6,8,13,0.82)'); g.addColorStop(0.7, 'rgba(6,8,13,0.82)'); g.addColorStop(1, 'rgba(6,8,13,0)');
+          ctx.save(); ctx.globalAlpha *= ease.out(clamp(gk * 2)); ctx.fillStyle = g; ctx.fillRect(0, y - 150, W, 240); ctx.restore();
+          PX.begin();
+          KIT.ptext(V.lines.gray, W / 2, y, { size: 66, family: F.serif, weight: 500, color: [0.72, 0.74, 0.78], a: 0.45, k: gk, crisp: 0.85, t: lt, drift: 0.3, spacing: 6, seed: 5, tag: 7 });
+          PX.flush({ exposure: 1.4 });
+        }
+      }
+    },
+    cues(V, api) {
+      const t = n => at(api, n), out = [];
+      for (let i = 0; i < 3; i++) out.push({ t: t('facts') + 1.1 + i * 1.2 + 0.8, type: 'pen' });
+      out.push({ t: t('fill') + 0.3, type: 'ticks', dur: 2.8, n: 20, p0: 0.45, p1: 0.75 });
+      out.push({ t: t('fill') + 3.4, type: 'pen' });
+      out.push({ t: t('right') + 0.1, type: 'pen' });
+      out.push({ t: t('gray'), type: 'hush' });
+      return out;
+    },
+  });
+
+  // b03 shows b01's last card again: its captions and video clock come from b01 in the timeline
+  function feedInfo() {
+    const b = T.TL && T.TL.beats.find(x => x.visual.type === 'feed'); if (!b) return { caps: ['', '', ''], t0: [0, 0, 0] };
+    const st = n => (b.visual.steps.find(s => s.show === n) || { t: 0 }).t;
+    return { caps: b.visual.lines.cards, t0: ['swipe1', 'swipe2', 'swipe3'].map(st), clock: b.visual.lines.clock };
+  }
+  // a note to self, typed on the phone just before it dies
+  function noteToSelf(str, lt, tO) {
+    const k = ease.out(prog(lt, tO + 0.3, tO + 0.9)); if (k <= 0) return;
+    const x = SCR.x + 26, w = SCR.w - 52, h = 132, y = lerp(SCR.y + SCR.h + 10, SCR.y + SCR.h - 300, k);
+    ctx.save();
+    ctx.fillStyle = 'rgba(6,9,16,0.55)'; ctx.fillRect(SCR.x, SCR.y, SCR.w, SCR.h);   // the video steps back behind the note
+    ctx.fillStyle = 'rgba(24,30,46,0.94)'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 22); ctx.fill();
+    ctx.strokeStyle = INKA(0.18); ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = INKA(0.35); ctx.beginPath(); ctx.roundRect(x + 26, y + 26, 34, 4, 2); ctx.fill();
+    const chars = [...str], n = Math.floor(clamp(prog(lt, tO + 1.0, tO + 3.1)) * chars.length), shown = chars.slice(0, n).join('');
+    const fo = { size: 34, family: F.sans, weight: 400 };
+    text(shown, x + 26, y + 88, { ...fo, color: '#eef2fa', alpha: 0.95 });
+    if (Math.floor((lt - tO) * 2.2) % 2 === 0 || (n > 0 && n < chars.length)) { ctx.fillStyle = '#8fb4ff'; ctx.fillRect(x + 28 + K.measure(shown, fo), y + 58, 2.5, 40); }
+    ctx.restore();
+  }
+
+  // ================================================================ b03 darkq
+  /* The question as particles (cached). All of them start packed in the screen's last dot; when the question comes
+     the CRT runs backwards where the screen died: the dot opens into a line, the line parts into two rows, and the
+     rows develop into letters, left to right. Two sizes: the first line quieter, the second larger; 暗 is the one
+     character that is barely lit. */
+  const QL = [{ size: 46, y: 640, col: [0.78, 0.82, 0.9] }, { size: 66, y: 742, col: [0.9, 0.93, 1] }], QSP = s => s * 0.08, QDIM = '暗';
+  const QY = SCY;
+  let QC = null;
+  function qLayout(l, o) {                                              // char x positions, exactly as PX.text lays them out
+    const sp = QSP(o.size), ws = [...l].map(ch => K.measure(ch, { size: o.size, family: F.serif, weight: 400 }) + sp);
+    const tw = ws.reduce((a, b) => a + b, 0) - sp; let x = W / 2 - tw / 2; return [...l].map((ch, i) => { const r = { ch, x, w: ws[i] }; x += ws[i]; return r; });
+  }
+  function qCloud(lines) {
+    if (QC) return QC;
+    const xs = [], ys = [], ord = [], row = [], dim = [];
+    lines.forEach((l, li) => {
+      const o = QL[li], c = PX.text(l, { size: o.size, family: F.serif, weight: 400, x: W / 2, y: o.y, step: o.size / 44, spacing: QSP(o.size), seed: 31 + li });
+      const lay = qLayout(l, o);
+      let x0 = 1e9, x1 = -1e9; for (let i = 0; i < c.n; i++) { x0 = Math.min(x0, c.X[i]); x1 = Math.max(x1, c.X[i]); }
+      for (let i = 0; i < c.n; i++) {
+        xs.push(c.X[i]); ys.push(c.Y[i]); ord.push((c.X[i] - x0) / (x1 - x0)); row.push(li);
+        const ch = lay.find(r => c.X[i] >= r.x - 2 && c.X[i] < r.x + r.w); dim.push(ch && ch.ch === QDIM ? 0.3 : 1);
+      }
+    });
+    const n = xs.length;
+    return (QC = { n, X: Float32Array.from(xs), Y: Float32Array.from(ys), D: Float32Array.from(ord), L: Uint8Array.from(row), M: Float32Array.from(dim),
+      ox: new Float32Array(n), oy: new Float32Array(n), oa: new Float32Array(n), C: new Float32Array(n * 3) });
+  }
+  T.register('darkq', {
+    draw(ctx, V, lt, api) {
+      const tO = at(api, 'off'), tQ = at(api, 'q'), tAbs = api.beat.start + lt;
+      const tC = tO + 5 * KIT.beat.BEAT, u = lt - tC;                       // the CRT switch-off, on the beat
+      const base = 0.78;                                                    // the dimmed screen from b01's stare
+      const squash = u < 0 ? 1 : 1 - ease.in(clamp(u / 0.17));
+      const lineK = clamp((u - 0.17) / 0.26);
+      const frameA = u < 0 ? 1 : 1 - ease.out(clamp(u / 0.5));
+      const youLight = u < 0 ? base : Math.max(0, 1 - ease.out(clamp(u / 0.6))) * base;
+      const qk = prog(lt, tQ, tQ + 4.2);
+      spill(u < 0.17 ? base : youLight * 0.6, youLight);
+      const youA = lerp(1, 0.42, ease.inOut(clamp(u / 1.4)));
+      you(lt, Math.max(youLight, 0.14 * sm(qk)), { a: youA, lit: u < 0 ? 0.18 : 0.5 });
+      phoneFrame(frameA);
+      const fi = feedInfo();
+      if (u < 0.17) screen({ light: base, s: 3, t: tAbs, lt, clock: fi.clock, caps: fi.caps, cardT0: fi.t0, on: 1, squash, flash: u > 0 ? 0.55 * ease.in(clamp(u / 0.17)) : 0,
+        extra: () => noteToSelf(V.lines.off, lt, tO) });
+      const q = qCloud(V.lines.q), n = q.n;
+      PX.begin();
+      if (u >= 0.12 && u < 0.43) {                                         // the bright line collapsing to a dot
+        const wd = lerp(SCR.w * 0.5, 3, ease.in(lineK)), m = 900, out = PX.buf(m, 61);
+        for (let i = 0; i < m; i++) { out.X[i] = SCX + (R(i, 141) * 2 - 1) * wd; out.Y[i] = SCY + (R(i, 142) - 0.5) * 4; out.A[i] = 1; }
+        PX.points(out.X, out.Y, m, [0.85, 0.92, 1], { a: 0.5 * lerp(1, 1.4, lineK) * (wd > 40 ? 1 : 1.6), A: out.A, glow: 0.7 });
+      }
+      if (u >= 0.38) {
+        // the dot: a flare as the line closes, then a faint breathing remnant that never quite dies
+        const e = 0.06 + 0.94 * Math.exp(-(u - 0.38) / 0.45), br = 1 + 0.15 * Math.sin(tAbs * 1.7);
+        const rad = 1 + 1.6 * ease.out(clamp((u - 0.38) / 3));
+        const ka = ease.inOut(prog(lt, tQ, tQ + 1.4));                     // dot -> line
+        const kb = ease.inOut(prog(lt, tQ + 1.1, tQ + 2.0));               // line -> two rows
+        const settle = sm(prog(lt, tQ + 3.8, tQ + 6.0));
+        for (let i = 0; i < n; i++) {
+          const r = Math.sqrt(R(i, 131)) * 4.5 * rad, an = R(i, 132) * TAU, li = q.L[i], o = QL[li];
+          const sx = SCX + Math.cos(an) * r + Math.sin(tAbs * 0.4 + R(i, 134) * 30) * 0.8, sy = QY + Math.sin(an) * r * 0.8;
+          const kc = ease.out(prog(lt, tQ + 1.9 + q.D[i] * 0.9 + R(i, 133) * 0.25, tQ + 2.9 + q.D[i] * 0.9 + R(i, 133) * 0.25));
+          const rowc = o.y - o.size * 0.36, ly = lerp(QY + (R(i, 135) - 0.5) * 2.5, rowc + (R(i, 135) - 0.5) * 2.5, kb);
+          q.ox[i] = lerp(sx, q.X[i], ka);
+          q.oy[i] = lerp(lerp(sy, ly, ka), q.Y[i], kc);
+          q.oa[i] = lerp(lerp(e * br * 0.045, 0.1, ka), 0.42 * q.M[i] * (li ? 1 : 0.85), kc) * lerp(1, 0.5, settle);
+          q.C[i * 3] = o.col[0]; q.C[i * 3 + 1] = o.col[1]; q.C[i * 3 + 2] = o.col[2];
+        }
+        PX.points(q.ox, q.oy, n, null, { a: 0.5, A: q.oa, C: q.C, glow: 0.4 });
+      }
+      PX.flush({ exposure: 1.5, glow: 1.1 });
+      // the crisp question surfaces out of its particles (暗 stays the least lit)
+      const qa = ease.inOut(prog(lt, tQ + 2.5, tQ + 4.4));
+      if (qa > 0) V.lines.q.forEach((l, li) => {
+        const o = QL[li];
+        for (const r of qLayout(l, o)) text(r.ch, r.x, o.y, { size: o.size, family: F.serif, weight: 400, color: css(o.col), alpha: qa * (r.ch === QDIM ? 0.38 : li ? 0.95 : 0.8) });
+      });
+    },
+    cues(V, api) {
+      const t = n => at(api, n), tC = t('off') + 5 * KIT.beat.BEAT;
+      return [{ t: t('off') + 1.0, type: 'type', dur: 2.1 }, { t: tC, type: 'off' }, { t: t('dark'), type: 'hush' }, { t: t('q'), type: 'glow' }, { t: t('q') + 2.4, type: 'title' }];
+    },
+  });
+})();

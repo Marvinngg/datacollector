@@ -30,15 +30,6 @@
   let SX = new Float32Array(1 << 16), SY = new Float32Array(1 << 16), SA = new Float32Array(1 << 16);
   function scratch(n) { if (SX.length < n) { const m = 1 << Math.ceil(Math.log2(n)); SX = new Float32Array(m); SY = new Float32Array(m); SA = new Float32Array(m); } }
 
-  // a caption that reveals at t0 and leaves before t1
-  function cap(lines, lt, t0, t1, o = {}) {
-    const ls = Array.isArray(lines) ? lines : [lines], n = ls.reduce((a, l) => a + [...l].length, 0);
-    const k = prog(lt, t0, t0 + (o.dur || Math.min(2.6, 0.7 + n * 0.08)));
-    if (k <= 0) return;
-    const out = t1 == null ? 0 : prog(lt, t1 - 0.6, t1 - 0.08);
-    if (out >= 1) return;
-    KIT.caption(ls, k, { ...o, out });
-  }
   function veil(a) { if (a <= 0) return; ctx.save(); ctx.globalAlpha *= Math.min(1, a); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); ctx.restore(); }
   function softLight(x, y, r, rgbStr, a, sy = 1) {
     if (a <= 0.002 || r <= 1) return;
@@ -396,20 +387,29 @@
     ctx.restore();
   }
   // imprints of the others on the floor: [x, depth 0..1, size, rotation, brightness, ring]
+  /* the floor is the page of the last sentences: rows of text lying on it (world depth in front of the cliff base,
+     size, squash), centred on the floor shot's centre */
+  const FLOOR_D = 400, FLOOR_SQ = 0.24;                   // world depth of the floor band in front of the cliff, ellipse squash
+  const ROW_ALIVE = { d: 80, size: 40, sq: 0.74, x: XL }, ROWS = [{ d: 176, size: 58, sq: 0.7 }, { d: 270, size: 62, sq: 0.72 }, { d: 358, size: 62, sq: 0.74 }];
+  const FLOOR_CX = 668;
   let MARKS = null;
-  function marks() {
+  function marks(spans) {
     if (MARKS) return MARKS;
     const r = rng(1717), out = [], x0 = faceX(YF) + 30;
-    for (let i = 0; i < 160 && out.length < 64; i++) {
-      const g = r() < 0.55, gx = () => { let s = 0; for (let k = 0; k < 3; k++) s += r(); return (s - 1.5) / 0.5; };
-      const x = g ? XL + gx() * 170 : x0 + r() * 820, d = g ? clamp(0.35 + gx() * 0.25, 0.05, 1) : 0.05 + r() * 0.95;
-      if (x < x0 || Math.abs(x - XL) < 46 && d < 0.5) continue;
-      if (out.some(m => Math.abs(m[0] - x) < 34 && Math.abs(m[1] - d) < 0.16)) continue;   // no pile-ups: each one legible
+    const clear = (x, d) => spans.some(([cx, half, dd, hh]) => Math.abs(x - cx) < half + 30 && Math.abs(d - dd) < hh);
+    for (let i = 0; i < 400 && out.length < 90; i++) {
+      const g = r() < 0.45, gx = () => { let s = 0; for (let k = 0; k < 3; k++) s += r(); return (s - 1.5) / 0.5; };
+      const x = g ? XL + gx() * 200 : x0 - 120 + r() * 950, d = g ? 14 + Math.abs(gx()) * 120 : 10 + r() * (FLOOR_D - 20);
+      if (x < (d < 40 ? x0 : 80) || x > 1500 || Math.abs(x - XL) < 50 && d < 40) continue;
+      if (clear(x, d)) continue;                                                             // the sentences' rows stay clear
+      if (out.some(m => Math.abs(m[0] - x) < 40 && Math.abs(m[1] - d) < 34)) continue;      // no pile-ups: each one legible
       out.push([x, d, 0.75 + 0.5 * r(), (r() - 0.5) * 1.4, 0.45 + 0.55 * r(), r()]);
     }
     return (MARKS = out);
   }
-  const FLOOR_D = 190, FLOOR_SQ = 0.24;                   // world depth of the floor band in front of the cliff, ellipse squash
+  // a sentence lying on the floor: points in world space (cloud sampled at 100 px, scaled to size; squashed by sq)
+  const floorCloud = (str, seed) => PX.text(str, { size: 100, family: F.serif, weight: 500, x: 0, y: 0, step: 2.7, spacing: 4, seed });
+  const rowHalf = (str, size) => [...str].length * size * 0.53;
   function fallTimes(api) {
     const tC = at(api, 'cliff'), tS = at(api, 'step'), tD = at(api, 'drop'), tL = at(api, 'land'), tF = at(api, 'floor');
     return { tC, tS, tD, tL, tF, walk: [tS + 0.25, tS + 1.45], tip: tS + 2.3, stop: tL - 0.22, contact: tL + 0.3 };
@@ -507,6 +507,28 @@
     g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.85)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.restore();
   }
+  /* 「每一个新选择，看起来都像悬崖。」 carved into the rock below where 你 stands: two lines of engraved outline, cut
+     left to right with a little dust, moving with the rock (it rushes away upward when you fall) */
+  const ENG = [{ x: 428, y: YT + 98, size: 37 }, { x: 428, y: YT + 156, size: 37 }];
+  function engrave(m, lines, k, a, lt) {
+    if (a <= 0.003) return [];
+    const sparks = [];
+    ctx.save(); ctx.globalAlpha *= a; ctx.translate(m.ox, m.oy); ctx.scale(m.s, m.s);
+    lines.forEach((str, li) => {
+      const e = ENG[li], kk = clamp(k * 2 - li); if (kk <= 0) return;
+      ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(-0.018 + li * 0.01);
+      ctx.font = `600 ${e.size}px ${F.serif}`; ctx.textAlign = 'center'; ctx.letterSpacing = (e.size * 0.12) + 'px';
+      const w = ctx.measureText(str).width, cut = (w + 20) * ease.inOut(kk);
+      ctx.beginPath(); ctx.rect(-w / 2 - 10, -e.size, cut, e.size * 1.5); ctx.clip();
+      ctx.fillStyle = 'rgba(6,8,13,0.75)'; ctx.fillText(str, 0, 0);                 // the cut is darker than the rock
+      ctx.lineJoin = 'round'; ctx.strokeStyle = ink(0.62); ctx.lineWidth = 1.05 / m.s; ctx.strokeText(str, 0, 0);
+      ctx.strokeStyle = ink(0.16); ctx.lineWidth = 1 / m.s; ctx.strokeText(str, 1.6, 1.6);  // the far wall of the groove
+      ctx.restore();
+      if (kk > 0 && kk < 1) sparks.push([e.x - w / 2 - 10 + cut, e.y - e.size * 0.35]);
+    });
+    ctx.restore();
+    return sparks;
+  }
   T.register('fall', {
     draw(ctx, V, lt, api) {
       const S = fallTimes(api), cam = camAt(S, lt), you = youState(S, lt, cam);
@@ -518,12 +540,15 @@
       // ---------- darkness deepens during the fall
       const dark = falling && !landShot ? 0.22 * ease.inOut(clamp(tau / 4)) : landShot ? 0.3 * (1 - ease.out(prog(lt, S.tL, S.tL + 2.5))) : 0;
       veil(dark);
+      let engSparks = [];
       // ---------- the cliff: lit from above (opening), an endless face (fall), the true cliff (landing, reveal)
       if (!landShot) {
         const follow = falling ? smooth(clamp(tau / 1.0)) : 0;
         const m = { s: cam.s, ox: cam.ox, oy: cam.oy - (falling ? F_.D * follow : 0) };
         const fo = falling ? 1 - ease.in(prog(tau, 0.6, 2.4)) : 1;
         drawCliff(m, y => Math.pow(clamp(1 - (y - YT) / 270), 1.5) + 0.04, fo);
+        const cl = V.lines.cliff, cc = cl.indexOf('，') + 1;
+        engSparks = engrave(m, cc > 0 ? [cl.slice(0, cc), cl.slice(cc)] : [cl], prog(lt, S.tC + 0.8, S.tC + 3.6), fo, lt).map(([x, y]) => [m.ox + x * m.s, m.oy + y * m.s]);
         if (falling) {
           const recede = -260 * ease.in(clamp(tau / 3.2));
           drawTile(m, YT + 150, recede * 1, clamp(tau / 0.5) * (1 - ease.in(prog(tau, 1.2, 3.4))) * 0.75);
@@ -533,16 +558,19 @@
         const floorLit = y => clamp(1 - (YF - y) / 105) * clamp(R / 200);
         drawCliff(m, y => Math.max(floorLit(y) * 0.85, reveal * (0.62 + 0.3 * clamp((y - YT) / HC))), 1);
       }
+      const fl = V.lines.floor, l2 = fl[1], cut2 = l2.indexOf('，') + 1;
+      const rowsTxt = [fl[0], ...(cut2 > 0 ? [l2.slice(0, cut2), l2.slice(cut2)] : [l2])];
+      const spans = [[ROW_ALIVE.x, rowHalf(V.lines.alive, ROW_ALIVE.size), ROW_ALIVE.d, 34], ...ROWS.slice(0, rowsTxt.length).map((r, i) => [FLOOR_CX, rowHalf(rowsTxt[i], r.size), r.d, 40])];
       // ---------- the floor: the imprints of everyone who fell before (flattened 你: everyone who fell was someone's 你; lit as the light reaches them)
       if (lightK && R > 0) {
         ctx.save(); ctx.translate(cam.ox, cam.oy); ctx.scale(cam.s, cam.s);
         ctx.font = `600 50px ${F.serif}`; ctx.textAlign = 'center';
-        for (const [mx, md, ms, mr, mb, mz] of marks()) {
-          const y = YF + 10 + md * FLOOR_D, dist = Math.hypot(mx - XL, (y - YF) / FLOOR_SQ);
+        for (const [mx, md, ms, mr, mb, mz] of marks(spans)) {
+          const y = YF + md, dist = Math.hypot(mx - XL, (y - YF) / 0.45);
           const lit = clamp((R - dist) / 300); if (lit <= 0.01) continue;
-          const pk = 0.65 + 0.55 * md, flash = Math.exp(-Math.max(0, R - dist) / 200);
+          const pk = 0.65 + 0.55 * md / FLOOR_D, flash = Math.exp(-Math.max(0, R - dist) / 200);
           ctx.save(); ctx.translate(mx, y); ctx.scale(ms * pk, ms * pk * 0.46); ctx.rotate(mr);
-          ctx.globalAlpha = lit * mb * (0.11 + 0.16 * flash) * (0.55 + 0.45 * md) * (1 + 0.7 * reveal);
+          ctx.globalAlpha = lit * mb * (0.11 + 0.16 * flash) * (0.55 + 0.45 * md / FLOOR_D) * (1 + 0.7 * reveal);
           ctx.fillStyle = warmS(1); ctx.fillText('你', 0, 18);
           if (mz > 0.45) { ctx.strokeStyle = warmS(0.35); ctx.lineWidth = 1.2 / (ms * pk); ctx.beginPath(); ctx.ellipse(0, 0, 50, 50, 0, 0, TAU); ctx.stroke(); }
           ctx.restore();
@@ -580,6 +608,45 @@
           PX.points(SX, SY, j, WARM, { a: 0.4, A: SA, glow: 0.5 });
         }
       }
+      // ---------- the sentences on the floor
+      if (lightK && lt > cT) {
+        // 「原来摔一跤，人是不会死的。」 lights up in the ripple, outward from where you landed; later it settles faint
+        const Rt = 600 * ease.out(prog(lt, cT + 0.5, cT + 3.4)), dim = 1 - 0.6 * ease.inOut(prog(lt, S.tF + 0.6, S.tF + 3.0));
+        const cl = floorCloud(V.lines.alive, 5), k = ROW_ALIVE.size / 100, n = cl.n; scratch(n); let j = 0;
+        for (let i = 0; i < n; i++) {
+          const xw = ROW_ALIVE.x + cl.X[i] * k, dx = Math.abs(xw - XL), v = clamp((Rt - dx) / 70); if (v <= 0.01) continue;
+          SX[j] = cam.X(xw); SY[j] = cam.Y(YF + ROW_ALIVE.d + (cl.Y[i] + 36) * k * ROW_ALIVE.sq);
+          SA[j] = v * (1 + 1.6 * Math.exp(-Math.max(0, Rt - dx) / 45)) * (0.75 + 0.25 * PX.rand(i, 5)); j++;
+        }
+        PX.points(SX, SY, j, mix(WARM, [1, 0.95, 0.88], 0.3), { a: 0.62 * dim, A: SA, glow: 0.35 });
+        // 「他们不是比你更勇敢。他们只是早就摔过很多次，知道底下有地。」 written across the floor by the light of the
+        // imprints around it: each particle leaves one of the others' marks and settles into the words
+        const mk = marks(spans);
+        rowsTxt.forEach((str, ri) => {
+          const row = ROWS[ri], t0 = S.tF + (ri === 0 ? 1.6 : 3.7 + (ri - 1) * 1.15), kr = prog(lt, t0, t0 + (ri === 0 ? 2.2 : 1.9));
+          if (kr <= 0) return;
+          const c = floorCloud(str, 9 + ri), kk0 = row.size / 100, m = c.n; scratch(m); let q = 0;
+          const half = rowHalf(str, row.size);
+          for (let i = 0; i < m; i++) {
+            const xw = FLOOR_CX + c.X[i] * kk0, ord = clamp((xw - FLOOR_CX + half) / (2 * half)) * 0.65 + PX.rand(i, 13) * 0.35;
+            const e = ease.inOut(clamp((kr * 1.6 - ord * 0.6))); if (e <= 0.002) continue;
+            const src = mk[(i * 7 + ri * 13) % mk.length], sx = cam.X(src[0]) + (PX.rand(i, 14) - 0.5) * 30 * cam.s, sy = cam.Y(YF + src[1]) + (PX.rand(i, 15) - 0.5) * 8 * cam.s;
+            const tx = cam.X(xw), ty = cam.Y(YF + row.d + (c.Y[i] + 36) * kk0 * row.sq);
+            SX[q] = lerp(sx, tx, e) + Math.sin(e * Math.PI) * (PX.rand(i, 16) - 0.5) * 40; SY[q] = lerp(sy, ty, e) - Math.sin(e * Math.PI) * 26 * PX.rand(i, 17);
+            SA[q] = 0.25 + 0.75 * e; q++;
+          }
+          PX.points(SX, SY, q, mix(WARM, [1, 0.96, 0.9], 0.55), { a: 0.6, A: SA, glow: 0.3 });
+        });
+      }
+      // dust from the carving
+      if (engSparks.length) {
+        const n = 120; scratch(n * engSparks.length); let j = 0;
+        for (const [x, y] of engSparks) for (let i = 0; i < n; i++) {
+          const ph = (PX.rand(i, 21) + lt * 1.7) % 1;
+          SX[j] = x + (PX.rand(i, 22) - 0.3) * 30 * ph; SY[j] = y + (PX.rand(i, 23) - 0.5) * 18 + ph * ph * 40; SA[j] = (1 - ph) * (0.4 + 0.6 * PX.rand(i, 24)); j++;
+        }
+        PX.points(SX, SY, j, [0.9, 0.88, 0.84], { a: 0.3, A: SA, glow: 0.3 });
+      }
       // ---------- the rush
       if (falling) {
         const ra = clamp(tau / 0.9) * (lt < S.stop ? 1 : 1 - ease.out(prog(lt, S.stop, S.stop + 0.55)));
@@ -615,12 +682,6 @@
         softLight(cam.X(XL), cam.Y(YF + 14), Math.max(60, R) * cam.s * 0.9, '255,201,133', 0.12 * Math.max(pre, clamp(R / 300)), 0.24);
         softLight(cam.X(XL), cam.Y(YF), 260 * cam.s, '255,201,133', 0.12 * pre * (1 - 0.5 * reveal), 0.3);
       }
-      // ---------- the voice
-      cap(V.lines.cliff, lt, S.tC + 0.9, S.tS + 0.7);
-      cap(V.lines.alive, lt, S.tL + 1.4, S.tF + 0.7, { family: F.hand, size: 56, dur: 2.2 });
-      const fl = V.lines.floor, l2 = fl[1], cut = l2.indexOf('，') + 1;
-      cap([fl[0]], lt, S.tF + 1.5, null, { y: 1400, dur: 1.6 });
-      cap(cut > 0 ? [l2.slice(0, cut), l2.slice(cut)] : [l2], lt, S.tF + 4.1, null, { y: 1500, dur: 2.6 });
     },
     cues(V, api) {
       const S = fallTimes(api);

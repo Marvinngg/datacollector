@@ -32,6 +32,20 @@
   const youA = lit => 1 + 1.3 * lit;                    // KIT.you reads dim at this size: let the borrowed light show
   const youPts = () => PX.text('你', { size: 300, family: F.serif, weight: 600, x: 0, y: 300 * 0.38, step: 2.5, seed: 17 });
 
+  /* particles of a text cloud travelling from per-particle sources to their glyph places.
+     src(i) -> [x, y]; k gather progress; d(i) per-particle delay 0..1 (default random); returns nothing. */
+  function gatherCloud(cl, src, k, o) {
+    const n = cl.n, b = PX.buf(n, o.tag), st = o.stagger == null ? 0.6 : o.stagger, arc = o.arc == null ? 30 : o.arc, t = o.t || 0;
+    for (let i = 0; i < n; i++) {
+      const d = o.d ? o.d(i) : PX.rand(i, 400 + o.tag), kk = ease.inOut(clamp(k * (1 + st) - d * st));
+      const [sx, sy] = src(i), sw = Math.sin(kk * Math.PI) * arc * (PX.rand(i, 401) - 0.5);
+      b.X[i] = lerp(sx, cl.X[i], kk) + sw + Math.sin(t * 1.1 + i) * 0.5; b.Y[i] = lerp(sy, cl.Y[i], kk) + Math.cos(t * 0.9 + i) * 0.5;
+      b.A[i] = (0.25 + 0.75 * kk) * (kk > 0 ? 1 : 0.6);
+    }
+    PX.points(b.X, b.Y, n, o.color, { a: o.a == null ? 0.5 : o.a, A: b.A, glow: o.glow == null ? 0.35 : o.glow });
+  }
+  const tcloud = (str, size, x, y, o = {}) => PX.text(str, { size, family: o.family || F.serif, weight: o.weight || 500, x, y, align: o.align || 'center', step: o.step || Math.max(1.15, size / 40), seed: o.seed || 9 });
+
   // ================================================================ b07 fuel
   const WORD_SIZE = 50;
   const WORD_START = [[320, 560], [760, 540], [260, 450], [810, 440], [590, 430], [290, 650]];
@@ -61,6 +75,30 @@
     }
     ctx.restore();
     text('燃料 · 认可', x, y1 + 44, { size: 20, family: F.sans, weight: 400, color: C.dim, align: 'center', spacing: 3, alpha: a });
+  }
+
+  function ruleSentence(V, lt, tR, lit) {
+    const k1 = prog(lt, tR + 0.2, tR + 2.3), k2 = prog(lt, tR + 1.5, tR + 3.8);
+    if (k1 <= 0) return;
+    const YP = youPts(), y1 = 560, y2 = 662, S1 = 50, S2 = 50, SH = 64;
+    const l2 = V.lines.rule[1], hi = '别人的评价', hiAt = l2.indexOf(hi);
+    const segs = hiAt < 0 ? [[l2, S2, false]] : [[l2.slice(0, hiAt), S2, false], [hi, SH, true], [l2.slice(hiAt + hi.length), S2, false]].filter(g => g[0]);
+    const ws = segs.map(([t, sz, h]) => measure(t, { size: sz, family: F.serif, weight: h ? 600 : 500 }));
+    let x = W / 2 - ws.reduce((a, b) => a + b, 0) / 2;
+    PX.begin();
+    const c1 = tcloud(V.lines.rule[0], S1, W / 2, y1, { seed: 81 });
+    gatherCloud(c1, i => { const j = (i * 13) % YP.n; return [YOU.x + YP.X[j], YOU.y + YP.Y[j]]; }, k1, { tag: 460, color: mixRGB(INK, LAMP, 0.5), a: 0.5, arc: 60, t: lt });
+    segs.forEach(([t, sz, h], gi) => {
+      const c = tcloud(t, sz, x, y2, { align: 'left', seed: 82 + gi, weight: h ? 600 : 500 });
+      if (h) gatherCloud(c, i => [200 + PX.rand(i, 470) * 680, 300 + PX.rand(i, 471) * 140], k2, { tag: 461 + gi, color: GOLD, a: 0.55, glow: 0.6, arc: 40, t: lt });
+      else gatherCloud(c, i => { const j = (i * 17 + gi * 501) % YP.n; return [YOU.x + YP.X[j], YOU.y + YP.Y[j]]; }, k2, { tag: 461 + gi, color: mixRGB(INK, LAMP, 0.5), a: 0.5, arc: 50, t: lt });
+      x += ws[gi];
+    });
+    PX.flush({ exposure: 1.45, glow: 0.9 });
+    // once gathered, the line is also there in ink, so it reads cleanly
+    const a1 = clamp((k1 - 0.85) / 0.15) * 0.85, a2 = clamp((k2 - 0.85) / 0.15) * 0.85;
+    if (a1 > 0) text(V.lines.rule[0], W / 2, y1, { size: S1, family: F.serif, weight: 500, color: '#e6e9f0', align: 'center', alpha: a1 });
+    if (a2 > 0) { let xx = W / 2 - ws.reduce((a, b) => a + b, 0) / 2; segs.forEach(([t, sz, h], gi) => { text(t, xx, y2, { size: sz, family: F.serif, weight: h ? 600 : 500, color: h ? C.gold : '#e6e9f0', alpha: a2, glow: h ? 10 : 0 }); xx += ws[gi]; }); }
   }
 
   T.register('fuel', {
@@ -130,11 +168,13 @@
 
       // ---- the gauge beside 你
       gauge(800, 870, 1110, fill, ease.out(prog(lt, tP - 0.3, tP + 0.9)), lt, lands);
-      // ---- the caption
-      KIT.caption(V.lines.rule, prog(lt, tR + 0.25, tR + 2.6), { hi: ['别人的评价'], hiColor: C.gold });
+      // ---- the sentence: 你的自我价值 rises out of 你's own (borrowed) light; 别人的评价 condenses out of the dark above,
+      //      where the praise came from, in the praise's gold
+      ruleSentence(V, lt, tR, lit);
     },
     cues(V, api) {
       const out = [{ t: at(api, 'name') + 0.25, type: 'title' }];
+      out.push({ t: at(api, 'rule') + 1.5, type: 'glow' });
       wordTimes(api).forEach((t, i) => out.push({ t, type: 'glow', i, n: 6 }));
       out.push({ t: at(api, 'rule'), type: 'hush' });
       return out;
@@ -335,11 +375,14 @@
       if (fOn > 0 && litK > 0) { const zp = ZPOOL; KIT.spot(sx_(PATH.lit(zp), zp), sy_(zp), { k: litK * 0.6, w: 120, h: 580, px: true, t: lt, dust: 0.6, tag: 3 }); }
       PX.flush({ exposure: 1.45, glow: 1.0 });
 
-      // ---- captions
-      const out1 = prog(lt, tG - 0.45, tG);
-      KIT.caption(V.lines.met, prog(lt, tM + 0.6, tM + 2.6), { out: out1 });
-      floatCaption(V.lines.gone, lt, tG + 1.0, tF - 0.45, wk);
-      KIT.caption(V.lines.fear, prog(lt, tF + 2.6, tF + 4.6), { size: 42, color: C.dim, y: 1480 });
+      // ---- the sentences live in the picture: engraved under the 标准 line; weightless with 你; lying on the ground of the fork
+      PX.begin();
+      metSentence(V, lt, tM, tG, er);
+      goneSentence(V, lt, tG, tF);
+      fearSentence(V, lt, tF);
+      PX.flush({ exposure: 1.45, glow: 0.8 });
+      metSentenceInk(V, lt, tM, er);
+      goneSentenceInk(V, lt, tG, tF);
     },
     cues(V, api) {
       const tM = at(api, 'met'), tG = at(api, 'gone'), tF = at(api, 'fork');
@@ -351,24 +394,83 @@
       ];
     },
   });
-  // a caption whose characters, once revealed, lose their baseline: each floats and turns a little, on its own
-  function floatCaption(str, lt, t0, t1, wk) {
-    const k = prog(lt, t0, t0 + 1.8), out = prog(lt, t1, t1 + 0.45);
-    if (k <= 0 || out >= 1) return;
-    const size = 54, o = { size, family: F.serif, weight: 400 }, sp = size * 0.04;
-    const chars = [...str], ws = chars.map(c => measure(c, o) + sp), tw = ws.reduce((a, b) => a + b, 0) - sp;
-    let x = W / 2 - tw / 2; const n = chars.length;
-    chars.forEach((c, i) => {
-      const p = clamp(k * (n + 5) - i, 0, 5) / 5, e = ease.out(p);
-      if (p > 0) {
-        const f = smooth(prog(lt, t0 + 1.2 + i * 0.05, t0 + 3.8)) * wk;
-        const dy = (Math.sin(lt * (0.35 + PX.rand(i, 5) * 0.3) + i * 1.7) * 2.2 + (PX.rand(i, 6) - 0.5) * 4) * f;
-        const rot = (Math.sin(lt * (0.3 + PX.rand(i, 7) * 0.2) + i) * 0.015 + (PX.rand(i, 8) - 0.5) * 0.03) * f;
-        ctx.save(); ctx.translate(x + ws[i] / 2, 1460 + dy + (1 - e) * size * 0.35); ctx.rotate(rot);
-        text(c, -ws[i] / 2 + sp / 2, 0, { ...o, color: C.ink, alpha: e * (1 - ease.in(out)) });
-        ctx.restore();
+  // 标准满足了… : engraved under the ruler, written left to right as if dripping off the line; crumbles with the line
+  const MET = { size: 36, y: LY + 66 };
+  const eraseT = (x, tG) => tG + ERASE[0] + invInOut(clamp(1 - Math.abs(x - LCX) / LHM, 0, 0.999)) * (ERASE[1] - ERASE[0]);
+  function metSentence(V, lt, tM, tG, er) {
+    const k = prog(lt, tM + 0.9, tM + 3.0); if (k <= 0) return;
+    const cl = tcloud(V.lines.met, MET.size, LCX, MET.y, { seed: 91, weight: 400 }), n = cl.n, b = PX.buf(n, 470);
+    const x0 = LCX - cl.w / 2;
+    let m = 0;
+    for (let i = 0; i < n; i++) {
+      const d = clamp((cl.X[i] - x0) / cl.w) * 0.75 + PX.rand(i, 471) * 0.25, kk = ease.out(clamp(k * 1.8 - d * 0.8 * 1.0 - d * 0.0));
+      if (kk <= 0) continue;
+      let x = cl.X[i], y = lerp(LY + 4, cl.Y[i], kk), A = 0.3 + 0.7 * kk;
+      const tr = eraseT(cl.X[i], tG);
+      if (lt > tr) { const tau = lt - tr, an = PX.rand(i, 472) * TAU, sp = 4 + Math.pow(PX.rand(i, 473), 2) * 34; x += Math.cos(an) * sp * tau; y += Math.sin(an) * sp * tau; A *= Math.exp(-tau * 0.5); }
+      b.X[m] = x; b.Y[m] = y; b.A[m] = A; m++;
+    }
+    PX.points(b.X, b.Y, m, mixRGB(INK, LAMP, 0.6), { a: 0.5, A: b.A, glow: 0.3 });
+  }
+  function metSentenceInk(V, lt, tM, er) {
+    const a = clamp((prog(lt, tM + 0.9, tM + 3.0) - 0.8) / 0.2) * (1 - clamp(er * 4)) * 0.75;
+    if (a > 0) text(V.lines.met, LCX, MET.y, { size: MET.size, family: F.serif, weight: 400, color: '#dfe6f2', align: 'center', alpha: a });
+  }
+  // 标准消失了，就开始失重。: condenses out of the line's dust, then loses its baseline for good: every character drifts
+  // and turns on its own, slowly faster, its grains loosening, until at the fork it comes apart
+  const GONE = { size: 56, y: 1300 };
+  function goneLayout(V) {
+    const chars = [...V.lines.gone], o = { size: GONE.size, family: F.serif, weight: 500 }, ws = chars.map(c => measure(c, o) + 3);
+    const tw = ws.reduce((a, b) => a + b, 0); let x = W / 2 - tw / 2;
+    return chars.map((c, i) => { const cx = x + ws[i] / 2; x += ws[i]; return { c, cx, i }; });
+  }
+  function goneState(ch, lt, tG) {
+    const tau = Math.max(0, lt - (tG + 3.0)), s = tau < 1.2 ? tau * tau / 2.4 : tau - 0.6, i = ch.i;
+    const vx = (PX.rand(i, 481) - 0.5) * 16, vy = (PX.rand(i, 482) - 0.5) * 18 - 2, w = (PX.rand(i, 483) - 0.5) * 0.11;
+    return { x: ch.cx + vx * s, y: GONE.y + vy * s, rot: w * s + Math.sign(w) * 0.006 * s * s, loose: 0.7 * Math.pow(s, 1.4) };
+  }
+  function goneSentence(V, lt, tG, tF) {
+    const k = prog(lt, tG + 1.0, tG + 3.0); if (k <= 0) return;
+    const out = prog(lt, tF - 0.3, tF + 1.6); if (out >= 1) return;
+    goneLayout(V).forEach(ch => {
+      const cl = PX.text(ch.c, { size: GONE.size, family: F.serif, weight: 500, x: 0, y: GONE.size * 0.36, step: 1.2, seed: 60 + ch.i });
+      const st = goneState(ch, lt, tG), cs = Math.cos(st.rot), sn = Math.sin(st.rot), n = cl.n, b = PX.buf(n, 480 + ch.i);
+      for (let i = 0; i < n; i++) {
+        const d = PX.rand(i, 484) * 0.5 + ch.i * 0.03, kk = ease.inOut(clamp(k * 1.6 - d));
+        const an = PX.rand(i, 485) * TAU, lo = st.loose * (0.3 + PX.rand(i, 486)) + out * (20 + 90 * PX.rand(i, 487));
+        const px = cl.X[i] + Math.cos(an) * lo, py = cl.Y[i] + Math.sin(an) * lo;
+        const tx = st.x + px * cs - py * sn, ty = st.y + px * sn + py * cs;
+        const sx = ch.cx + cl.X[i] * 2.2 + (PX.rand(i, 488) - 0.5) * 120, sy = LY + (PX.rand(i, 489) - 0.5) * 30;   // from the line's dust
+        b.X[i] = lerp(sx, tx, kk); b.Y[i] = lerp(sy, ty, kk); b.A[i] = (0.2 + 0.8 * kk) * (1 - out);
       }
-      x += ws[i];
+      PX.points(b.X, b.Y, n, mixRGB(INK, LAMP, 0.3), { a: 0.5, A: b.A, glow: 0.3 });
+    });
+  }
+  function goneSentenceInk(V, lt, tG, tF) {
+    const a0 = clamp((prog(lt, tG + 1.0, tG + 3.0) - 0.8) / 0.2) * (1 - smooth(prog(lt, tG + 3.6, tF - 0.2))) * 0.8;
+    if (a0 <= 0) return;
+    goneLayout(V).forEach(ch => {
+      const st = goneState(ch, lt, tG);
+      ctx.save(); ctx.translate(st.x, st.y); ctx.rotate(st.rot);
+      text(ch.c, 0, GONE.size * 0.36, { size: GONE.size, family: F.serif, weight: 500, color: '#e8e6e0', align: 'center', alpha: a0 });
+      ctx.restore();
+    });
+  }
+  // 被夸聪明的孩子，更怕失败。: lying on the ground at the foot of the fork, in perspective, like an old inscription
+  function fearSentence(V, lt, tF) {
+    const k = prog(lt, tF + 2.4, tF + 4.6); if (k <= 0) return;
+    const str = V.lines.fear, c = str.indexOf('，'), lines = c < 0 ? [str] : [str.slice(0, c + 1), str.slice(c + 1)];
+    [[lines[0], 0.80, 50], [lines[1], 0.70, 58]].forEach(([l, zc, size], li) => {
+      if (!l) return;
+      const cl = PX.text(l, { size, family: F.serif, weight: 500, x: 0, y: 0, step: 1.15, seed: 95 + li }), n = cl.n, b = PX.buf(n, 500 + li);
+      const kz = 0.0011 / size * 50;
+      for (let i = 0; i < n; i++) {
+        const u = cl.X[i], v = cl.Y[i], z = zc - v * kz, X = u * zc / FK;
+        const tx = W / 2 + FK * X / z, ty = HOR + FK / z;
+        const d = clamp((u + cl.w / 2) / cl.w) * 0.6 + PX.rand(i, 501) * 0.4, kk = ease.inOut(clamp(k * 1.7 - d * 0.7 - li * 0.25));
+        b.X[i] = tx + (PX.rand(i, 502) - 0.5) * 30 * (1 - kk); b.Y[i] = ty - (1 - kk) * 26 * PX.rand(i, 503); b.A[i] = kk;
+      }
+      PX.points(b.X, b.Y, n, [0.74, 0.76, 0.82], { a: 0.55, A: b.A, glow: 0.25 });
     });
   }
 
@@ -477,6 +579,38 @@
     ctx.restore();
   }
 
+  const FY2 = FY1 + 300, RM = { size: 50, x: FM.x0 + 64, y0: FY1 + 118, gap: 70 };
+  function remarkLines(V) {                                  // wrap inside the box at the commas: 3 short lines
+    const out = []; V.lines.end.forEach(l => { const c = l.indexOf('，'); if (c > 0 && c < l.length - 1) out.push(l.slice(0, c + 1), l.slice(c + 1)); else out.push(l); });
+    return out;
+  }
+  function remark(V, lt, tE, dim) {
+    const ext = ease.inOut(prog(lt, tE, tE + 1.0)); if (ext <= 0) return;
+    const yb = lerp(FY1, FY2, ext), LINE = 'rgba(236,231,220,0.30)';
+    ctx.save(); ctx.globalAlpha *= dim;
+    ctx.fillStyle = 'rgba(236,231,220,0.025)'; ctx.fillRect(FM.x0, FY1, FM.x1 - FM.x0, yb - FY1);
+    vline(FM.x0, FY1, yb, 1, LINE, 1.3); vline(FM.x1, FY1, yb, 1, LINE, 1.3); hline(FM.x0, FM.x1, yb, 1, LINE, 1.3);
+    hline(FM.x0, FM.x1, FY1 + 5, ext, 'rgba(236,231,220,0.14)', 1);
+    ctx.restore();
+    text('评语', FM.x0 + 40, FY1 + 50, { size: 22, family: F.sans, color: C.dim, alpha: ease.out(prog(lt, tE + 0.6, tE + 1.2)), spacing: 4 });
+    // handwriting: one character after another, each wiped on left to right like a pen stroke
+    const lines = remarkLines(V), o = { size: RM.size, family: F.hand, weight: 400 };
+    let idx = 0;
+    lines.forEach((l, li) => {
+      const hiMask = [...l].map(() => false); let h = l.indexOf('个性'); while (h >= 0) { hiMask[h] = hiMask[h + 1] = true; h = l.indexOf('个性', h + 1); }
+      let x = RM.x + (li === 0 ? 0 : 0), y = RM.y0 + li * RM.gap + (li === 0 ? 0 : 14);
+      [...l].forEach((c, ci) => {
+        const w = measure(c, o), t0 = tE + 1.1 + idx * 0.12 + li * 0.35, p = prog(lt, t0, t0 + 0.28);
+        if (p > 0) {
+          ctx.save(); ctx.beginPath(); ctx.rect(x - 4, y - RM.size, (w + 8) * ease.out(p), RM.size * 1.4); ctx.clip();
+          text(c, x, y + (PX.rand(idx, 520) - 0.5) * 4, { ...o, color: hiMask[ci] ? C.warm : '#ece7dc', alpha: 0.4 + 0.55 * p, glow: hiMask[ci] ? 8 : 0 });
+          ctx.restore();
+        }
+        x += w + 1; idx++;
+      });
+    });
+  }
+
   T.register('rules', {
     draw(ctx, V, lt, api) {
       const tr = ['r1', 'r2', 'r3'].map(n => at(api, n)), tS = at(api, 'score'), tE = at(api, 'end');
@@ -506,7 +640,8 @@
       // the red pen: 0
       KIT.pen('score', (FM.sx + FM.x1) / 2 - 4, rowY(3) + 116, 70, ease.inOut(prog(lt, tS + 1.9, tS + 2.6)), { text: V.lines.zero, seed: 31, width: 5 });
       // the end
-      KIT.caption(V.lines.end, prog(lt, tE + 0.3, tE + 3.6), { size: 42, hi: ['个性'], hiColor: C.warm, y: 1470 });
+      // the end: the form grows a remark box, and the sentence is written in it by hand — not in red
+      remark(V, lt, tE, dim);
     },
     cues(V, api) {
       const out = [];

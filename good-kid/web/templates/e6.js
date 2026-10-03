@@ -280,15 +280,42 @@
     PX.points(Kc.X, Kc.Y, n, col, { a: 0.15 * (o.a == null ? 1 : o.a) * (1 + 1.6 * (o.own || 0)), A: Kc.A, glow: 0.12 + 0.4 * (o.own || 0) });
   }
 
-  // ================================================================ captions (the film's voice, fixed place)
-  function cap(lines, ct, t0, t1, o = {}) {
-    lines = (Array.isArray(lines) ? lines : [lines]).map(noDot);
-    const n = lines.reduce((a, l) => a + [...l].length, 0), d = clamp(n * 0.075, 0.9, 2.0), dl = o.delay == null ? 0.25 : o.delay;
-    const k = prog(ct, t0 + dl, t0 + dl + d); if (k <= 0) return;
-    const out = t1 == null ? 0 : prog(ct, t1 - 0.55, t1 - 0.05);
-    if (out >= 1) return;
-    KIT.caption(lines, k, { ...o, out });
+  // ================================================================ the voice, inside the picture
+  /* words printed / lying on the page: particles fall onto the paper and settle into the glyphs (k), then the glyphs
+     are also drawn crisply through the same projection (one affine per character), so they read as ink on the
+     paper in perspective. out: the words lift off the page and scatter. Call inside PX.begin/flush. */
+  const SWB = new Map();
+  function sheetWords(cm, str, u, v, o) {
+    const k = o.k, out = o.out || 0; if (k <= 0 || out >= 1) return;
+    const size = o.size, fam = o.family || F.serif, wt = o.weight || 500, align = o.align || 'center', seed = o.seed || 5, t = o.t || 0;
+    const cl = PX.text(str, { size, family: fam, weight: wt, x: u, y: v, align, step: Math.max(1.3, size / 26), seed });
+    const n = cl.n; let b = SWB.get(cl); if (!b) SWB.set(cl, b = { X: new Float32Array(n), Y: new Float32Array(n), A: new Float32Array(n) });
+    const q = {};
+    for (let i = 0; i < n; i++) {
+      const kk = ease.inOut(clamp(k * 1.5 - R(i, seed + 40) * 0.5)), ko = ease.in(clamp(out * 1.5 - R(i, seed + 41) * 0.5));
+      const an = R(i, seed + 42) * TAU, rr = size * (0.4 + 1.4 * R(i, seed + 43));
+      const su = cl.X[i] + Math.cos(an) * rr * (1 - kk) + Math.cos(an) * ko * size * 0.8, sv = cl.Y[i] + Math.sin(an) * rr * 0.5 * (1 - kk);
+      const h = (1 - kk) * size * (0.8 + 2.2 * R(i, seed + 44)) + ko * size * (1 + 2.5 * R(i, seed + 45));
+      P(cm, su, sv, h, q);
+      b.X[i] = q.x + Math.sin(t * (0.8 + R(i, seed + 46)) + i) * 0.35; b.Y[i] = q.y; b.A[i] = (0.25 + 0.75 * kk) * (1 - ko);
+    }
+    PX.points(b.X, b.Y, n, o.color || LC.ink, { a: o.a == null ? 0.32 : o.a, A: b.A, glow: 0.25 });
+    const ck = clamp((k - 0.75) / 0.25) * (1 - clamp(out * 2.5));
+    if (ck <= 0.01) return;
+    const ctx = K.ctx, fo = { size, family: fam, weight: wt }, chars = [...str], ws = chars.map(ch => K.measure(ch, fo)), tw = ws.reduce((a, c) => a + c, 0);
+    let uL = align === 'center' ? u - tw / 2 : align === 'right' ? u - tw : u;
+    const A = {}, B = {}, Cc = {};
+    ctx.save(); ctx.font = `${wt} ${size}px ${fam}`; ctx.fillStyle = o.css || 'rgba(236,231,220,0.9)';
+    const a0 = ctx.globalAlpha * ck * (o.crispA == null ? 0.85 : o.crispA);
+    chars.forEach((ch, i) => {
+      P(cm, uL, v, 0, A); P(cm, uL + 10, v, 0, B); P(cm, uL, v - 10, 0, Cc);
+      ctx.setTransform((B.x - A.x) / 10, (B.y - A.y) / 10, -(Cc.x - A.x) / 10, -(Cc.y - A.y) / 10, A.x, A.y);
+      ctx.globalAlpha = a0; ctx.fillText(ch, 0, 0); uL += ws[i];
+    });
+    ctx.restore();
   }
+  const lyingMatrix = (cm, u, v, out) => { const A = P(cm, u, v, 0, {}), B = P(cm, u + 10, v, 0, {}), Cc = P(cm, u, v - 10, 0, {});
+    out[0] = (B.x - A.x) / 10; out[1] = (B.y - A.y) / 10; out[2] = -(Cc.x - A.x) / 10; out[3] = -(Cc.y - A.y) / 10; out[4] = A.x; out[5] = A.y; return out; };
   const steps = api => { const m = {}; for (const s of api.steps) m[s.show] = s.lt - api.chainStart; return m; };   // chain time of each step
 
   // ================================================================ b18 stand
@@ -319,13 +346,23 @@
       drawSheet(cm, { a: 1, head: ss(S.given + 0.5, S.given + 2.0, ct), print: st.kRise });
       PX.begin();
       drawKid(cm, { k: ss(S.kid + 0.6, S.kid + 3.2, ct), phi: 104 * DEG, t: lt });
+      // the voice is printed on the page itself
+      // 'not': the question line of the sheet, in its header
+      sheetWords(cm, noDot(V.lines.not), 452, 50, { size: 40, k: prog(ct, S.not + 0.3, S.not + 1.9), out: prog(ct, S.up + 0.3, S.up + 1.5), t: lt, seed: 5 });
+      // 'up': lying on the tilted page in front of 你, in perspective
+      const up = V.lines.up, cut = up.indexOf('，') + 1, upOut = prog(ct, S.given - 0.3, S.given + 0.9);
+      sheetWords(cm, up.slice(0, cut), 440, 1046, { size: 50, k: prog(ct, S.up + 1.6, S.up + 3.6), out: upOut, t: lt, seed: 6 });
+      sheetWords(cm, noDot(up.slice(cut)), 440, 1112, { size: 50, k: prog(ct, S.up + 2.8, S.up + 4.4), out: upOut, t: lt, seed: 7 });
+      // 'given': on the page's lifted head, under 发卷人：别人
+      sheetWords(cm, noDot(V.lines.given), 440, 218, { size: 58, k: prog(ct, S.given + 1.1, S.given + 2.7), out: prog(ct, S.kid - 0.2, S.kid + 0.9), t: lt, seed: 8 });
+      // 'kid': written small in the bubble rows beside the child, in a hand
+      const kd = V.lines.kid, kc = kd.indexOf('，') + 1;
+      const kidO = { size: 38, family: F.hand, weight: 400, align: 'left', t: lt, css: 'rgba(236,231,220,0.82)', a: 0.26 };
+      sheetWords(cm, kd.slice(0, kc), 262, 1034, { ...kidO, k: prog(ct, S.kid + 1.0, S.kid + 2.6), seed: 9 });
+      sheetWords(cm, noDot(kd.slice(kc)), 262, 1094, { ...kidO, k: prog(ct, S.kid + 1.9, S.kid + 3.7), seed: 10 });
       drawYou(cm, { u: st.u, v: st.v, phi: st.phi, occ: st.occ, yaw: st.yaw, lift: st.lift, flutter: st.fl, t: lt,
         gray: 1, a: 3.0, shim: 1 + st.fl });
       PX.flush({ exposure: 1.4 });
-      cap(V.lines.not, ct, S.not, S.up + 0.2);
-      cap(['而是从那张打分表上站起来，', '看一眼它。'], ct, S.up + 0.4, S.given);
-      cap(V.lines.given, ct, S.given + 0.3, S.kid);
-      cap(['那个深夜让你难受的，', '是心里那个始终在等分数的小孩。'], ct, S.kid + 0.3, api.dur + 1);
     },
     cues(V, api) {
       const S = steps(api);

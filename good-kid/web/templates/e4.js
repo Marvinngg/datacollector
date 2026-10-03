@@ -28,9 +28,10 @@
 
   // ================================================================ b12 bills
   const RW = 236, RX = [230, 540, 850], SLOT_Y = 422, ICON_Y = 318;
-  const RL = [830, 760, 890];                       // receipt lengths
+  const RL = [700, 640, 760];                       // receipt lengths
   const R_T0 = [0.5, 0.82, 1.14], R_D = [5.7, 5.2, 6.1];  // print start (after 'print') and duration
   const PAD = 6;                                    // texture padding (x)
+  let PAYK = 0;                                     // how far the sentence has risen out of the totals (dims 未知)
   const TEX = [];                                   // static paper textures (paper, grain, edges, rules, ghost rows, barcode)
   function wrap(str) {
     const i = str.indexOf('，');
@@ -43,7 +44,7 @@
     const out = [{ y: 66, str: title, size: 31, fam: F.sans, wt: 500, align: 'center', col: INK(0.92), sp: 6 }];
     it.forEach((s, k) => out.push({ y: 136 + k * 36, str: s, size: 23, fam: F.mono, wt: 400, align: 'left', col: INK(0.8) }));
     out.push({ y: L - 112, str: '合计', size: 24, fam: F.mono, wt: 400, align: 'left', col: INK(0.8) });
-    out.push({ y: L - 112, str: '未知', size: 24, fam: F.mono, wt: 400, align: 'right', col: INK(0.5), late: 0.5 });
+    out.push({ y: L - 112, str: '未知', size: 24, fam: F.mono, wt: 400, align: 'right', col: INK(0.5 * (1 - 0.7 * PAYK)), late: 0.5 });
     return out;
   }
   function paperTex(i) {
@@ -225,8 +226,19 @@
         ctx.strokeStyle = INK(0.14); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(RX[i] - half + 6, SLOT_Y - 9); ctx.lineTo(RX[i] + half - 6, SLOT_Y - 9); ctx.stroke();
         ctx.restore();
       }
+      const k1 = prog(lt, tPay + 0.1, tPay + 2.1), k2 = prog(lt, tPay + 0.8, tPay + 2.8);
+      PAYK = smooth(Math.max(k1, k2) * 1.4 > 1 ? 1 : Math.max(k1, k2) * 1.4);
       for (let i = 0; i < 3; i++) drawReceipt(V, i, lt, tP, 1);
-      KIT.caption(V.lines.pay, prog(lt, tPay + 0.2, tPay + 1.8), { y: 1500 });
+      // the sentence rises out of the bills: particles leave the unknown totals (未知) and gather under the strips,
+      // the first clause hung from the left strip's edge, the second from the right one's
+      const [s1, s2] = splitAt(V.lines.pay, '，');
+      PX.begin(); fullFrame();
+      const ya = SLOT_Y + RL[2] + 120, yb = ya + 92;
+      // the ink lifts off the lower part of all three strips (around 合计 · 未知)
+      const src = [0, 1, 2].map(i => [RX[i] - RW / 2 + 12, SLOT_Y + RL[i] - 150, RW - 24, 110]);
+      gatherText(s1, RX[0] - RW / 2, ya, { align: 'left', size: 56, k: k1, src, t, tag: 1, seed: 5 });
+      gatherText(s2, RX[2] + RW / 2, yb, { align: 'right', size: 56, k: k2, src, t, tag: 2, seed: 7 });
+      PX.flush({ exposure: 1.4, glow: 0.8 });
     },
     cues(V, api) {
       const tP = at(api, 'print'), out = [];
@@ -238,9 +250,32 @@
         out.push({ t: +tt(136).toFixed(3), type: 'type', dur: 0.9, i });
       }
       out.push({ t: at(api, 'pay'), type: 'hush' });
+      out.push({ t: at(api, 'pay') + 0.1, type: 'swell', dur: 2.7 });
       return out;
     },
   });
+
+  /* a line that gathers out of other things: its particles start inside the source rectangles src [[x, y, w, h], …]
+     (each particle picks one), drift up in a soft arc and settle into the glyphs; a crisp line fades in at the end */
+  function gatherText(str, x, y, o) {
+    const size = o.size || 56, k = o.k, seed = o.seed || 3; if (k <= 0) return;
+    const cl = PX.text(str, { size, family: o.family || F.serif, weight: o.weight || 500, x, y, align: o.align || 'center', spacing: o.spacing == null ? 4 : o.spacing, step: Math.max(1.3, size / 34), seed });
+    const n = cl.n, b = PX.buf(n, 1300 + (o.tag || 0)), t = o.t || 0, src = o.src;
+    for (let i = 0; i < n; i++) {
+      const r = src[Math.floor(PX.rand(i, seed + 1) * src.length)];
+      const sx = r[0] + PX.rand(i, seed + 2) * r[2], sy = r[1] + PX.rand(i, seed + 3) * r[3];
+      const d = PX.rand(i, seed + 4) * 0.55, kk = ease.inOut(clamp((k - d) / 0.45));
+      const arc = Math.sin(kk * Math.PI) * (40 + 60 * PX.rand(i, seed + 5));
+      const w = Math.sin(t * (0.7 + PX.rand(i, seed + 6)) + i) * 0.6;
+      b.X[i] = lerp(sx, cl.X[i], kk) + w + Math.sin(kk * Math.PI) * (PX.rand(i, seed + 7) - 0.5) * 30;
+      b.Y[i] = lerp(sy, cl.Y[i], kk) - arc * 0.4 + w * 0.6;
+      b.A[i] = clamp((k - d) * 6) * (0.3 + 0.7 * kk);
+    }
+    PX.points(b.X, b.Y, n, o.color || KIT.L.ink, { a: o.a == null ? 0.55 : o.a, A: b.A, glow: 0.3 });
+    const ck = clamp((k - 0.85) / 0.15) * (o.crisp == null ? 0.85 : o.crisp);
+    if (ck > 0) text(str, x, y, { size, family: o.family || F.serif, weight: o.weight || 500, align: o.align || 'center', spacing: o.spacing == null ? 4 : o.spacing, color: o.css || C.ink, alpha: ck });
+  }
+  function splitAt(str, ch) { const i = str.indexOf(ch); return i > 0 && i < str.length - 1 ? [str.slice(0, i + 1), str.slice(i + 1)] : [str, '']; }
 
   // ================================================================ b13 trap
   const BX = 170, BY = 440, BW = 740;

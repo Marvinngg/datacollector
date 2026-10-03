@@ -42,6 +42,23 @@
     g.addColorStop(0, `rgba(${rgbStr},1)`); g.addColorStop(0.35, `rgba(${rgbStr},0.35)`); g.addColorStop(1, `rgba(${rgbStr},0)`);
     ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); ctx.restore();
   }
+  /* a line set along a circle (cx, cy, r) centred on angle aMid; characters stand with their tops toward the centre.
+     Revealed character by character (blur to sharp, k 0..1); out 0..1 fades it the same way. */
+  function arcText(str, cx, cy, r, aMid, size, k, out, o = {}) {
+    if (k <= 0 || out >= 1) return;
+    const fam = o.family || F.serif, chars = [...str], sp = o.spacing == null ? size * 0.08 : o.spacing;
+    const ws = chars.map(c => measure(c, { size, family: fam, weight: o.weight || 400 }) + sp), tot = ws.reduce((a, b) => a + b, 0) - sp;
+    let acc = 0; const n = chars.length;
+    chars.forEach((ch, i) => {
+      const p = clamp(k * (n + 4) - i, 0, 4) / 4, q = clamp(out * (n + 4) - i, 0, 4) / 4, e = ease.out(p) * (1 - ease.in(q));
+      const a = aMid + (tot / 2 - acc - ws[i] / 2 + sp / 2) / r; acc += ws[i];
+      if (e <= 0.003) return;
+      const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(a - Math.PI / 2);
+      L.glyph(ch, 0, -(1 - ease.out(p)) * 8, size, o.color || C.ink, (o.alpha == null ? 1 : o.alpha) * e, { family: fam, blur: (1 - e) * 7 > 0.6 ? (1 - e) * 7 : 0, glow: 4 });
+      ctx.restore();
+    });
+  }
   // a glyph's particle cloud centred on (0, 0) (cached by PX)
   const cloud = (ch, size, step, seed = 3) => PX.text(ch, { size, family: F.serif, weight: 600, x: 0, y: size * 0.38, step, seed });
   function drawCloud(cl, x, y, col, a, o = {}) {
@@ -61,6 +78,7 @@
   const HIM = 5, GUESTS = [1, 2, 3, 4, 6, 7, 8, 9];
   const YOU4 = { x: 540, y: TC.y + RS + 10, size: 76 };
   const STORY_Y = [TC.y - 62, TC.y + 14, TC.y + 90];            // over the table, between everyone
+  const STORY_GAP = 2.3;
   // where each guest looks before he arrives (chatting: a neighbour or the dishes)
   const IDLE = { 1: 2, 2: 1, 3: -1, 4: 6, 6: 4, 7: 8, 8: 7, 9: -1 };
 
@@ -111,10 +129,11 @@
     ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, len, ang - half, ang + half); ctx.closePath(); ctx.fill(); ctx.restore();
   }
   // the empty speech bubble as fine particles along its outline (so it can dissolve), ordered from the tail round
+  const BUB_C = { x: 540, y: 1168 };
   let BUB = null;
   function bubble() {
     if (BUB) return BUB;
-    const cx = 540, cy = 1172, w = 212, h = 86, r = 42, xs = [], ys = [], step = 1.6;
+    const cx = BUB_C.x, cy = BUB_C.y, w = 236, h = 92, r = 44, xs = [], ys = [], step = 1.6;
     const pts = [];
     const line = (x0, y0, x1, y1) => { const d = Math.hypot(x1 - x0, y1 - y0), n = Math.ceil(d / step); for (let i = 0; i < n; i++) pts.push([lerp(x0, x1, i / n), lerp(y0, y1, i / n)]); };
     const arc = (ax, ay, a0, a1) => { const n = Math.ceil(Math.abs(a1 - a0) * r / step); for (let i = 0; i < n; i++) { const a = lerp(a0, a1, i / n); pts.push([ax + Math.cos(a) * r, ay + Math.sin(a) * r]); } };
@@ -141,7 +160,7 @@
       const himIn = lt >= tA;
       // attention: how much of the table's light is on him (0..1); stories make it glow more
       const att = ease.inOut(prog(lt, tA + 0.8, tA + 3.2));
-      const laughT = [1.2, 2.9, 4.3, 5.7].map(d => tS + d);
+      const laughT = [1.3, 3.5, 5.6, 7.2].map(d => tS + d);
       let laugh = 0; for (const lT of laughT) if (lt >= lT) laugh += Math.exp(-(lt - lT) * 1.8) * (1 - Math.exp(-(lt - lT) * 14));
       const storyOn = ease.inOut(prog(lt, tS, tS + 1.6));
 
@@ -183,6 +202,13 @@
         gaze(s.x, s.y, ang, 96 + 40 * turn, 0.36 - 0.1 * turn, ga);
       });
 
+      // the bubble clears a quiet patch of table under itself
+      const bkA = ease.inOut(prog(lt, tW + 1.4, tW + 2.6));
+      if (bkA > 0) {
+        ctx.save(); ctx.globalAlpha *= bkA * 0.85; ctx.translate(BUB_C.x, BUB_C.y); ctx.scale(1, 0.42);
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 150); g.addColorStop(0, 'rgba(6,8,13,0.95)'); g.addColorStop(0.65, 'rgba(6,8,13,0.8)'); g.addColorStop(1, 'rgba(6,8,13,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 150, 0, TAU); ctx.fill(); ctx.restore();
+      }
       PX.begin(); fullFrame();
       // heads
       const disc = PX.disc(80, 0, 0, 15), hb = PX.buf(80 * GUESTS.length, 310);
@@ -199,7 +225,7 @@
       if (himIn) drawCloud(cloud(Ln.him, 72, 1.5, 9), hx, hy, WARM, (0.12 + 0.07 * att + 0.04 * laugh) * clamp(walk * 3), { t: lt, tag: 320, glow: 0.45 });
       // his stories: warm smoke that rises from him toward us (growing as it rises) and settles over the table
       Ln.stories.forEach((str, i) => {
-        const t0 = tS + 0.1 + i * 1.7; if (lt < t0) return;
+        const t0 = tS + 0.1 + i * STORY_GAP; if (lt < t0) return;
         const S = PX.text(str, { size: 42, family: F.serif, weight: 400, x: 540, y: STORY_Y[i], step: 1.3, seed: 11 + i });
         const n = S.n, out = PX.buf(n, 330 + i), k = (lt - t0) / 1.5, cy = STORY_Y[i] - 16;
         const dis = prog(lt, tW - 0.3, tW + 2.0), drift = (lt - t0) * 2.2;
@@ -218,27 +244,32 @@
         }
         PX.points(out.X, out.Y, n, WARM, { a: 0.2, A: out.A, glow: 0.6 });
       });
-      // the empty speech bubble above 你: drawn on, waiting; then it comes apart
-      const bk = ease.inOut(prog(lt, tW + 1.3, tW + 2.6));
+      // the empty speech bubble above 你: drawn on, waiting; then it comes apart — and its own particles settle
+      // into the only answer there is: 没有人问。
+      const bk = ease.inOut(prog(lt, tW + 1.6, tW + 2.9));
       if (bk > 0) {
-        const bb = bubble(), n = bb.n, out = PX.buf(n, 340), dz = prog(lt, tN + 0.5, tN + 3.4);
-        const shown = Math.floor(n * bk);
+        const bb = bubble(), nb = bb.n, dz = prog(lt, tN + 0.2, tN + 2.6);
+        const NO = PX.text(Ln.none, { size: 38, family: F.serif, weight: 500, x: 540, y: BUB_C.y + 14, step: 1.15, seed: 23 });
+        const n = Math.max(nb, NO.n), out = PX.buf(n, 340), shown = Math.floor(nb * bk);
+        const fade = 1 - 0.35 * ease.inOut(prog(lt, tN + 3.2, end));
         let q = 0;
-        for (let p = 0; p < shown; p++) {
+        for (let p = 0; p < n; p++) {
+          const bi = p % nb; if (bi >= shown) continue;
           const r1 = PX.rand(p, 81), r2 = PX.rand(p, 82);
-          const dd = ease.out(clamp(dz * 1.6 - r1 * 0.6)), an = r2 * TAU;
-          out.X[q] = bb.X[p] + Math.cos(an) * 46 * dd + Math.sin(lt * 0.8 + p) * 0.3;
-          out.Y[q] = bb.Y[p] + Math.sin(an) * 30 * dd - 40 * dd * r1;
-          out.A[q] = (1 - dd) * (0.85 + 0.15 * Math.sin(lt * 2 + p * 0.05)); q++;
+          const dd = smooth(clamp(dz * 1.7 - r1 * 0.7)), an = r2 * TAU, sw = Math.sin(dd * Math.PI);
+          const tp = p % NO.n;
+          out.X[q] = lerp(bb.X[bi], NO.X[tp], dd) + Math.cos(an) * 26 * sw + Math.sin(lt * 0.8 + p) * 0.3;
+          out.Y[q] = lerp(bb.Y[bi], NO.Y[tp], dd) + Math.sin(an) * 18 * sw;
+          out.A[q] = (p < nb ? 1 - 0.25 * dd : clamp(dz * 2 - 0.6)) * (0.85 + 0.15 * Math.sin(lt * 2 + p * 0.05)); q++;
         }
-        const breath = 0.85 + 0.15 * Math.sin((lt - tW) * 2.2);
-        PX.points(out.X, out.Y, q, [0.92, 0.9, 0.86], { a: 0.75 * breath, A: out.A, glow: 0.3 });
+        const breath = 0.85 + 0.15 * Math.sin((lt - tW) * 2.2) * (1 - dz);
+        PX.points(out.X, out.Y, q, [0.92, 0.9, 0.86], { a: (0.75 - 0.35 * dz) * breath * fade, A: out.A, glow: 0.3 });
       }
       PX.flush({ exposure: 1.4, glow: 1 });
 
       // stories as crisp warm type once the smoke has settled
       Ln.stories.forEach((str, i) => {
-        const t0 = tS + 0.1 + i * 1.7, k = prog(lt, t0 + 1.05, t0 + 1.7);
+        const t0 = tS + 0.1 + i * STORY_GAP, k = prog(lt, t0 + 1.05, t0 + 1.7);
         if (k <= 0) return;
         const out = prog(lt, tW - 0.3, tW + 0.5), drift = (lt - t0) * 2.2;
         L.serif(str, 540, STORY_Y[i] - 16 - drift, { size: 42, color: C.warm, glow: 6, alpha: 0.92 * (1 - out) * k, reveal: 1, spacing: 0 });
@@ -252,15 +283,18 @@
         L.serif(h, x, y, { size: 30, color: C.gold, glow: 6, alpha: 0.42 * a, spacing: 5 });
       });
 
-      // the voice
-      cap(Ln.wait, lt, tW + 0.2, tN);
-      cap(Ln.none, lt, tN + 0.3, end + 1);
+      // the wait: written in your hand along a ring around your seat, echoing the table — a thought nobody hears
+      arcText(Ln.wait, TC.x, TC.y, RS + 108, Math.PI / 2, 40, prog(lt, tW + 0.3, tW + 3.2), prog(lt, tN + 0.4, tN + 2.2),
+        { family: F.hand, color: '#d9d3c7', alpha: 0.86 });
+      // the answer's crisp core, once the bubble's particles have settled
+      const nk = prog(lt, tN + 1.9, tN + 2.8);
+      if (nk > 0) L.serif(Ln.none, 540, BUB_C.y, { size: 38, color: '#e4ded2', glow: 3, alpha: 0.75 * nk * (1 - 0.35 * ease.inOut(prog(lt, tN + 3.2, end))), weight: 500, spacing: 0 });
     },
     cues(V, api) {
       const t = n => at(api, n);
       return [
         { t: t('table'), type: 'title' },
-        { t: t('stories') + 0.1, type: 'glow' }, { t: t('stories') + 1.8, type: 'glow' }, { t: t('stories') + 3.5, type: 'glow' },
+        { t: t('stories') + 0.1, type: 'glow' }, { t: t('stories') + 0.1 + STORY_GAP, type: 'glow' }, { t: t('stories') + 0.1 + 2 * STORY_GAP, type: 'glow' },
         { t: t('none'), type: 'hush' },
       ];
     },
