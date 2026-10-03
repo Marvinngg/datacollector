@@ -1,0 +1,716 @@
+{
+ "title": "先别急",
+ "mode": "silent",
+ "subtitles": false,
+ "width": 1080,
+ "height": 1920,
+ "bpm": 80,
+ "pace": {
+  "lead": 0,
+  "tail": 0,
+  "card": 0
+ },
+ "chapters": [
+  {
+   "id": "e0",
+   "num": "",
+   "title": "序",
+   "beats": [
+    {
+     "id": "b01",
+     "visual": {
+      "type": "pitch",
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "lines": {
+       "ask": "朋友拉你投一个 AI 项目",
+       "money": "100 万",
+       "tags": [
+        "履历漂亮",
+        "方向正热",
+        "故事动人"
+       ],
+       "q1": "凭直觉——",
+       "q2": "它成功的可能有多大？"
+      },
+      "steps": [
+       {
+        "show": "ask",
+        "beats": 4
+       },
+       {
+        "show": "money",
+        "beats": 4
+       },
+       {
+        "show": "tag1",
+        "beats": 2
+       },
+       {
+        "show": "tag2",
+        "beats": 2
+       },
+       {
+        "show": "tag3",
+        "beats": 2
+       },
+       {
+        "show": "q1",
+        "beats": 2
+       },
+       {
+        "show": "q2",
+        "beats": 4
+       }
+      ]
+     }
+    },
+    {
+     "id": "b02",
+     "visual": {
+      "type": "gut",
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "lines": {
+       "more": "甚至更高"
+      },
+      "steps": [
+       {
+        "show": "rise",
+        "beats": 6
+       },
+       {
+        "show": "hold",
+        "beats": 2
+       },
+       {
+        "show": "more",
+        "beats": 4
+       },
+       {
+        "show": "freeze",
+        "beats": 2
+       }
+      ]
+     }
+    },
+    {
+     "id": "b03",
+     "visual": {
+      "type": "title",
+      "fadeIn": 0,
+      "lines": {
+       "title": "先别急",
+       "sub": "一次乘法里的判断力"
+      },
+      "steps": [
+       {
+        "show": "shatter",
+        "beats": 6
+       },
+       {
+        "show": "form",
+        "beats": 6
+       },
+       {
+        "show": "sub",
+        "beats": 4
+       },
+       {
+        "show": "hold",
+        "beats": 2
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "e1",
+   "num": "一",
+   "title": "一成",
+   "beats": [
+    {
+     "id": "b04",
+     "visual": {
+      "type": "thousand",
+      "lines": {
+       "fact": "先看一个事实",
+       "count": "1000 个同类项目"
+      },
+      "steps": [
+       {
+        "show": "fact",
+        "beats": 4
+       },
+       {
+        "show": "fall",
+        "beats": 6
+       },
+       {
+        "show": "count",
+        "beats": 4
+       }
+      ]
+     }
+    },
+    {
+     "id": "b05",
+     "visual": {
+      "type": "baserate",
+      "ref": "b04",
+      "lines": {
+       "one": "十个里，大约只有一个能成",
+       "gut": "你的直觉在这里",
+       "real": "现实在这里"
+      },
+      "steps": [
+       {
+        "show": "sweep",
+        "beats": 6
+       },
+       {
+        "show": "one",
+        "beats": 4
+       },
+       {
+        "show": "gather",
+        "beats": 6
+       },
+       {
+        "show": "gap",
+        "beats": 8
+       }
+      ]
+     }
+    },
+    {
+     "id": "b06",
+     "visual": {
+      "type": "nine",
+      "ref": "b04",
+      "lines": {
+       "need": "要从一成走到五成",
+       "info": "你需要一条信息：",
+       "ratio": "它在成功项目里出现的可能，是失败项目的 9 倍",
+       "rare": "这样的信息，非常少见"
+      },
+      "steps": [
+       {
+        "show": "need",
+        "beats": 4
+       },
+       {
+        "show": "membrane",
+        "beats": 8
+       },
+       {
+        "show": "result",
+        "beats": 6
+       },
+       {
+        "show": "rare",
+        "beats": 6
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "e2",
+   "num": "二",
+   "title": "竞争世界",
+   "beats": [
+    {
+     "id": "b07",
+     "visual": {
+      "type": "worlds",
+      "lines": {
+       "stop": "先别下结论",
+       "list": "先摆出几个世界",
+       "names": [
+        "成功",
+        "失败",
+        "不死不活"
+       ],
+       "flow": "信心，在世界之间流动"
+      },
+      "steps": [
+       {
+        "show": "stop",
+        "beats": 4
+       },
+       {
+        "show": "form",
+        "beats": 8
+       },
+       {
+        "show": "orbit",
+        "beats": 6
+       },
+       {
+        "show": "flow",
+        "beats": 6
+       }
+      ]
+     }
+    },
+    {
+     "id": "b08",
+     "visual": {
+      "type": "missing",
+      "ref": "b07",
+      "lines": {
+       "claim": "你只能在列出的世界里分配信心",
+       "unlisted": [
+        "被收购",
+        "转型"
+       ],
+       "real": "真实世界，可能不在你的列表里",
+       "humble": "保持「我可能漏了什么」的警觉"
+      },
+      "steps": [
+       {
+        "show": "claim",
+        "beats": 6
+       },
+       {
+        "show": "reveal",
+        "beats": 10
+       },
+       {
+        "show": "real",
+        "beats": 6
+       },
+       {
+        "show": "humble",
+        "beats": 6
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "e3",
+   "num": "三",
+   "title": "一次乘法",
+   "beats": [
+    {
+     "id": "b09",
+     "visual": {
+      "type": "pie_vs_odds",
+      "lines": {
+       "pie": "切蛋糕：每来一条信息，就重切一遍",
+       "sum": "总和必须是 100%",
+       "odds": "换成赔率",
+       "tug": "1 : 9",
+       "rel": "只看两边的相对大小"
+      },
+      "steps": [
+       {
+        "show": "pie",
+        "beats": 8
+       },
+       {
+        "show": "tug",
+        "beats": 8
+       },
+       {
+        "show": "rel",
+        "beats": 4
+       }
+      ]
+     }
+    },
+    {
+     "id": "b10",
+     "visual": {
+      "type": "equation",
+      "lines": {
+       "rule": [
+        "新赔率",
+        "旧赔率",
+        "似然比"
+       ],
+       "lr": "似然比：这条信息在成功世界里出现的可能，是失败世界里的几倍",
+       "cancel": "P(D) 约掉了",
+       "only": "只剩一次乘法"
+      },
+      "steps": [
+       {
+        "show": "rule",
+        "beats": 6
+       },
+       {
+        "show": "lr",
+        "beats": 6
+       },
+       {
+        "show": "fraction",
+        "beats": 6
+       },
+       {
+        "show": "cancel",
+        "beats": 4
+       },
+       {
+        "show": "only",
+        "beats": 4
+       }
+      ]
+     }
+    },
+    {
+     "id": "b11",
+     "visual": {
+      "type": "evidence1",
+      "lines": {
+       "card": "创始人背景优秀",
+       "lit": [
+        "成功项目里有 50 个",
+        "失败项目里有 90 个"
+       ],
+       "ratio": "50 : 90 = 5 : 9",
+       "times": "×5",
+       "note": "一条很有分量的好消息，也只推到三成多"
+      },
+      "steps": [
+       {
+        "show": "stamp",
+        "beats": 4
+       },
+       {
+        "show": "light",
+        "beats": 6
+       },
+       {
+        "show": "stream",
+        "beats": 6
+       },
+       {
+        "show": "ratio",
+        "beats": 6
+       },
+       {
+        "show": "note",
+        "beats": 6
+       }
+      ]
+     }
+    },
+    {
+     "id": "b12",
+     "visual": {
+      "type": "evidence2",
+      "ref": "b11",
+      "lines": {
+       "card": "产品还没上线",
+       "lit": [
+        "20",
+        "54"
+       ],
+       "ratio": "20 : 54 = 10 : 27",
+       "times": "×⅔",
+       "ghost": "你的直觉",
+       "note": "默认两条信息互不相关"
+      },
+      "steps": [
+       {
+        "show": "stamp",
+        "beats": 4
+       },
+       {
+        "show": "filter",
+        "beats": 6
+       },
+       {
+        "show": "ratio",
+        "beats": 6
+       },
+       {
+        "show": "ghost",
+        "beats": 6
+       }
+      ]
+     }
+    },
+    {
+     "id": "b13",
+     "visual": {
+      "type": "noise",
+      "ref": "b11",
+      "lines": {
+       "card": "团队很努力",
+       "times": "×1",
+       "text": "成功和失败里都常见的信息，乘上去等于没乘",
+       "chain": "1:9  ×5  ×⅔  =  10:27"
+      },
+      "steps": [
+       {
+        "show": "drop",
+        "beats": 4
+       },
+       {
+        "show": "nothing",
+        "beats": 4
+       },
+       {
+        "show": "text",
+        "beats": 6
+       },
+       {
+        "show": "chain",
+        "beats": 6
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "e4",
+   "num": "四",
+   "title": "概率不是决定",
+   "beats": [
+    {
+     "id": "b14",
+     "visual": {
+      "type": "threshold",
+      "lines": {
+       "calc": "算出概率，还不等于做出决定",
+       "win": "成了：净赚 300 万",
+       "lose": "没成：亏掉 100 万",
+       "line": "门槛 25%",
+       "go": "投"
+      },
+      "steps": [
+       {
+        "show": "calc",
+        "beats": 4
+       },
+       {
+        "show": "lever",
+        "beats": 8
+       },
+       {
+        "show": "line",
+        "beats": 4
+       },
+       {
+        "show": "go",
+        "beats": 4
+       }
+      ]
+     }
+    },
+    {
+     "id": "b15",
+     "visual": {
+      "type": "other",
+      "ref": "b14",
+      "lines": {
+       "him": "换一个人：他手头紧",
+       "heavy": "亏 100 万，像亏了 200 万",
+       "line": "门槛 40%",
+       "no": "不投",
+       "both": "同一个概率，相反的决定",
+       "right": "两个人都没有错"
+      },
+      "steps": [
+       {
+        "show": "heavy",
+        "beats": 6
+       },
+       {
+        "show": "slide",
+        "beats": 6
+       },
+       {
+        "show": "split",
+        "beats": 6
+       },
+       {
+        "show": "both",
+        "beats": 6
+       }
+      ]
+     }
+    },
+    {
+     "id": "b16",
+     "visual": {
+      "type": "gap",
+      "lines": {
+       "close": "27% 离门槛只差两个点",
+       "do": "最该做的，不是马上拍板",
+       "find": "而是再找一条有区分度的信息"
+      },
+      "steps": [
+       {
+        "show": "zoom",
+        "beats": 8
+       },
+       {
+        "show": "do",
+        "beats": 4
+       },
+       {
+        "show": "find",
+        "beats": 6
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "e5",
+   "num": "五",
+   "title": "人与 AI",
+   "beats": [
+    {
+     "id": "b17",
+     "visual": {
+      "type": "ai",
+      "lines": {
+       "jobs": [
+        "展开世界",
+        "搜集证据",
+        "设计实验",
+        "计算概率"
+       ],
+       "fast": "AI 做得快，覆盖面也广"
+      },
+      "steps": [
+       {
+        "show": "burst",
+        "beats": 8
+       },
+       {
+        "show": "flood",
+        "beats": 6
+       },
+       {
+        "show": "fast",
+        "beats": 4
+       }
+      ]
+     }
+    },
+    {
+     "id": "b18",
+     "visual": {
+      "type": "human",
+      "lines": {
+       "q": "要解决什么？",
+       "own": "定义问题，是人的事",
+       "keys": [
+        "做",
+        "不做"
+       ],
+       "decide": "相信什么、做不做，由承担后果的人来决定",
+       "rope": "AI 可以把拔河的每一步算得很准",
+       "who": "但哪两支队伍站上场，输了谁付钱，得由人来定"
+      },
+      "steps": [
+       {
+        "show": "freeze",
+        "beats": 4
+       },
+       {
+        "show": "cursor",
+        "beats": 6
+       },
+       {
+        "show": "decide",
+        "beats": 6
+       },
+       {
+        "show": "rope",
+        "beats": 6
+       },
+       {
+        "show": "who",
+        "beats": 8
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "e6",
+   "num": "",
+   "title": "尾声",
+   "beats": [
+    {
+     "id": "b19",
+     "visual": {
+      "type": "recall",
+      "lines": {
+       "steps": [
+        "先承认有几种可能",
+        "从基准线出发",
+        "只让有区分度的证据移动你的信念",
+        "按你承受得起的代价行动"
+       ]
+      },
+      "steps": [
+       {
+        "show": "flash",
+        "beats": 4
+       },
+       {
+        "show": "slow",
+        "beats": 6
+       },
+       {
+        "show": "s1",
+        "beats": 4
+       },
+       {
+        "show": "s2",
+        "beats": 4
+       },
+       {
+        "show": "s3",
+        "beats": 4
+       },
+       {
+        "show": "s4",
+        "beats": 6
+       }
+      ]
+     }
+    },
+    {
+     "id": "b20",
+     "visual": {
+      "type": "end",
+      "lines": {
+       "l1": "它对抗的不是无知",
+       "l2": "而是过早的确定",
+       "final": "先别急"
+      },
+      "steps": [
+       {
+        "show": "l1",
+        "beats": 6
+       },
+       {
+        "show": "l2",
+        "beats": 6
+       },
+       {
+        "show": "final",
+        "beats": 12
+       }
+      ]
+     }
+    }
+   ]
+  }
+ ]
+}
