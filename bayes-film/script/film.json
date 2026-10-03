@@ -682,7 +682,9 @@
         "show": "s4",
         "beats": 6
        }
-      ]
+      ],
+      "fadeIn": 0,
+      "fadeOut": 0
      }
     },
     {
@@ -707,7 +709,8 @@
         "show": "final",
         "beats": 12
        }
-      ]
+      ],
+      "fadeIn": 0
      }
     }
    ]

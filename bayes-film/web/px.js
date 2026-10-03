@@ -87,25 +87,26 @@
   const _x = new Float32Array(1), _y = new Float32Array(1);
   function dot(x, y, col, a = 1, glowK = 0.6) { _x[0] = x; _y[0] = y; points(_x, _y, 1, col, { a, glow: glowK }); }
 
-  // separable box blur on the glow buffer (3 channels), radius r, two passes ≈ gaussian
+  // separable box blur on the glow buffer (3 channels), radius r, two passes ≈ gaussian. Reads are clamped to the
+  // region [x0..x1] x [y0..y1] (padded by the caller), so stale data outside it from earlier frames never leaks in.
   function blurGlow(r, x0, y0, x1, y1) {
     const w = GW, src = glow, dst = tmp, n = 2 * r + 1;
     for (let pass = 0; pass < 2; pass++) {
       for (let y = y0; y <= y1; y++) {                      // horizontal: src -> dst
         let sr = 0, sg = 0, sb = 0; const row = y * w;
-        for (let x = x0 - r; x <= x0 + r; x++) { const k = (row + clampi(x, 0, w - 1)) * 3; sr += src[k]; sg += src[k + 1]; sb += src[k + 2]; }
+        for (let x = x0 - r; x <= x0 + r; x++) { const k = (row + clampi(x, x0, x1)) * 3; sr += src[k]; sg += src[k + 1]; sb += src[k + 2]; }
         for (let x = x0; x <= x1; x++) {
           const k = (row + x) * 3; dst[k] = sr / n; dst[k + 1] = sg / n; dst[k + 2] = sb / n;
-          const ka = (row + clampi(x + r + 1, 0, w - 1)) * 3, kb = (row + clampi(x - r, 0, w - 1)) * 3;
+          const ka = (row + clampi(x + r + 1, x0, x1)) * 3, kb = (row + clampi(x - r, x0, x1)) * 3;
           sr += src[ka] - src[kb]; sg += src[ka + 1] - src[kb + 1]; sb += src[ka + 2] - src[kb + 2];
         }
       }
       for (let x = x0; x <= x1; x++) {                      // vertical: dst -> src
         let sr = 0, sg = 0, sb = 0;
-        for (let y = y0 - r; y <= y0 + r; y++) { const k = (clampi(y, 0, GH - 1) * w + x) * 3; sr += dst[k]; sg += dst[k + 1]; sb += dst[k + 2]; }
+        for (let y = y0 - r; y <= y0 + r; y++) { const k = (clampi(y, y0, y1) * w + x) * 3; sr += dst[k]; sg += dst[k + 1]; sb += dst[k + 2]; }
         for (let y = y0; y <= y1; y++) {
           const k = (y * w + x) * 3; src[k] = sr / n; src[k + 1] = sg / n; src[k + 2] = sb / n;
-          const ka = (clampi(y + r + 1, 0, GH - 1) * w + x) * 3, kb = (clampi(y - r, 0, GH - 1) * w + x) * 3;
+          const ka = (clampi(y + r + 1, y0, y1) * w + x) * 3, kb = (clampi(y - r, y0, y1) * w + x) * 3;
           sr += dst[ka] - dst[kb]; sg += dst[ka + 1] - dst[kb + 1]; sb += dst[ka + 2] - dst[kb + 2];
         }
       }
