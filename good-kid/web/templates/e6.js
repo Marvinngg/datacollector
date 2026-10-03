@@ -85,7 +85,7 @@
     K.text(GIVER, PAD + SW - 26, PAD + 46, { ctx: head.getContext('2d'), size: 27, family: F.sans, weight: 400, color: 'rgba(236,231,220,0.62)', align: 'right', spacing: 3 });
     // the imprint 你 leaves on the paper (same glyph, same place as the particle body lying there)
     const yc = youCloud(), print = mk(cw, ch), pg = print.getContext('2d');
-    pg.font = `600 ${yc.fs}px ${F.serif}`; pg.textAlign = 'center'; pg.fillStyle = 'rgba(138,143,152,0.16)';
+    pg.font = `600 ${yc.fs}px ${F.serif}`; pg.textAlign = 'center'; pg.fillStyle = 'rgba(138,143,152,0.13)';
     const bl = PAD + PRINT_V - yc.baseYoff + 0.38 * yc.fs;
     pg.fillText('你', PAD + PRINT_U, bl); pg.fillStyle = 'rgba(138,143,152,0.06)'; pg.fillText('你', PAD + PRINT_U + 1.5, bl + 1.5);
     return (LAY = { fk, sheet, warm, head, print });
@@ -340,10 +340,10 @@
 
   // ================================================================ b19 tries + b20 lamp (one chain)
   const TRY = [
-    { x: 112, y: 452, align: 'left', rot: -0.03, kind: 'wobble' },
-    { x: 940, y: 578, align: 'right', rot: 0.02, kind: 'strike' },
-    { x: 124, y: 704, align: 'left', rot: -0.012, kind: 'slip' },
-    { x: 934, y: 826, align: 'right', rot: 0.026, kind: 'fall' },
+    { x: 112, y: 400, align: 'left', rot: -0.03, kind: 'wobble' },
+    { x: 948, y: 512, align: 'right', rot: 0.02, kind: 'strike' },
+    { x: 124, y: 622, align: 'left', rot: -0.012, kind: 'slip' },
+    { x: 940, y: 734, align: 'right', rot: 0.026, kind: 'fall' },
   ];
   const HS = 46, CPS = 0.15;                       // hand size, seconds per character
   let LAYOUT = null;
@@ -420,7 +420,7 @@
   }
   // the lamps' light drawn down into 你
   const NL = 2400, LX = new Float32Array(NL), LY = new Float32Array(NL), LA = new Float32Array(NL), LCc = new Float32Array(NL * 3);
-  const LAMPS = [{ x: 300, y: 1150 }, { x: 540, y: 1110 }, { x: 780, y: 1150 }], LAMP_H = 880;
+  const LAMPS = [{ x: 350, y: 1050 }, { x: 610, y: 1085 }, { x: 870, y: 1050 }], LAMP_H = 800;
 
   function triesState(ct, S, V) {
     const Ls = layout(V), tk = ['t1', 't2', 't3', 't4'].map(n => S[n]);
@@ -454,11 +454,11 @@
         fallK = (c, i) => {
           const d = tf + 0.12 * i + R(i, 61) * 0.35, k = clamp((ct - d) / 1.7); if (k <= 0) return null;
           // it lands on the paper behind and right of 你, lying flat
-          const lu = 600 + (c.x - 600) * 0.35 + (R(i, 62) - 0.5) * 70, lv = 700 + R(i, 63) * 170;
+          const lu = 800 + (c.x - 600) * 0.22 + (R(i, 62) - 0.5) * 50, lv = 790 + R(i, 63) * 120;
           const p = P(cm, lu, lv, 0, {}), e = k * k * (3 - 2 * k), fallE = Math.min(1, k * k * 1.25);
           const bounce = k > 0.8 ? Math.sin((k - 0.8) / 0.2 * Math.PI) * 5 : 0;
           return { x: lerp(c.x, p.x, e) + Math.sin(k * 5 + i) * 10 * (1 - k), y: lerp(c.y, p.y, fallE) - bounce,
-            rot: c.rot + (R(i, 64) - 0.5) * 2.2 * e, sx: lerp(1, p.s * 1.15, e), sy: lerp(1, p.s * 1.15 * 0.5, e), a: lerp(1, 0.6, e) };
+            rot: c.rot + (R(i, 64) - 0.5) * 1.3 * e, sx: lerp(1, p.s * 1.15, e), sy: lerp(1, p.s * 1.15 * 0.5, e), a: lerp(1, 0.6, e) };
         };
       }
       const tp = drawHand(L, ct, tr.t0[li], dimL, fallK);
@@ -466,11 +466,11 @@
     });
     // ---- the lamps of the middle of the film, faint, for a moment
     const lampK = ss(take + 0.2, take + 1.6, ct) * (1 - ss(take + 2.4, take + 4.6, ct));
-    if (lampK > 0.003) LAMPS.forEach((L, i) => KIT.spot(L.x, L.y, { k: lampK * 0.42, w: 150, h: LAMP_H }));
+    if (lampK > 0.003) LAMPS.forEach((L, i) => KIT.spot(L.x, L.y, { k: lampK * 0.26, w: 120, h: LAMP_H }));
     // ---- light
     PX.begin();
     drawKid(cm, { k: 1, phi: lerp(104 * DEG, 92 * DEG, ss(take + 4, take + 7, ct)), own: 0.55 * ss(take + 4.0, take + 7.0, ct), t: lt + 30 });
-    const Y = drawYou(cm, { u: STAND_U, v: STAND_V, occ: 1, phi, yaw, t: lt + 20, gray, own, a: 0.95, em: emK });
+    const Y = drawYou(cm, { u: STAND_U, v: STAND_V, occ: 1, phi, yaw, t: lt + 20, gray, own, a: lerp(2.2, 1.5, own), em: emK });
     // sparks from each finished line into its light
     tr.Ls.forEach((L, li) => {
       const k = prog(ct, tr.done[li] + 0.1, tr.kin[li]); if (k <= 0 || k >= 1) return;
@@ -555,7 +555,7 @@
       // ground: a faint warm line where the paper ends and the ground begins, lit only near 你
       PX.begin();
       const kid = ss(1.2, 5.2, ct);
-      const Y = drawYou(cm, { u, v, occ: 1, phi, lift, t: ct + 40, own, gray: 0, a: 0.95 });
+      const Y = drawYou(cm, { u, v, occ: 1, phi, lift, t: ct + 40, own, gray: 0, a: 1.5 });
       drawKid(cm, { k: 1, phi: 92 * DEG, own: 0.55, t: ct + 60, to: kid, dest: Y });
       // Have a try: warm particles flowing out of 你's light
       const T0 = S.try + 0.15, tc = tryCloud(), n = tc.n;

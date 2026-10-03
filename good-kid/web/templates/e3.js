@@ -18,7 +18,7 @@
   const smooth = k => k * k * (3 - 2 * k);
   const at = (api, n) => KIT.at(api, n);
   const R = (i, k) => PX.rand(i, k);
-  const FREE = KIT.L.free, WARM = KIT.L.warm, INK = [0.93, 0.9, 0.84], GOLDW = [1, 0.86, 0.64];
+  const FREE = KIT.L.free, WARM = KIT.L.warm, INK = [0.93, 0.9, 0.84], GOLDW = [1, 0.76, 0.46];
   const CXF = new Float32Array([2, W - 3]), CYF = new Float32Array([2, H - 3]);
   const fullFrame = () => PX.points(CXF, CYF, 2, [0, 0, 0], { a: 0.001, glow: 1 });
   /* motion blur: each particle is splatted as a short tapered streak from where it was dt ago to where it is now,
@@ -223,7 +223,7 @@
   const hovY = (j, T) => Math.cos(T * (0.28 + 0.3 * R(j, 17)) + R(j, 18) * 40) * (4 + 7 * R(j, 19)) - 3 * Math.sin(T * 0.11 + R(j, 20) * 6);
   const twinkle = (j, T) => 0.7 + 0.3 * Math.sin(T * (1.1 + R(j, 21) * 1.7) + R(j, 22) * 30);
   // a hanging mote's light: most are faint, a few are embers
-  const hangA = (j, T) => (0.45 + 2.2 * Math.pow(R(j, 27), 4)) * twinkle(j, T);
+  const hangA = (j, T) => (0.6 + 2.6 * Math.pow(R(j, 27), 4)) * twinkle(j, T);
 
   // ================================================================ the wind (warm motes drifting right -> left)
   const NW = 340, DIE = 0.6, WIND_CALM = 0.5;                                        // DIE: share of the bike's motes that burn out
@@ -354,7 +354,6 @@
     }
   }
 
-  window.__e3 = () => { const m = bike(); return { n: m.n, total: m.total, pieces: m.pieces.length }; };
   T.register('honest', {
     draw(ctx, V, lt, api) {
       const T0 = api.beat.start, T = T0 + lt, tQ = at(api, 'q'), tNo = at(api, 'no'), tWhat = at(api, 'what'), dur = api.dur;
@@ -521,7 +520,7 @@
         const rx = bx - STAMP.x, g = Math.exp(-Math.pow((by - sy) / 120, 2)) * Math.sin(Math.PI * u);
         const clear = 175 + 150 * R(j, 75);                            // each passes at its own distance: no rim
         bx += (rx >= 0 ? 1 : -1) * Math.max(0, clear - Math.abs(rx)) * g;
-        x = bx; y = by; a = lerp(a, 0.95, smooth(u)) * (1 + 1.3 * Math.sin(Math.PI * u));
+        x = bx; y = by; a = lerp(a, 0.95, smooth(u)) * (1 + 0.7 * Math.sin(Math.PI * u));
       }
       // 3. hold (breathing), then fly on: upward and outward, the left wing left, the right wing right
       if (u >= 1) {
@@ -551,9 +550,9 @@
       // ---- particles
       PX.begin();
       drawWind(T, WIND_CALM * (1 - smooth(prog(lt, 0.3, 2.4))));
-      const B1 = m.B1, sy0 = stampY(lt, tS), sy1 = stampY(lt - 0.045, tS);
+      const B1 = m.B1, sy0 = stampY(lt, tS), sy1 = stampY(lt - 0.03, tS);
       for (let j = 0; j < N; j++) {
-        pos11(m, j, lt - 0.045, T - 0.045, flare, sy1, tF, o); B1.X[j] = o[0]; B1.Y[j] = o[1];
+        pos11(m, j, lt - 0.03, T - 0.03, flare, sy1, tF, o); B1.X[j] = o[0]; B1.Y[j] = o[1];
         B.A[j] = pos11(m, j, lt, T, flare, sy0, tF, o); B.X[j] = o[0]; B.Y[j] = o[1];
       }
       let CCx = m.CC;

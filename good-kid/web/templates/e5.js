@@ -534,7 +534,7 @@
           const lit = clamp((R - dist) / 300); if (lit <= 0.01) continue;
           const pk = 0.65 + 0.55 * md, flash = Math.exp(-Math.max(0, R - dist) / 200);
           ctx.save(); ctx.translate(mx, y); ctx.scale(ms * pk, ms * pk * 0.46); ctx.rotate(mr);
-          ctx.globalAlpha = lit * mb * (0.11 + 0.16 * flash) * (0.55 + 0.45 * md);
+          ctx.globalAlpha = lit * mb * (0.11 + 0.16 * flash) * (0.55 + 0.45 * md) * (1 + 0.7 * reveal);
           ctx.fillStyle = warmS(1); ctx.fillText('你', 0, 18);
           if (mz > 0.45) { ctx.strokeStyle = warmS(0.35); ctx.lineWidth = 1.2 / (ms * pk); ctx.beginPath(); ctx.ellipse(0, 0, 50, 50, 0, 0, TAU); ctx.stroke(); }
           ctx.restore();
