@@ -19,8 +19,6 @@
   const at = (api, n) => KIT.at(api, n);
   const R = (i, k) => PX.rand(i, k);
   const FREE = KIT.L.free, WARM = KIT.L.warm, INK = [0.93, 0.9, 0.84], GOLDW = [1, 0.76, 0.46];
-  const CXF = new Float32Array([2, W - 3]), CYF = new Float32Array([2, H - 3]);
-  const fullFrame = () => PX.points(CXF, CYF, 2, [0, 0, 0], { a: 0.001, glow: 1 });
   /* motion blur: each particle is splatted as a short tapered streak from where it was dt ago to where it is now,
      light conserved (a still particle is one point; a fast one a dim line). One PX.points call. */
   const SBN = 1 << 19, SB = { X: new Float32Array(SBN), Y: new Float32Array(SBN), A: new Float32Array(SBN), C: new Float32Array(SBN * 3) };
@@ -29,7 +27,7 @@
     for (let j = 0; j < n && k < SBN - 16; j++) {
       const a = A[j]; if (a <= 0.003) continue;
       const dx = X0[j] - X1[j], dy = Y0[j] - Y1[j], d = Math.abs(dx) + Math.abs(dy);
-      const m = d < 1.6 ? 1 : Math.min(16, Math.ceil(d / 1.7)), nrm = m === 1 ? 1 : 1 / (m * 0.7);
+      const m = d < 1.6 ? 1 : Math.min(12, Math.ceil(d / 1.8)), nrm = m === 1 ? 1 : 1 / (m * 0.7);
       const cr = CC ? CC[j * 3] : 0, cg = CC ? CC[j * 3 + 1] : 0, cb = CC ? CC[j * 3 + 2] : 0;
       for (let q = 0; q < m; q++) {
         const f = m === 1 ? 0 : q / (m - 1);
@@ -238,7 +236,6 @@
   }
 
   // ================================================================ b10 honest
-  const DT = 0.035, TW = [0.42, 0.3, 0.18, 0.1];                     // motion-blur trail: 4 samples, weights sum to 1
   let WB = null;
   const wbuf = () => WB || (WB = { X: new Float32Array(NW), Y: new Float32Array(NW), A: new Float32Array(NW) });
   // the wind: each mote a short warm streak (canvas, additive) with a bright head (PX; call inside begin/flush)
@@ -285,7 +282,12 @@
         draw(x - l, y, x + l, y, 0.08 + 0.03 * Math.sin(lt * 0.6 + r * 1.3 + c), 1);
       }
     }
-    // a low sun on the horizon (thin warm ring, half set), its path on the water
+    // a far headland on the left (as in the feed)
+    ctx.strokeStyle = C.ink; ctx.globalAlpha = a * 0.2 * k; ctx.lineWidth = 1.1; ctx.beginPath();
+    for (let i = 0; i <= 40; i++) { const u = i / 40, x = 70 + u * 330, y = hz - Math.pow(Math.sin(Math.PI * Math.pow(u, 0.8)), 1.6) * 62; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.stroke();
+    // a low sun on the horizon (thin warm ring, half set, a little warmth around it), its path on the water
+    L.light(806, hz, 210, 'rgba(255,150,90,0.09)', a * k);
     ctx.strokeStyle = C.free; ctx.globalAlpha = a * 0.5 * k;
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, hz); ctx.clip();
     ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(806, hz + 12, 54, 0, TAU); ctx.stroke(); ctx.restore();

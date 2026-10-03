@@ -38,7 +38,7 @@
   // cu: how far the far end of the page curls up to face the camera (0..1); fade: soften the page's near rows
   const CAM0 = { th: 0, D: 1000, Cy: 380, Yc: 960, cx: 0, cu: 0, fade: 0 };          // flat: the sheet at 1:1, x 100..980, y 180..1340
   const CAM1 = { th: 66 * DEG, D: 1000, Cy: 560, Yc: 760, cx: 90, cu: 0, fade: 0.6 };  // the floor, seen from ~40deg (b18 'up' .. b20)
-  const CAM2 = { th: 72 * DEG, D: 1300, Cy: 900, Yc: 760, cx: 150, cu: 0, fade: 0.3 }; // b21: risen and eased back, room above
+  const CAM2 = { th: 72 * DEG, D: 1300, Cy: 900, Yc: 880, cx: 150, cu: 0, fade: 0.3 }; // b21: risen and eased back, room above
   const camMix = (a, b, k) => { const o = {}; for (const key in a) o[key] = lerp(a[key], b[key], k); return cam(o); };
   const cam = o => (o.c = Math.cos(o.th), o.s = Math.sin(o.th), o);
   cam(CAM0); cam(CAM1); cam(CAM2);
@@ -230,7 +230,7 @@
     // sprite pixel (px, py) -> cloud (X = px - ox, Y = py - oy) -> (gx = X sc, up = (y1 - Y) sc)
     const y1 = Y.baseYoff / sc;
     const ctx = K.ctx; ctx.save();
-    ctx.globalAlpha *= 0.8 * st.occ;
+    ctx.globalAlpha *= Math.min(0.96, 0.8 * st.occ);
     ctx.transform(axx, axy, -ayx, -ayy, f.x - o.ox * axx + (y1 + o.oy) * ayx, f.y - o.ox * axy + (y1 + o.oy) * ayy);
     ctx.drawImage(o.c, 0, 0); ctx.restore();
   }
@@ -277,7 +277,7 @@
       }
       Kc.X[i] = x; Kc.Y[i] = y; Kc.A[i] = a;
     }
-    PX.points(Kc.X, Kc.Y, n, col, { a: 0.11 * (o.a == null ? 1 : o.a) * (1 + 1.6 * (o.own || 0)), A: Kc.A, glow: 0.12 + 0.4 * (o.own || 0) });
+    PX.points(Kc.X, Kc.Y, n, col, { a: 0.15 * (o.a == null ? 1 : o.a) * (1 + 1.6 * (o.own || 0)), A: Kc.A, glow: 0.12 + 0.4 * (o.own || 0) });
   }
 
   // ================================================================ captions (the film's voice, fixed place)
@@ -320,7 +320,7 @@
       PX.begin();
       drawKid(cm, { k: ss(S.kid + 0.6, S.kid + 3.2, ct), phi: 104 * DEG, t: lt });
       drawYou(cm, { u: st.u, v: st.v, phi: st.phi, occ: st.occ, yaw: st.yaw, lift: st.lift, flutter: st.fl, t: lt,
-        gray: 1, a: lerp(1.5, 2.2, st.kRise), shim: 1 + st.fl });
+        gray: 1, a: 3.0, shim: 1 + st.fl });
       PX.flush({ exposure: 1.4 });
       cap(V.lines.not, ct, S.not, S.up + 0.2);
       cap(['而是从那张打分表上站起来，', '看一眼它。'], ct, S.up + 0.4, S.given);
@@ -470,7 +470,7 @@
     // ---- light
     PX.begin();
     drawKid(cm, { k: 1, phi: lerp(104 * DEG, 92 * DEG, ss(take + 4, take + 7, ct)), own: 0.55 * ss(take + 4.0, take + 7.0, ct), t: lt + 30 });
-    const Y = drawYou(cm, { u: STAND_U, v: STAND_V, occ: 1, phi, yaw, t: lt + 20, gray, own, a: lerp(2.2, 1.5, own), em: emK });
+    const Y = drawYou(cm, { u: STAND_U, v: STAND_V, occ: 1 + 0.2 * own, phi, yaw, t: lt + 20, gray, own, a: lerp(3.0, 1.5, own), em: emK });
     // sparks from each finished line into its light
     tr.Ls.forEach((L, li) => {
       const k = prog(ct, tr.done[li] + 0.1, tr.kin[li]); if (k <= 0 || k >= 1) return;
@@ -530,7 +530,7 @@
   function tryCloud() {
     const fk = document.fonts.check(`400 40px ${F.serif}`, 'Have a try');
     if (TXT && TXT.fk === fk) return TXT;
-    const c = PX.text('Have a try', { size: 116, family: F.serif, weight: 400, x: W / 2, y: 836, step: 1.35, jitter: 0.7, seed: 9 });
+    const c = PX.text('Have a try', { size: 116, family: F.serif, weight: 400, x: W / 2, y: 716, step: 1.0, jitter: 0.7, seed: 9 });
     // flow order: left to right, a little loose
     const n = c.n, D = new Float32Array(n); let x0 = 1e9, x1 = -1e9;
     for (let i = 0; i < n; i++) { x0 = Math.min(x0, c.X[i]); x1 = Math.max(x1, c.X[i]); }
@@ -540,10 +540,11 @@
   T.register('end', {
     draw(ctx, V, lt, api) {
       const S = steps(api), ct = lt, yc = youCloud();
-      const kc = ease.inOut(prog(ct, 0.3, 8.0)), cm = camMix(CAM1, CAM2, kc);
       // the step: forward, off the near edge of the paper, onto the dark ground
       const tS = S.life + 1.9, kStep = ease.inOut(prog(ct, tS, tS + 1.7));
-      const v = lerp(STAND_V, SH + 120, kStep), u = lerp(STAND_U, STAND_U - 40, kStep), lift = 22 * Math.sin(Math.PI * kStep);
+      const kc = ease.inOut(prog(ct, 0.3, 8.0)), cm = camMix(CAM1, CAM2, kc);
+      cm.D += 240 * ease.inOut(prog(ct, tS - 0.3, tS + 4.5));          // the camera gives it room as it comes forward
+      const v = lerp(STAND_V, SH + 70, kStep), u = lerp(STAND_U, STAND_U - 40, kStep), lift = 22 * Math.sin(Math.PI * kStep);
       const phi = 90 * DEG - 7 * DEG * Math.sin(Math.PI * kStep);
       const breath = 0.5 + 0.5 * Math.sin(ct * 1.25);
       const own = 1 + 0.06 * Math.sin(ct * 1.25 + 0.6);
@@ -555,7 +556,7 @@
       // ground: a faint warm line where the paper ends and the ground begins, lit only near 你
       PX.begin();
       const kid = ss(1.2, 5.2, ct);
-      const Y = drawYou(cm, { u, v, occ: 1, phi, lift, t: ct + 40, own, gray: 0, a: 1.5 });
+      const Y = drawYou(cm, { u, v, occ: 1.2, phi, lift, t: ct + 40, own, gray: 0, a: 1.5 });
       drawKid(cm, { k: 1, phi: 92 * DEG, own: 0.55, t: ct + 60, to: kid, dest: Y });
       // Have a try: warm particles flowing out of 你's light
       const T0 = S.try + 0.15, tc = tryCloud(), n = tc.n;
@@ -568,15 +569,15 @@
           const mx = lerp(sx, tx, 0.35) + (R(i, 82) - 0.5) * 260, my = lerp(sy, ty, 0.55) + (R(i, 83) - 0.3) * 120;
           const sh = 0.5 * Math.sin(ct * (1.1 + R(i, 84)) + i) * e;
           tc.X[i] = u * u * sx + 2 * u * e * mx + e * e * tx + sh; tc.Y[i] = u * u * sy + 2 * u * e * my + e * e * ty + 0.5 * Math.cos(ct * (0.9 + R(i, 85)) + i) * e;
-          tc.A[i] = (0.55 + 1.6 * Math.sin(Math.PI * k) ** 2) * (k < 0.08 ? k / 0.08 : 1) * (0.9 + 0.1 * Math.sin(ct * 1.25 + tc.c.X[i] * 0.01));
+          tc.A[i] = (1 + 1.4 * Math.sin(Math.PI * k) ** 2) * (k < 0.08 ? k / 0.08 : 1) * (0.9 + 0.1 * Math.sin(ct * 1.25 + tc.c.X[i] * 0.01));
         }
-        PX.points(tc.X, tc.Y, n, LC.warm, { a: 0.3, A: tc.A, glow: 0.55 });
+        PX.points(tc.X, tc.Y, n, LC.warm, { a: 0.34, A: tc.A, glow: 0.22 });
       }
       PX.flush({ exposure: 1.4 });
       halo(Y.x, Y.y, 300 * Y.s / 0.6, 0.9 + 0.12 * breath);
       // the voice
       cap(V.lines.years, ct, S.years + 0.4, S.try - 0.1, { y: 760 });
-      cap(V.lines.life, ct, S.life + 0.2, null, { y: 1002, size: 50 });
+      cap(V.lines.life, ct, S.life + 0.2, null, { y: 858, size: 50 });
     },
     cues(V, api) {
       const S = steps(api);

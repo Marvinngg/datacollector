@@ -396,7 +396,8 @@
         "show": "what",
         "beats": 6
        }
-      ]
+      ],
+      "fadeOut": 0
      }
     },
     {
@@ -435,7 +436,8 @@
         "show": "need",
         "beats": 6
        }
-      ]
+      ],
+      "fadeIn": 0
      }
     }
    ]
