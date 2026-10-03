@@ -383,14 +383,21 @@
     { x: 940, y: 734, align: 'right', rot: 0.026, kind: 'fall' },
   ];
   const HS = 46, CPS = 0.15;                       // hand size, seconds per character
-  let LAYOUT = null;
+  let LAYOUT = null, HEAD = null;
   function layout(V) {
     if (LAYOUT) return LAYOUT;
     const list = V.lines.list;
-    LAYOUT = TRY.map((L, li) => {
-      let chars = [...list[li]], strike = -1;
+    // the heading of the list, in the same hand: 去试一件没人给你打分的事
+    HEAD = buildLine({ x: 112, y: 292, align: 'left', rot: -0.012, kind: 'head', hs: 54 }, noDot(V.lines.try), 7);
+    LAYOUT = TRY.map((L, li) => buildLine(L, list[li], li));
+    return LAYOUT;
+  }
+  function buildLine(L, str, li) {
+    const HSZ = L.hs || HS;
+    {
+      let chars = [...str], strike = -1;
       if (L.kind === 'strike') { const j = chars.indexOf('城'); if (j > 0) { chars = [...chars.slice(0, j), '成', ...chars.slice(j)]; strike = j; } }
-      const sizes = chars.map((_, i) => HS * (1 + (R(i + li * 31, 3) - 0.5) * (L.kind === 'fall' ? 0.2 : 0.08)));
+      const sizes = chars.map((_, i) => HSZ * (1 + (R(i + li * 31, 3) - 0.5) * (L.kind === 'fall' ? 0.2 : 0.08)));
       const ws = chars.map((ch, i) => K.measure(ch, { size: sizes[i], family: F.hand }) + 2);
       const tw = ws.reduce((a, b) => a + b, 0);
       let x = L.align === 'left' ? L.x : L.x - tw;
@@ -405,8 +412,7 @@
       let t = 0; const tt = cs.map((c, i) => { const t0 = t; t += CPS * (0.8 + 0.5 * R(i + li * 31, 6)); if (i === strike) t += 0.42; return t0; });
       const wob = L.kind === 'wobble' ? chars.indexOf('不') : -1;
       return { ...L, cs, tt, dur: t, strike, wob, end: x };
-    });
-    return LAYOUT;
+    }
   }
   function drawHand(L, ct, t0, alpha, fallK) {
     const ctx = K.ctx;
@@ -418,11 +424,17 @@
         const tw = ct - t0 - L.tt[i];
         rot += Math.sin(tw * 5.2 + i) * 0.09 * (0.35 + 0.65 * Math.exp(-tw * 0.6)); y += Math.sin(tw * 3.7 + i * 2) * 2.2;
       }
-      if (fallK) { const f = fallK(c, i); if (f) { x = f.x; y = f.y; rot = f.rot; sx = f.sx; sy = f.sy; a *= f.a; } }
+      const f = fallK ? fallK(c, i) : null;
+      if (f) a *= f.a;
       ctx.save(); ctx.globalAlpha *= a * (0.25 + 0.75 * p);
-      ctx.translate(x, y); ctx.scale(sx, sy); ctx.rotate(rot);
+      if (f) ctx.transform(f.m[0], f.m[1], f.m[2], f.m[3], f.m[4], f.m[5]);
+      else { ctx.translate(x, y); ctx.scale(sx, sy); ctx.rotate(rot); }
       if (p < 1) { ctx.beginPath(); ctx.rect(-4, -c.size * 1.1, (c.w + 8) * p, c.size * 1.5); ctx.clip(); }
-      ctx.font = `400 ${c.size}px ${F.hand}`; ctx.fillStyle = INK; ctx.fillText(c.ch, 0, 0);
+      ctx.font = `400 ${f ? f.size : c.size}px ${F.hand}`; ctx.fillStyle = INK;
+      if (f && f.altK > 0) {                       // lying on the paper, the fallen character turns into another
+        const a1 = ctx.globalAlpha; ctx.globalAlpha = a1 * (1 - f.altK); ctx.fillText(c.ch, 0, 0);
+        ctx.globalAlpha = a1 * f.altK; if (f.alt) ctx.fillText(f.alt, f.altDx || 0, 0);
+      } else ctx.fillText(c.ch, 0, 0);
       ctx.restore();
       if (p > 0 && p < 1) { tip.on = true; tip.x = x + c.w * p; tip.y = y - c.size * 0.35; }
       if (i === L.strike) {                                          // crossed out, in the same warm ink
@@ -435,7 +447,7 @@
       }
     });
     // where a mark would be: an empty place, nothing written in it
-    const ke = ss(t0 + L.dur + 0.35, t0 + L.dur + 1.3, ct);
+    const ke = L.kind === 'head' ? 0 : ss(t0 + L.dur + 0.35, t0 + L.dur + 1.3, ct);
     if (ke > 0) {
       const last = L.cs[L.cs.length - 1], ex = L.align === 'left' ? last.x + last.w + 30 : L.end + 30, ey = last.y - HS * 0.32;
       ctx.save(); ctx.globalAlpha *= alpha * ke * 0.5; ctx.strokeStyle = 'rgba(236,231,220,0.5)'; ctx.lineWidth = 1.2; ctx.setLineDash([3, 5]);
@@ -459,6 +471,15 @@
   const NL = 2400, LX = new Float32Array(NL), LY = new Float32Array(NL), LA = new Float32Array(NL), LCc = new Float32Array(NL * 3);
   const LAMPS = [{ x: 350, y: 1050 }, { x: 610, y: 1085 }, { x: 870, y: 1050 }], LAMP_H = 800;
 
+  // 做得不好，世界也没有塌。 — the slots on the paper where the fallen characters come to lie (hand, in reading order)
+  const FINE_V = 1070, FINE_S = 60, MM = [0, 0, 0, 0, 0, 0];
+  let SLOTS = null;
+  function fineSlots(V) {
+    if (SLOTS) return SLOTS;
+    const chars = [...V.lines.fine], ws = chars.map(ch => K.measure(ch, { size: FINE_S, family: F.hand }) + 3), tw = ws.reduce((a, b) => a + b, 0);
+    let u = 470 - tw / 2; SLOTS = chars.map((ch, i) => { const s = { ch, u }; u += ws[i]; return s; });
+    return SLOTS;
+  }
   function triesState(ct, S, V) {
     const Ls = layout(V), tk = ['t1', 't2', 't3', 't4'].map(n => S[n]);
     const t0 = tk.map(t => t + 0.25), done = Ls.map((L, i) => t0[i] + L.dur), kin = done.map(d => d + 0.8);
@@ -482,20 +503,24 @@
     const pool = 0.25 * ownTry + ss(take + 3.0, take + 7.0, ct) * 1.0;
     floorLight(cm, STAND_U, STAND_V, 230 + 260 * ss(take + 3.0, take + 7.5, ct), pool, 1);
     // ---- the tries, by hand
-    const dimL = lerp(1, 0.42, ss(take + 0.2, take + 2.2, ct));
+    const dimL = lerp(1, 0.14, ss(take + 0.1, take + 1.3, ct));
     let tip = null;
+    { const tp = drawHand(HEAD, ct, S.try + 0.35, dimL * 1.0, null); if (tp.on) tip = tp; }
     tr.Ls.forEach((L, li) => {
       let fallK = null;
       if (L.kind === 'fall') {
-        const tf = S.fine + 0.25;
+        const tf = S.fine + 0.15, slots = fineSlots(V), dimF = lerp(1, 0.55, ss(take + 0.1, take + 1.3, ct)) / Math.max(0.05, dimL);
         fallK = (c, i) => {
-          const d = tf + 0.12 * i + R(i, 61) * 0.35, k = clamp((ct - d) / 1.7); if (k <= 0) return null;
-          // it lands on the paper behind and right of 你, lying flat
-          const lu = clamp(530 + (c.x + c.w * 0.5 - 540) / 0.85 + (R(i, 62) - 0.5) * 40, 60, 850), lv = 690 + R(i, 63) * 100;   // straight down, onto the paper (behind 你 they vanish behind its body)
-          const p = P(cm, lu, lv, 0, {}), e = k * k * (3 - 2 * k), fallE = Math.min(1, k * k * 1.25);
-          const bounce = k > 0.8 ? Math.sin((k - 0.8) / 0.2 * Math.PI) * 5 : 0;
-          return { x: lerp(c.x, p.x, e) + Math.sin(k * 5 + i) * 10 * (1 - k), y: lerp(c.y, p.y, fallE) - bounce,
-            rot: c.rot + (R(i, 64) - 0.5) * 1.3 * e, sx: lerp(1, p.s * 1.15, e), sy: lerp(1, p.s * 1.15 * 0.5, e), a: lerp(1, 0.6, e) };
+          const d = tf + 0.06 * i + R(i, 61) * 0.2, k = clamp((ct - d) / 1.3); if (k <= 0) return null;
+          // it comes loose and lies down on the paper in front of 你 — and lying there it spells something else
+          const sl = slots[Math.min(i, slots.length - 1)], M1 = lyingMatrix(cm, sl.u, FINE_V, MM);
+          const e = ease.inOut(k), g = Math.min(1, k * k * 1.15), cr = Math.cos(c.rot), sr = Math.sin(c.rot);
+          const wob = Math.sin(Math.PI * k) * (R(i, 64) - 0.5) * 0.9, cw = Math.cos(wob), sw = Math.sin(wob);
+          const m0 = [cr * cw - sr * sw, sr * cw + cr * sw, -(sr * cw + cr * sw), cr * cw - sr * sw];
+          const m = [lerp(m0[0], M1[0], e), lerp(m0[1], M1[1], e), lerp(m0[2], M1[2], e), lerp(m0[3], M1[3], e),
+            lerp(c.x, M1[4], e) + Math.sin(k * 4 + i) * 8 * (1 - k), lerp(c.y, M1[5], g)];
+          const altK = ss(0.9, 1, k) * ss(d + 1.3, d + 1.9, ct);
+          return { m, size: lerp(c.size, FINE_S, e), a: lerp(1, 0.95, e) * (k > 0.5 ? dimF : 1), alt: i < slots.length ? slots[i].ch : '', altK: i < slots.length ? altK : ss(d + 1.3, d + 1.9, ct) };
         };
       }
       const tp = drawHand(L, ct, tr.t0[li], dimL, fallK);

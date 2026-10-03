@@ -40,7 +40,7 @@
       const d = o.d ? o.d(i) : PX.rand(i, 400 + o.tag), kk = ease.inOut(clamp(k * (1 + st) - d * st));
       const [sx, sy] = src(i), sw = Math.sin(kk * Math.PI) * arc * (PX.rand(i, 401) - 0.5);
       b.X[i] = lerp(sx, cl.X[i], kk) + sw + Math.sin(t * 1.1 + i) * 0.5; b.Y[i] = lerp(sy, cl.Y[i], kk) + Math.cos(t * 0.9 + i) * 0.5;
-      b.A[i] = (0.25 + 0.75 * kk) * (kk > 0 ? 1 : 0.6);
+      b.A[i] = clamp(kk * 6) * (0.3 + 0.7 * kk);
     }
     PX.points(b.X, b.Y, n, o.color, { a: o.a == null ? 0.5 : o.a, A: b.A, glow: o.glow == null ? 0.35 : o.glow });
   }
@@ -90,7 +90,7 @@
     gatherCloud(c1, i => { const j = (i * 13) % YP.n; return [YOU.x + YP.X[j], YOU.y + YP.Y[j]]; }, k1, { tag: 460, color: mixRGB(INK, LAMP, 0.5), a: 0.5, arc: 60, t: lt });
     segs.forEach(([t, sz, h], gi) => {
       const c = tcloud(t, sz, x, y2, { align: 'left', seed: 82 + gi, weight: h ? 600 : 500 });
-      if (h) gatherCloud(c, i => [200 + PX.rand(i, 470) * 680, 300 + PX.rand(i, 471) * 140], k2, { tag: 461 + gi, color: GOLD, a: 0.55, glow: 0.6, arc: 40, t: lt });
+      if (h) gatherCloud(c, i => [160 + PX.rand(i, 470) * 760, 420 + PX.rand(i, 471) * 90], k2, { tag: 461 + gi, color: GOLD, a: 0.55, glow: 0.6, arc: 40, t: lt });
       else gatherCloud(c, i => { const j = (i * 17 + gi * 501) % YP.n; return [YOU.x + YP.X[j], YOU.y + YP.Y[j]]; }, k2, { tag: 461 + gi, color: mixRGB(INK, LAMP, 0.5), a: 0.5, arc: 50, t: lt });
       x += ws[gi];
     });
@@ -383,6 +383,7 @@
       PX.flush({ exposure: 1.45, glow: 0.8 });
       metSentenceInk(V, lt, tM, er);
       goneSentenceInk(V, lt, tG, tF);
+      fearSentenceInk(V, lt, tF);
     },
     cues(V, api) {
       const tM = at(api, 'met'), tG = at(api, 'gone'), tF = at(api, 'fork');
@@ -418,19 +419,19 @@
   }
   // 标准消失了，就开始失重。: condenses out of the line's dust, then loses its baseline for good: every character drifts
   // and turns on its own, slowly faster, its grains loosening, until at the fork it comes apart
-  const GONE = { size: 56, y: 1300 };
+  const GONE = { size: 56, y: 1370 };
   function goneLayout(V) {
     const chars = [...V.lines.gone], o = { size: GONE.size, family: F.serif, weight: 500 }, ws = chars.map(c => measure(c, o) + 3);
     const tw = ws.reduce((a, b) => a + b, 0); let x = W / 2 - tw / 2;
     return chars.map((c, i) => { const cx = x + ws[i] / 2; x += ws[i]; return { c, cx, i }; });
   }
   function goneState(ch, lt, tG) {
-    const tau = Math.max(0, lt - (tG + 3.0)), s = tau < 1.2 ? tau * tau / 2.4 : tau - 0.6, i = ch.i;
-    const vx = (PX.rand(i, 481) - 0.5) * 16, vy = (PX.rand(i, 482) - 0.5) * 18 - 2, w = (PX.rand(i, 483) - 0.5) * 0.11;
+    const tau = Math.max(0, lt - (tG + 3.3)), s = tau < 1.2 ? tau * tau / 2.4 : tau - 0.6, i = ch.i;
+    const vx = (ch.cx - W / 2) / W * 22 + (PX.rand(i, 481) - 0.5) * 6, vy = (PX.rand(i, 482) - 0.5) * 16 - 2, w = (PX.rand(i, 483) - 0.5) * 0.11;
     return { x: ch.cx + vx * s, y: GONE.y + vy * s, rot: w * s + Math.sign(w) * 0.006 * s * s, loose: 0.7 * Math.pow(s, 1.4) };
   }
   function goneSentence(V, lt, tG, tF) {
-    const k = prog(lt, tG + 1.0, tG + 3.0); if (k <= 0) return;
+    const k = prog(lt, tG + 1.6, tG + 3.4); if (k <= 0) return;
     const out = prog(lt, tF - 0.3, tF + 1.6); if (out >= 1) return;
     goneLayout(V).forEach(ch => {
       const cl = PX.text(ch.c, { size: GONE.size, family: F.serif, weight: 500, x: 0, y: GONE.size * 0.36, step: 1.2, seed: 60 + ch.i });
@@ -447,7 +448,7 @@
     });
   }
   function goneSentenceInk(V, lt, tG, tF) {
-    const a0 = clamp((prog(lt, tG + 1.0, tG + 3.0) - 0.8) / 0.2) * (1 - smooth(prog(lt, tG + 3.6, tF - 0.2))) * 0.8;
+    const a0 = clamp((prog(lt, tG + 1.6, tG + 3.4) - 0.8) / 0.2) * (1 - smooth(prog(lt, tG + 3.6, tF - 0.2))) * 0.8;
     if (a0 <= 0) return;
     goneLayout(V).forEach(ch => {
       const st = goneState(ch, lt, tG);
@@ -470,7 +471,18 @@
         const d = clamp((u + cl.w / 2) / cl.w) * 0.6 + PX.rand(i, 501) * 0.4, kk = ease.inOut(clamp(k * 1.7 - d * 0.7 - li * 0.25));
         b.X[i] = tx + (PX.rand(i, 502) - 0.5) * 30 * (1 - kk); b.Y[i] = ty - (1 - kk) * 26 * PX.rand(i, 503); b.A[i] = kk;
       }
-      PX.points(b.X, b.Y, n, [0.74, 0.76, 0.82], { a: 0.55, A: b.A, glow: 0.25 });
+      PX.points(b.X, b.Y, n, [0.74, 0.76, 0.82], { a: 0.5, A: b.A, glow: 0.2 });
+    });
+  }
+  function fearSentenceInk(V, lt, tF) {
+    const a = clamp((prog(lt, tF + 2.4, tF + 4.6) - 0.8) / 0.2) * 0.55; if (a <= 0) return;
+    const str = V.lines.fear, c = str.indexOf('，'), lines = c < 0 ? [str] : [str.slice(0, c + 1), str.slice(c + 1)];
+    [[lines[0], 0.80, 50], [lines[1], 0.70, 58]].forEach(([l, zc, size]) => {
+      if (!l) return;
+      const kz = 0.0011 / size * 50, sy = FK * kz / (zc * zc);            // the ground's foreshortening at that depth
+      ctx.save(); ctx.translate(W / 2, HOR + FK / zc); ctx.scale(1, sy);
+      text(l, 0, 0, { size, family: F.serif, weight: 500, color: '#c3c7d0', align: 'center', alpha: a });
+      ctx.restore();
     });
   }
 
