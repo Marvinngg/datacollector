@@ -598,7 +598,8 @@
         "show": "fast",
         "beats": 4
        }
-      ]
+      ],
+      "fadeOut": 0
      }
     },
     {
@@ -637,7 +638,8 @@
         "show": "who",
         "beats": 8
        }
-      ]
+      ],
+      "fadeIn": 0
      }
     }
    ]

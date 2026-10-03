@@ -262,7 +262,11 @@
       for (let i = 0; i < DN; i++) d.B[i] = d.A[i] * 0.5 * kD;
       // stars are points: no energy normalisation; brightness falls off gently with distance
       project(DN, d.X, d.Y, d.Z, d.B, { ...cam, zf: cam.dist, kc: 0 }, d.O, 0, 3);
-      for (let i = 0; i < DN; i++) { if (d.O.A[i] > 0) { const zc = (d.X[i] - cam.ex) * cam.fx + (d.Y[i] - cam.ey) * cam.fy + (d.Z[i] - cam.ez) * cam.fz; d.O.A[i] = d.B[i] * clamp(14 / zc, 0.08, 1.4); } }
+      for (let i = 0; i < DN; i++) { if (d.O.A[i] > 0) { const zc = (d.X[i] - cam.ex) * cam.fx + (d.Y[i] - cam.ey) * cam.fy + (d.Z[i] - cam.ez) * cam.fz; const X = d.O.X[i], Y = d.O.Y[i];
+        // kept inside a soft-edged window: the light buffers are only converted over what was drawn, and a full-frame
+        // star field would double the cost of every frame
+        const edge = Math.min(X - 60, 1020 - X, Y - 250, 1560 - Y) / 140;
+        d.O.A[i] = edge <= 0 ? 0 : d.B[i] * clamp(14 / zc, 0.08, 1.4) * (edge < 1 ? edge * edge * (3 - 2 * edge) : 1); } }
       PX.points(d.O.X, d.O.Y, DN, [0.75, 0.78, 0.95], { a: 1, A: d.O.A, glow: 0.2 });
     }
 
@@ -397,8 +401,11 @@
       if (al <= 0) return;
       const dir = w.lab, off = w.R * 1.05 + 0.32;
       const p = proj1(cam, c[0] + cam.ux * off * -dir, c[1] + cam.uy * off * -dir, c[2] + cam.uz * off * -dir);
-      const size = Math.round(clamp(42 * 8.6 * cam.f / FOC / p.z, 24, 42));
-      L.serif(nm, p.x, p.y + (dir > 0 ? size * 0.25 : -size * 0.1), { size, weight: 600, color: w.css, glow: 10, alpha: al, reveal: prog(ct, le - 0.9, le + 0.5), spacing: size * 0.12 });
+      // one cached 42 px sprite set, scaled with distance (no new glyph sprites per frame during the pull-back)
+      const size = clamp(42 * 8.6 * cam.f / FOC / p.z, 24, 42), sc = size / 42;
+      ctx.save(); ctx.translate(p.x, p.y + (dir > 0 ? size * 0.25 : -size * 0.1)); ctx.scale(sc, sc);
+      L.serif(nm, 0, 0, { size: 42, weight: 600, color: w.css, glow: 10, alpha: al, reveal: prog(ct, le - 0.9, le + 0.5), spacing: 5 });
+      ctx.restore();
     });
     // b07
     KIT.type(L7.stop, W / 2, 960, { size: 86, family: F.serif, weight: 600, mode: 'punch', k: prog(ct, 0.15, 0.6), color: C.ink, out: prog(ct, 3.0, 3.7) });

@@ -134,6 +134,7 @@
       for (let y = gy0; y <= gy1; y++) for (let x = gx0, k = (y * GW + gx0) * 3, j = y * GW + gx0; x <= gx1; x++, k += 3, j++) {
         glow32[j] = 0xff000000 | (tm(glow[k + 2] * gs) << 16) | (tm(glow[k + 1] * gs) << 8) | tm(glow[k] * gs);
       }
+      glowG.clearRect(0, 0, GW, GH);    // the upscale below samples a pixel past the region's edge: keep that transparent, not last frame's glow
       glowG.putImageData(glowImg, 0, 0, gx0, gy0, gx1 - gx0 + 1, gy1 - gy0 + 1);
       ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(glowCv, gx0, gy0, gx1 - gx0 + 1, gy1 - gy0 + 1, gx0 * 4, gy0 * 4, (gx1 - gx0 + 1) * 4, (gy1 - gy0 + 1) * 4);
