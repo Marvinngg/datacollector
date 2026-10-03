@@ -25,15 +25,6 @@
   const CX = new Float32Array([2, W - 3]), CY = new Float32Array([2, H - 3]);
   const fullFrame = () => PX.points(CX, CY, 2, [0, 0, 0], { a: 0.001, glow: 1 });
 
-  // a caption that reveals at t0 and leaves before t1
-  function cap(lines, lt, t0, t1, o = {}) {
-    const ls = Array.isArray(lines) ? lines : [lines], n = ls.reduce((a, l) => a + [...l].length, 0);
-    const k = prog(lt, t0 + 0.12, t0 + 0.12 + Math.min(2.4, 0.7 + n * 0.075));
-    if (k <= 0) return;
-    const out = t1 == null ? 0 : prog(lt, t1 - 0.6, t1 - 0.08);
-    if (out >= 1) return;
-    KIT.caption(ls, k, { ...o, out });
-  }
   function veil(a) { if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); ctx.restore(); }
   function softLight(x, y, r, rgbStr, a) {
     if (a <= 0.002) return;
@@ -313,10 +304,10 @@
   ];
   // papers: item index, world position, rotation; which holder scored it
   const PAPERS = [
-    { i: 0, x: 196, y: 600, rot: -0.06, h: 1 },   // 作业 ✓    — 老师
-    { i: 1, x: 392, y: 468, rot: 0.04, h: 0 },    // 考试 100  — 排名
-    { i: 2, x: 688, y: 468, rot: -0.035, h: 2 },  // 竞赛 ○    — 奖状
-    { i: 3, x: 884, y: 600, rot: 0.05, h: 0 },    // 排名 #1   — 排名
+    { i: 0, x: 190, y: 756, rot: -0.06, h: 1 },   // 作业 ✓    — 老师
+    { i: 1, x: 382, y: 668, rot: 0.04, h: 0 },    // 考试 100  — 排名
+    { i: 2, x: 698, y: 668, rot: -0.035, h: 2 },  // 竞赛 ○    — 奖状
+    { i: 3, x: 890, y: 756, rot: 0.05, h: 0 },    // 排名 #1   — 排名
   ];
   const ON_ORDER = [1, 0, 2];                                        // beam that clicks on with mark 0, 1, 2
 
@@ -488,6 +479,7 @@
     ctx.save(); ctx.globalAlpha *= 1 - 0.5 * ease.inOut(prog(ct, S.go + 4, S.title + 1));
     classroom(prog(ct, S.school + 0.05, S.school + 2.6), light, ct);
     ctx.restore();
+    blackboard(ct, S, light, dark, lines5);
     // papers and their marks
     PAPERS.forEach((P, pi) => {
       const tm = markT(S, pi), app = ease.out(prog(ct, tm - 0.7, tm - 0.1));
@@ -524,23 +516,114 @@
     // the far lamp after it stops lighting you: a small point, still burning, carried away
     // 你: exactly the same shape, same place; only the borrowed light changes
     KIT.you(cx(YOU.x), cy(YOU.y), YOU.size, { lit, a: 1, t: ct, breathe: 0.35, tag: 5, scale: z });
-    PX.flush({ exposure: 1.4, glow: 1 });
 
+    // the voice in light: what society says, the title, the last lamp's lines
+    const far = HS[1], fx = cx(far.h.x + far.dx), fy = cy(far.h.y + far.dy);
+    voiceParticles(ct, S, lines6, fx, fy, far);
+    PX.flush({ exposure: 1.4, glow: 1 });
+    voiceCrisp(ct, S, lines6);
     return { lines5, lines6, lit, dark };
   }
-  const linesOf = type => { const b = T.TL.beats.find(b => b.visual.type === type); return b ? b.visual.lines : {}; };
-
-  function captionsSchool(ct, S) {
-    const l5 = linesOf('scorer'), l6 = linesOf('leave');
-    cap(l5.school, ct, S.school + 0.3, S.marks + 0.2);
-    cap(l5.seen, ct, S.seen + 0.1, S.held + 1.6);
-    cap(l6.none, ct, S.none + 0.1, S.title - 0.2);
-    // the title: mid-frame, larger, slow
-    const tk = prog(ct, S.title + 0.35, S.title + 2.7), tout = prog(ct, S.lamp - 0.2, S.lamp + 0.9);
-    if (tk > 0 && tout < 1) KIT.caption(l6.title, tk, { at: 'mid', y: 880, size: 70, gap: 112, out: tout, hi: ['打分的人走了'], hiColor: '#e3b2aa', color: '#e6e0d4', glow: 4 });
-    cap(l6.lamp, ct, S.lamp + 0.5, S.held2);
-    cap(l6.held, ct, S.held2 + 0.2, S.end + 1);
+  /* the blackboard behind the class: the sentence is chalked on it, and the scorer's red pen underlines the verbs */
+  const BOARD = { x0: 168, x1: 912, y0: 262, y1: 520 };
+  const CHALK = [{ y: 330, size: 46 }, { y: 402, size: 42 }, { y: 468, size: 42 }];
+  function chalk(str, x, y, size, k, a) {
+    if (k <= 0) return 0;
+    const chars = [...str], n = chars.length, fo = { size, family: F.hand, weight: 400 };
+    let px = x;
+    chars.forEach((ch, i) => {
+      const w = measure(ch, fo), p = clamp(k * n - i);
+      if (p > 0) {
+        ctx.save(); ctx.beginPath(); ctx.rect(px - 2, y - size, (w + 4) * p, size * 1.4); ctx.clip();
+        text(ch, px, y, { ...fo, color: '#e9e5db', alpha: a * 0.86 });
+        text(ch, px + 0.8, y + 0.6, { ...fo, color: '#e9e5db', alpha: a * 0.14 });                 // chalk doubling
+        ctx.restore();
+      }
+      px += w + size * 0.04;
+    });
+    return px - x;
   }
+  function blackboard(ct, S, light, dark, l5) {
+    const k = ease.inOut(prog(ct, S.school + 0.1, S.school + 1.4));
+    const a = k * (0.55 + 0.45 * Math.min(1, light * 1.4)) * (1 - ease.inOut(prog(ct, S.go + 2.5, S.title - 0.3)));
+    if (a <= 0.003) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    const { x0, x1, y0, y1 } = BOARD, w = (x1 - x0) * k;
+    ctx.fillStyle = 'rgba(120,140,130,0.035)'; ctx.fillRect((x0 + x1) / 2 - w / 2, y0, w, y1 - y0);
+    ctx.strokeStyle = ink(0.2); ctx.lineWidth = 1.4; ctx.strokeRect((x0 + x1) / 2 - w / 2, y0, w, y1 - y0);
+    ctx.strokeStyle = ink(0.13); ctx.beginPath(); ctx.moveTo((x0 + x1) / 2 - w / 2 - 10, y1 + 12); ctx.lineTo((x0 + x1) / 2 + w / 2 + 10, y1 + 12); ctx.stroke();
+    // chalk: 在学校里， — then the rest of the sentence
+    const lx = x0 + 44;
+    const l2 = l5.seen[0], l3 = l5.seen[1];
+    chalk(l5.school, lx, CHALK[0].y, CHALK[0].size, prog(ct, S.school + 0.7, S.school + 1.6), 1);
+    chalk(l2, lx, CHALK[1].y, CHALK[1].size, prog(ct, S.seen + 0.15, S.seen + 1.2), 1);
+    chalk(l3, lx, CHALK[2].y, CHALK[2].size, prog(ct, S.seen + 1.25, S.seen + 3.0), 1);
+    // red: the scorer underlines 被看见 / 被计分 / 被表扬
+    const fo = { size: CHALK[2].size, family: F.hand, weight: 400 }, sp = CHALK[2].size * 0.04;
+    const wOf = str => [...str].reduce((acc, ch) => acc + measure(ch, fo) + sp, 0);
+    ['被看见', '被计分', '被表扬'].forEach((v, i) => {
+      const at0 = l3.indexOf(v); if (at0 < 0) return;
+      const xa = lx + wOf(l3.slice(0, at0)), wv = wOf(v) - sp, tk = S.seen + 3.25 + i * 0.42;
+      KIT.pen('underline', xa + wv / 2, CHALK[2].y + 12, wv * 1.05, prog(ct, tk, tk + 0.3), { seed: 11 + i, width: 3 });
+    });
+    ctx.restore();
+  }
+  /* sentences made of light (screen space, inside the PX pass) */
+  const LAMPS0 = HOLD.map(h => ({ x: 540 + (h.x - YOU.x) * 0.55, y: 1196 + (h.y - YOU.y) * 0.55 }));
+  const POOL0 = { x: 540, y: 1196 + (TARGET.y - YOU.y) * 0.55 };
+  const NONE_AT = { x: 772, y: 486 };                                // the dark where 奖状 stood
+  const TITLE_Y = [868, 984], TITLE_SIZE = 72;
+  function voiceParticles(ct, S, l6, fx, fy, far) {
+    // 社会不发奖状。 — gathers in the empty dark where the 奖状 holder stood
+    KIT.ptext(l6.none, NONE_AT.x, NONE_AT.y, { size: 44, weight: 500, color: [0.74, 0.77, 0.84], a: 0.42, crisp: 0.55, t: ct, seed: 5, tag: 1,
+      k: prog(ct, S.none + 0.1, S.none + 1.9), out: prog(ct, S.title - 0.9, S.title + 0.2) });
+    // the title condenses out of the light the lamps left behind: motes along the three old beams drift in and gather
+    const tk = prog(ct, S.title - 0.6, S.title + 3.0), tout = prog(ct, S.lamp - 0.2, S.lamp + 1.0);
+    if (tk > 0 && tout < 1) {
+      l6.title.forEach((line, li) => {
+        const T_ = PX.text(line, { size: TITLE_SIZE, family: F.serif, weight: 400, x: 540, y: TITLE_Y[li] + TITLE_SIZE * 0.36, step: 1.9, seed: 31 + li });
+        const n = T_.n, b = PX.buf(n, 370 + li);
+        for (let i = 0; i < n; i++) {
+          const r1 = PX.rand(i, 101 + li), r2 = PX.rand(i, 102 + li), r3 = PX.rand(i, 103 + li), bi = i % 3;
+          const v = 0.08 + 0.85 * r2, L0 = LAMPS0[bi];
+          const sx = lerp(L0.x, POOL0.x, v) + (r3 * 2 - 1) * lerp(6, 112, v), sy = lerp(L0.y, POOL0.y, v);
+          const kk = smooth(clamp(tk * 1.7 - r1 * 0.7)), sw = Math.sin(kk * Math.PI) * 30;
+          const lift = ease.in(clamp(tout * 1.5 - r1 * 0.5));
+          b.X[i] = lerp(sx, T_.X[i], kk) + Math.cos(r1 * 40) * sw + Math.sin(ct * 0.5 + i) * 0.5;
+          b.Y[i] = lerp(sy, T_.Y[i], kk) + Math.sin(r1 * 40) * sw - lift * (40 + 90 * r2);
+          b.A[i] = (clamp(tk * 5) * (0.5 + 0.5 * r3)) * (1 - 0.55 * smooth(prog(tk, 0.75, 1))) * (1 - lift);
+        }
+        PX.points(b.X, b.Y, n, LAMP, { a: 0.22, A: b.A, glow: 0.5 });
+      });
+    }
+    // the last lamp, carried away: its faint beam no longer reaches you — it lights the words instead
+    const L1 = holderState(S, S.lamp)[1], lxs = 540 + (L1.h.x + L1.dx - YOU.x) * 0.57, lys = 1196 + (L1.h.y + L1.dy - YOU.y) * 0.57;
+    const ka = prog(ct, S.lamp + 0.5, S.lamp + 2.6), ko = prog(ct, S.held2 - 0.5, S.held2 + 0.6);
+    KIT.ptext(l6.lamp[0], lxs, lys + 300, { size: 44, weight: 400, color: LAMP, a: 0.4, crisp: 0.7, t: ct, seed: 7, tag: 2, from: [fx, fy], k: ka, out: ko });
+    KIT.ptext(l6.lamp[1], lxs, lys + 372, { size: 44, weight: 400, color: LAMP, a: 0.4, crisp: 0.7, t: ct, seed: 8, tag: 3, from: [fx, fy], k: prog(ct, S.lamp + 1.2, S.lamp + 3.2), out: ko });
+    const gone = prog(ct, S.end - 0.8, S.end - 0.3);
+    KIT.ptext(l6.held, lxs, lys + 110, { size: 40, weight: 500, color: LAMP, a: 0.42, crisp: 0.75, t: ct, seed: 9, tag: 4, from: [fx, fy], k: prog(ct, S.held2 + 0.3, S.held2 + 2.0), out: gone });
+  }
+  function voiceCrisp(ct, S, l6) {
+    // the far lamp's own soft beam (it lights the words, not you)
+    const far = holderState(S, ct)[1];
+    const bA = ease.inOut(prog(ct, S.lamp, S.lamp + 1.2)) * far.lampOn;
+    if (bA > 0) {
+      const z = 0.55 + 0.035 * ease.inOut(prog(ct, S.title, S.end));
+      const fx = 540 + (far.h.x + far.dx - YOU.x) * z, fy = 1196 + (far.h.y + far.dy - YOU.y) * z;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= bA;
+      const g = ctx.createLinearGradient(0, fy, 0, fy + 520);
+      g.addColorStop(0, 'rgba(223,232,255,0.10)'); g.addColorStop(0.55, 'rgba(223,232,255,0.035)'); g.addColorStop(1, 'rgba(223,232,255,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(fx - 5, fy); ctx.lineTo(fx + 5, fy); ctx.lineTo(fx + 300, fy + 520); ctx.lineTo(fx - 300, fy + 520); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    // the title: once the light has gathered, the words take their own colours; 打分的人走了 keeps a trace of the red pen
+    const tk = prog(ct, S.title + 1.6, S.title + 3.6), tout = prog(ct, S.lamp - 0.2, S.lamp + 0.8);
+    if (tk > 0 && tout < 1) l6.title.forEach((line, li) => {
+      L.serif(line, 540, TITLE_Y[li], { size: TITLE_SIZE, color: '#e6e0d4', glow: 4, alpha: (1 - ease.in(tout)) * 0.95, reveal: tk, weight: 400, highlight: ['打分的人走了'], hiColor: '#e3b2aa' });
+    });
+  }
+  const linesOf = type => { const b = T.TL.beats.find(b => b.visual.type === type); return b ? b.visual.lines : {}; };
 
   function schoolCues(api) {
     const S = chainT(api), out = [];
@@ -550,6 +633,7 @@
       if (m < 3) c(markT(S, m) + 0.7, 'click', { i: m });
       else c(markT(S, m) + 0.7, 'glow');
     }
+    for (let i = 0; i < 3; i++) c(S.seen + 3.25 + i * 0.42, 'pen', { i: 4 + i });
     c(S.held + 0.2, 'swell', { dur: 3.4 });
     c(S.go + 0.25 + 2.0, 'off'); c(S.go + 2.0 + 2.0, 'off');
     c(S.title - 0.45, 'hush'); c(S.title, 'title');
@@ -562,15 +646,13 @@
     draw(ctx, V, lt, api) {
       const S = chainT(api), ct = lt - S.o;
       drawSchool(V, ct, S, api);
-      captionsSchool(ct, S);
-    },
+      },
     cues(V, api) { return schoolCues(api); },
   });
   T.register('leave', {
     draw(ctx, V, lt, api) {
       const S = chainT(api), ct = lt - S.o;
       drawSchool(V, ct, S, api);
-      captionsSchool(ct, S);
     },
     cues(V, api) { return schoolCues(api); },
   });
