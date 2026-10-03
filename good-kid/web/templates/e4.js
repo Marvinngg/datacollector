@@ -516,11 +516,15 @@
     // plinth
     ctx.strokeStyle = ink(0.62); ctx.lineWidth = lw(1.4);
     const pk = ease.out(prog(dk, 0, 0.35));
-    ctx.beginPath(); ctx.moveTo(-130 * pk, 0); ctx.lineTo(130 * pk, 0); ctx.lineTo(126 * pk, -14); ctx.lineTo(-126 * pk, -14); ctx.closePath(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-88 * pk, -14); ctx.lineTo(-84 * pk, -30); ctx.lineTo(84 * pk, -30); ctx.lineTo(88 * pk, -14); ctx.stroke();
+    // a low engraved base: a front face and a bevelled top
+    ctx.beginPath(); ctx.rect(-230 * pk, -62, 460 * pk, 62); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-230 * pk, -62); ctx.lineTo(-214 * pk, -76); ctx.lineTo(214 * pk, -76); ctx.lineTo(230 * pk, -62); ctx.stroke();
+    ctx.strokeStyle = ink(0.22); ctx.lineWidth = lw(0.9); ctx.beginPath(); ctx.rect(-220 * pk, -54, 440 * pk, 46); ctx.stroke();
+    ctx.strokeStyle = ink(0.62); ctx.lineWidth = lw(1.4);
+    if (o.eng && o.eng.p) engrave([o.eng.p], [0], -21, 30, o.eng.g2, o.eng.a, light, lw);
     // pillar
-    const ph = ease.inOut(prog(dk, 0.15, 0.6)), ptop = lerp(-30, PIV + 14, ph);
-    ctx.beginPath(); ctx.moveTo(-6, -30); ctx.lineTo(-6, ptop); ctx.moveTo(6, -30); ctx.lineTo(6, ptop); ctx.stroke();
+    const ph = ease.inOut(prog(dk, 0.15, 0.6)), ptop = lerp(-76, PIV + 14, ph);
+    ctx.beginPath(); ctx.moveTo(-6, -76); ctx.lineTo(-6, ptop); ctx.moveTo(6, -76); ctx.lineTo(6, ptop); ctx.stroke();
     if (ph > 0.98) {
       ctx.strokeRect(-13, PIV + 14, 26, 10);                     // capital
       ctx.strokeRect(-11, -372, 22, 12);                        // collar holding the dial
@@ -553,10 +557,15 @@
       ctx.save(); ctx.translate(0, PIV); ctx.rotate(th);
       const L = ARM * bk;
       ctx.strokeStyle = ink(0.85); ctx.lineWidth = lw(1.4);
-      ctx.beginPath(); ctx.moveTo(-L, -1.6); ctx.lineTo(0, -6); ctx.lineTo(L, -1.6); ctx.lineTo(L, 1.6); ctx.lineTo(0, 6); ctx.lineTo(-L, 1.6); ctx.closePath(); ctx.stroke();
+      // the beam: a slender plate, wide enough to carry an engraving on each arm
+      const hb = 21, he = 4, ti = Math.min(L, 276);
+      ctx.beginPath(); ctx.moveTo(-L, -he); ctx.lineTo(-ti, -hb + 4); ctx.lineTo(-26, -hb); ctx.lineTo(0, -hb - 6); ctx.lineTo(26, -hb); ctx.lineTo(ti, -hb + 4); ctx.lineTo(L, -he);
+      ctx.lineTo(L, he); ctx.lineTo(ti, hb - 4); ctx.lineTo(26, hb); ctx.lineTo(0, hb + 6); ctx.lineTo(-26, hb); ctx.lineTo(-ti, hb - 4); ctx.lineTo(-L, he); ctx.closePath();
+      ctx.fillStyle = C.bg; ctx.fill(); ctx.stroke();
       ctx.strokeStyle = ink(0.4); ctx.lineWidth = lw(0.9); ctx.beginPath();
-      for (let x = 30; x < L - 10; x += 30) { ctx.moveTo(x, -5); ctx.lineTo(x, -9); ctx.moveTo(-x, -5); ctx.lineTo(-x, -9); }
+      for (let x = 30; x < L - 10; x += 30) { ctx.moveTo(x, -hb - 1); ctx.lineTo(x, -hb - 5); ctx.moveTo(-x, -hb - 1); ctx.lineTo(-x, -hb - 5); }
       ctx.stroke();
+      if (o.eng && o.eng.l && bk > 0.98) engrave([o.eng.l, o.eng.r], [-150, 152], 10, 29, o.eng.g1, o.eng.a, light, lw);
       if (bk > 0.98) { ctx.strokeStyle = ink(0.8); ctx.lineWidth = lw(1.2); ctx.beginPath(); ctx.arc(-ARM, 0, 5, 0, TAU); ctx.moveTo(ARM + 5, 0); ctx.arc(ARM, 0, 5, 0, TAU); ctx.stroke(); }
       // pointer
       const pl = 206 * bk;
@@ -587,6 +596,26 @@
     }
     ctx.restore();
     return ends;
+  }
+  /* engraved letters: light catches them one by one (a glint runs along), then they stay as fine incised text.
+     strs: pieces drawn centred at xs (local units) on baseline y; g: reveal 0..1 over all the pieces */
+  function engrave(strs, xs, y, size, g, a, light, lw) {
+    if (g <= 0 || a <= 0) return;
+    const N = strs.reduce((s, x) => s + [...x].length, 0), fo = { size, family: F.serif, weight: 500 };
+    let idx = 0;
+    strs.forEach((str, j) => {
+      const chars = [...str], ws = chars.map(ch => measure(ch, fo) + 3), tw = ws.reduce((p, q) => p + q, 0) - 3;
+      let x = xs[j] - tw / 2;
+      chars.forEach((ch, i) => {
+        const e = smooth(clamp(g * (N + 3) - idx)), glint = Math.sin(Math.PI * e);
+        if (e > 0) {
+          text(ch, x, y + 1.2, { ...fo, color: 'rgba(0,0,0,0.6)', alpha: a * e });
+          text(ch, x, y, { ...fo, color: INK(0.8 * (0.6 + 0.4 * light)), alpha: a * e });
+          if (glint > 0.02) text(ch, x, y, { ...fo, color: LAMP(1), alpha: a * glint * 0.9 });
+        }
+        x += ws[i]; idx++;
+      });
+    });
   }
   const PAIR_COL = ['rgba(214,224,245,', 'rgba(255,190,140,'];   // 稳定: a cool white; 自由: a warm one
   function wordAt(str, x, y, z, col, a) {
@@ -692,12 +721,8 @@
   }
   function drawPen(a) {
     if (a <= 0) return;
-    ctx.save(); ctx.globalAlpha *= a; ctx.translate(790, 1024); ctx.rotate(-0.16);
-    // a few sheets under it
-    ctx.strokeStyle = INK(0.3); ctx.lineWidth = 1.1;
-    for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.moveTo(-74 + k * 2, 10 - k * 3); ctx.lineTo(70 + k * 2, 4 - k * 3); ctx.stroke(); }
-    // the red pen, capped
-    ctx.rotate(0.05);
+    ctx.save(); ctx.globalAlpha *= a; ctx.translate(292, 1040); ctx.rotate(-0.1);
+    // the red pen, capped, put down
     ctx.strokeStyle = 'rgba(229,72,77,0.8)'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.roundRect(-56, -14, 96, 8, 4); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(40, -14); ctx.lineTo(54, -10); ctx.lineTo(40, -6); ctx.stroke();
@@ -705,6 +730,18 @@
     ctx.restore();
   }
 
+  // the examiner's nameplate, standing at the front of the desk, in front of the empty chair
+  const PLATE = { x0: 572, x1: 978, yt: 970, yb: 1034, base: 1016, size: 38, sp: 3 };
+  const PLATE_C = (PLATE.x0 + PLATE.x1) / 2;
+  function drawPlate(a, light) {
+    if (a <= 0) return;
+    const P_ = PLATE;
+    ctx.save(); ctx.globalAlpha *= a; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(P_.x0, P_.yb); ctx.lineTo(P_.x0 + 6, P_.yt); ctx.lineTo(P_.x1 - 6, P_.yt); ctx.lineTo(P_.x1, P_.yb); ctx.closePath();
+    ctx.fillStyle = C.bg; ctx.fill(); ctx.strokeStyle = INK(0.55 * (0.6 + 0.4 * light)); ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(P_.x0 + 6, P_.yt); ctx.lineTo(P_.x0 + 14, P_.yt - 8); ctx.lineTo(P_.x1 - 14, P_.yt - 8); ctx.lineTo(P_.x1 - 6, P_.yt); ctx.stroke();
+    ctx.restore();
+  }
   function exTimes(api) {
     const tS = at(api, 'scale'), tT = at(api, 'trade'), tE = at(api, 'empty');
     return { tS, tT, tE, tSwap: tT + 0.7, dSwap: 2.2, dPull: 3.2, tOff: tE + 4 * beat.BEAT, tCap: tE + 4 * beat.BEAT + 0.6 };
@@ -730,11 +767,25 @@
       drawDesk(lerp(0.0, 1, reveal), on);
       drawLamp(smooth(prog(lt, tE + 0.4, tE + dPull)), Math.max(on, after));
       drawPen(smooth(prog(lt, tE + 1.2, tE + dPull + 0.4)) * (0.65 + 0.35 * on));
+      // the nameplate: it says 阅卷人 — the examiner. When the lamp dies, the words that were missing condense out of the
+      // empty chair in front of it, and the name slides over to make room: 根本就没有阅卷人。
+      const plA = smooth(prog(lt, tE + 1.0, tE + dPull + 0.2));
+      drawPlate(plA, on);
+      const S_ = V.lines.empty, nm = '阅卷人', iN = S_.indexOf(nm);
+      const PF = { size: PLATE.size, family: F.serif, weight: 500 };
+      const wOf = str => [...str].reduce((q, ch) => q + measure(ch, PF) + PLATE.sp, 0);
+      const pre = iN >= 0 ? S_.slice(0, iN) : S_, post = iN >= 0 ? S_.slice(iN + nm.length) : '';
+      const x0s = PLATE_C - (wOf(S_) - PLATE.sp) / 2, slide = ease.inOut(prog(lt, tOff + 0.5, tOff + 1.7));
+      if (iN >= 0 && plA > 0) {
+        const xn = lerp(PLATE_C - (wOf(nm) - PLATE.sp) / 2, x0s + wOf(pre), slide);
+        text(nm, xn, PLATE.base, { ...PF, color: C.ink, spacing: PLATE.sp, alpha: plA * lerp(0.62 + 0.3 * on, 0.85, slide) });
+      }
       // the balance
       ctx.save(); ctx.translate(SX, SYD); ctx.scale(SZ, SZ);
       const th = theta(lt, tS), zs = zc * SZ, dk = prog(lt, tS + 0.05, tS + 1.6);
       const light = lerp(1, 0.75, 1 - on);
-      const ends = drawBalance(th, zs, { dk, light });
+      const [e1, e2] = splitAt(V.lines.trade[0], '是').map((x, i, arr) => x), engA = 1 - 0.75 * pk;
+      const ends = drawBalance(th, zs, { dk, light, eng: { l: e1, r: e2, p: V.lines.trade[1], g1: prog(lt, tT + 0.15, tT + 1.9), g2: prog(lt, tT + 1.7, tT + 3.5), a: engA } });
       // the words: in their pans, then they trade pans (arcs crossing above the pillar)
       const wa = ease.out(prog(lt, tS + 1.5, tS + 2.6));
       const sw = ease.inOut(prog(lt, tSwap, tSwap + dSwap));
@@ -763,9 +814,18 @@
         }
         PX.begin(); fullFrame(); PX.points(out.X, out.Y, n, KIT.L.lamp, { a: 0.55 * dA, A: out.A, glow: 0.3, size: zc > 1.6 ? 2 : 1 }); PX.flush({ exposure: 1.4, glow: 0.7 });
       }
-      // captions
-      KIT.caption(V.lines.trade, prog(lt, tT + 0.2, tT + 2.6), { out: prog(lt, tE - 0.5, tE), y: 1480 });
-      KIT.caption(V.lines.empty, prog(lt, tCap, tCap + 1.6), { y: 1520 });
+      // the missing words gather out of the empty chair (its back and its seat) into the nameplate
+      const gk = prog(lt, tOff + 0.6, tOff + 2.7);
+      if (gk > 0) {
+        const S2 = (wx, wy) => [(wx - fx) * zc + ax, (wy - fy) * zc + ay];
+        const r2 = (x, y, w, h) => { const [a1, b1] = S2(x, y); return [a1, b1, w * zc, h * zc]; };
+        const src = [r2(650, 640, 170, 220), r2(640, 1150, 200, 34)];
+        const [sx, sy] = S2(x0s, PLATE.base);
+        PX.begin(); fullFrame();
+        gatherText(pre, sx, sy, { align: 'left', size: PLATE.size * zc, spacing: PLATE.sp * zc, k: gk, src, t, tag: 3, seed: 9 });
+        if (post) { const [qx] = S2(x0s + wOf(pre) + wOf(nm), 0); gatherText(post, qx, sy, { align: 'left', size: PLATE.size * zc, spacing: PLATE.sp * zc, k: clamp(gk * 1.2 - 0.2), src, t, tag: 4, seed: 11 }); }
+        PX.flush({ exposure: 1.4, glow: 0.8 });
+      }
     },
     cues(V, api) {
       const X = exTimes(api), out = [];
@@ -774,7 +834,9 @@
       out.push({ t: X.tSwap, type: 'whoosh', dur: X.dSwap });
       out.push({ t: X.tE, type: 'hush' });
       out.push({ t: X.tOff, type: 'off' });
-      out.push({ t: X.tCap + 1.2, type: 'resolve' });
+      out.push({ t: X.tT + 0.15, type: 'glow' });
+      out.push({ t: X.tOff + 0.6, type: 'swell', dur: 2.1 });
+      out.push({ t: X.tOff + 3.0, type: 'resolve' });
       return out;
     },
   });

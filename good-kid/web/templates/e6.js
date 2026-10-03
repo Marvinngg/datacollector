@@ -592,7 +592,7 @@
     return out;
   };
   T.register('tries', { draw: chainDraw, cues: chainCues });
-  // b20 continues b19's picture: it draws with b19's strings (the list) plus its own caption
+  // b20 continues b19's picture: it draws with b19's strings (the list) plus its own sentence (the lamps' dust)
   let V19 = null;
   T.register('lamp', {
     draw(ctx, V, lt, api) {
@@ -656,7 +656,7 @@
          gathering from dust and dissolving upward before "Have a try" */
       const yrs = noDot(V.lines.years), yc2 = yrs.indexOf('好孩子'), yOut = prog(ct, S.try - 1.2, S.try - 0.05);
       KIT.ptext(yrs.slice(0, yc2), 150, 560, { size: 50, weight: 400, align: 'left', color: LC.ink, a: 0.42, crisp: 0.9, k: prog(ct, S.years + 0.5, S.years + 2.5), out: yOut, t: ct, seed: 4, tag: 3, drift: 0.4 });
-      KIT.ptext(yrs.slice(yc2), 142, 706, { size: 116, weight: 500, align: 'left', spacing: 10, color: [0.66, 0.68, 0.72], a: 0.36, crisp: 0.75, k: prog(ct, S.years + 1.8, S.years + 4.0), out: yOut, t: ct, seed: 6, tag: 4, drift: 0.4 });
+      KIT.ptext(yrs.slice(yc2), 142, 706, { size: 116, weight: 500, align: 'left', spacing: 10, color: [0.72, 0.74, 0.78], a: 0.38, crisp: 0.9, k: prog(ct, S.years + 1.8, S.years + 4.0), out: yOut, t: ct, seed: 6, tag: 4, drift: 0.4 });
       // 'life': beneath "Have a try", gathering out of 你's light
       KIT.ptext(noDot(V.lines.life), 540, 858, { size: 48, weight: 400, color: LC.ink, a: 0.4, crisp: 0.95, k: prog(ct, S.life + 0.2, S.life + 2.4), from: [Y.x, Y.y], t: ct, seed: 8, tag: 5, drift: 0.3 });
       PX.flush({ exposure: 1.4 });
