@@ -130,7 +130,7 @@
     const B = [bufg(0, 1), bufg(1, 1), bufg(2, 1)];
     for (const b of B) b.n = 0;
     const yScroll = Sl * 900;
-    const lum = ease.inOut(prog(lt, a.fast - 1.5, a.fast + 0.6)), gain = o.frozen ? 1 : 1 + 0.8 * fl + 1.0 * lum;
+    const lum = ease.inOut(prog(lt, a.fast - 1.5, a.fast + 0.6)), gain = o.frozen ? 1 : 1.4 + 0.45 * fl + 1.0 * lum;
     for (let i = 0; i < I.N; i++) {
       const tb = I.tb[i]; if (lt < tb) continue;
       const v = I.v[i], s = I.s[i];
