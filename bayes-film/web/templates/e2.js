@@ -43,6 +43,9 @@
     const delay = new Float32Array(1000), BVX = new Float32Array(1000), BVY = new Float32Array(1000), BVZ = new Float32Array(1000);
     const GXw = new Float32Array(1000), GYw = new Float32Array(1000), GSX = new Float32Array(1000), GSY = new Float32Array(1000);
     for (let b = 0; b < 1000; b++) { const [x, y] = gridPos(b); GSX[b] = x; GSY[b] = y; GXw[b] = (x - W / 2) / 100; GYw[b] = (H / 2 - y) / 100; }
+    // bead sizes at the end of b06: the 90 + 90 beads that passed its membrane are full size, the rest shrank to 0.65
+    const BR = new Float32Array(1000).fill(0.65), byRank = l => [...l].sort((a, b) => PROJ.rank[a] - PROJ.rank[b]);
+    byRank(PROJ.succ).slice(0, 90).forEach(i => BR[i] = 1); byRank(PROJ.fail).slice(0, 90).forEach(i => BR[i] = 1);
     const off = [], landEnd = [], landStart = [], ga = Math.PI * (3 - Math.sqrt(5));
     let o = 0;
     WD.forEach((w, wi) => {
@@ -69,8 +72,8 @@
         // the first 48 grains of a bead sit exactly where KIT.beads draws its 48 points (so the opening frame is b06's
         // last frame); the rest wait unlit at random spots inside the bead and light up as it flies
         const kb = Math.min(48, m), boost = PROJ.ok[b] ? 1.3 : 0.72;
-        if (q < kb) { const rr = Math.sqrt((q + 0.5) / 64), an = q * ga; OX[g] = Math.cos(an) * rr * 9; OY[g] = Math.sin(an) * rr * 9; AG[g] = 1.1 * boost * (48 / kb) * (1 - 0.55 * rr * rr); }
-        else { const rr = 0.85 * Math.sqrt(PX.rand(g, 7)), an = PX.rand(g, 8) * TAU; OX[g] = Math.cos(an) * rr * 9; OY[g] = Math.sin(an) * rr * 9; AG[g] = 0; }
+        if (q < kb) { const rr = Math.sqrt((q + 0.5) / 64), an = q * ga; OX[g] = Math.cos(an) * rr * 9 * BR[b]; OY[g] = Math.sin(an) * rr * 9 * BR[b]; AG[g] = 1.1 * boost * (48 / kb) * (1 - 0.55 * rr * rr); }
+        else { const rr = 0.85 * Math.sqrt(PX.rand(g, 7)), an = PX.rand(g, 8) * TAU; OX[g] = Math.cos(an) * rr * 9 * BR[b]; OY[g] = Math.sin(an) * rr * 9 * BR[b]; AG[g] = 0; }
         BID[g] = b;
       }
       // bead departures: a wave out from the centre of the grid, roughened by the bead's own random rank
