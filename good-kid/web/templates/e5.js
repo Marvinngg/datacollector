@@ -410,7 +410,7 @@
     return { D: fallD(tauS) + vS * k * (1 - Math.exp(-d / k)), v: vS * Math.exp(-d / k) };
   }
   // camera (world point shown at screen (540, 960), scale s)
-  const S_OPEN = 1.36, CAM_FLOOR = { s: 0.72, wx: 705, wy: 1000 }, LAND_AT = { x: 556, y: 930 };
+  const S_OPEN = 1.36, CAM_FLOOR = { s: 0.8, wx: 668, wy: 1105 }, LAND_AT = { x: 556, y: 930 };
   function camAt(S, lt) {
     const pk = ease.inOut(prog(lt, S.tC, S.tS + 2.2));
     let c = { s: lerp(1.24, S_OPEN, pk), wx: lerp(565, 580, pk), wy: lerp(950, 925, pk) };
@@ -445,7 +445,7 @@
     let x = lerp(x0, LAND_AT.x, follow) + Math.sin(tau * 0.7) * 12 * follow;
     let y = lerp(yRaw, y0 + 78, follow) + Math.sin(tau * 1.3) * 6 * follow;
     st.rot = 0.05 + (0.11 * Math.sin(tau * 0.8 + 0.4) + 0.04) * clamp(tau / 2);
-    st.gray = 0.2 + 0.3 * clamp(tau / 4);
+    st.gray = 0.15 + 0.2 * clamp(tau / 4);
     st.stream = clamp(fallV(tau) / 9000);
     st.drift = 2 + 9 * st.stream;
     if (lt >= S.stop) {
@@ -464,16 +464,17 @@
   }
   // the rush: depth layers moving up (screen space): far dust, thin streaks, and a few big soft ones close by
   const LAYERS = [
-    { n: 1100, par: 0.22, a: 0.42, len: 0.03, seed: 31, size: 1 },
-    { n: 140, par: 0.7, a: 0.34, len: 0.05, seed: 41, size: 1 },
-    { n: 12, par: 2.2, a: 0.2, len: 0.07, seed: 51, size: 2 },
+    { n: 1300, par: 0.22, a: 0.75, len: 0.03, seed: 31, size: 1 },
+    { n: 160, par: 0.7, a: 0.55, len: 0.05, seed: 41, size: 1 },
+    { n: 14, par: 2.2, a: 0.32, len: 0.07, seed: 51, size: 2 },
   ];
   function rush(D, v, a, xHole) {
     if (a <= 0.003) return;
     for (const L of LAYERS) {
       const span = H + 1400, len = clamp(v * L.par * L.len, 1, 1300), m = Math.max(1, Math.min(160, Math.round(len / (L.size > 1 ? 4 : 2.5))));
       scratch(L.n * m); let j = 0;
-      for (let i = 0; i < L.n; i++) {
+      const nn = Math.round(L.n * (0.45 + 0.55 * clamp(v / 9000)));
+      for (let i = 0; i < nn; i++) {
         const x = PX.rand(i, L.seed) * (W + 80) - 40, sp = 0.7 + 0.6 * PX.rand(i, L.seed + 1);
         const y = ((PX.rand(i, L.seed + 2) * span - D * L.par * sp) % span + span) % span - 700;
         if (y > H + 10 || y + len * sp < -10) continue;
@@ -516,17 +517,17 @@
         const floorLit = y => clamp(1 - (YF - y) / 105) * clamp(R / 200);
         drawCliff(m, y => Math.max(floorLit(y) * 0.85, reveal * (0.62 + 0.3 * clamp((y - YT) / HC))), 1);
       }
-      // ---------- the floor: the imprints of everyone who fell before (flattened 人, lit as the light reaches them)
+      // ---------- the floor: the imprints of everyone who fell before (flattened 你: everyone who fell was someone's 你; lit as the light reaches them)
       if (lightK && R > 0) {
         ctx.save(); ctx.translate(cam.ox, cam.oy); ctx.scale(cam.s, cam.s);
-        ctx.font = `600 54px ${F.serif}`; ctx.textAlign = 'center';
+        ctx.font = `600 50px ${F.serif}`; ctx.textAlign = 'center';
         for (const [mx, md, ms, mr, mb, mz] of marks()) {
           const y = YF + 10 + md * FLOOR_D, dist = Math.hypot(mx - XL, (y - YF) / FLOOR_SQ);
           const lit = clamp((R - dist) / 300); if (lit <= 0.01) continue;
           const pk = 0.65 + 0.55 * md, flash = Math.exp(-Math.max(0, R - dist) / 200);
-          ctx.save(); ctx.translate(mx, y); ctx.scale(ms * pk, ms * pk * FLOOR_SQ * 2); ctx.rotate(mr);
+          ctx.save(); ctx.translate(mx, y); ctx.scale(ms * pk, ms * pk * 0.46); ctx.rotate(mr);
           ctx.globalAlpha = lit * mb * (0.16 + 0.22 * flash) * (0.6 + 0.4 * md);
-          ctx.fillStyle = warmS(1); ctx.fillText('人', 0, 18);
+          ctx.fillStyle = warmS(1); ctx.fillText('你', 0, 18);
           if (mz > 0.45) { ctx.strokeStyle = warmS(0.35); ctx.lineWidth = 1.2 / (ms * pk); ctx.beginPath(); ctx.ellipse(0, 0, 50, 50, 0, 0, TAU); ctx.stroke(); }
           ctx.restore();
         }

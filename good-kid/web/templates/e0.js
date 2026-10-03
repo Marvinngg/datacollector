@@ -531,72 +531,78 @@
     return { caps: b.visual.lines.cards, t0: ['swipe1', 'swipe2', 'swipe3'].map(st), clock: b.visual.lines.clock };
   }
   // ================================================================ b03 darkq
-  // the question as particles (cached), and where each starts: all of them packed into the screen's last dot
+  /* The question as particles (cached). All of them start packed in the screen's last dot; when the question comes
+     the CRT runs backwards: the dot opens into a line, the line parts into two rows, and the rows develop into
+     letters, left to right. QY: the centre of the two-line block; ROWC: each row's glyph centre. */
+  const QSIZE = 54, QGAP = QSIZE * 1.55, QB = [960 - QGAP / 2, 960 + QGAP / 2], QY = 960 - QSIZE * 0.36;
   let QC = null;
   function qCloud(lines) {
     if (QC) return QC;
-    const size = 54, gap = size * 1.55, y0 = 960 - gap / 2, sp = size * 0.04;
-    const xs = [], ys = [], ord = [];
+    const xs = [], ys = [], ord = [], row = [];
     lines.forEach((l, li) => {
-      const c = PX.text(l, { size, family: F.serif, weight: 400, x: W / 2, y: y0 + li * gap, step: 1.25, spacing: sp, seed: 31 + li });
+      // KIT.type advances each char by its measured width (which already includes letterSpacing) plus the spacing again
+      const c = PX.text(l, { size: QSIZE, family: F.serif, weight: 400, x: W / 2, y: QB[li], step: 1.2, spacing: QSIZE * 0.08, seed: 31 + li });
       let x0 = 1e9, x1 = -1e9; for (let i = 0; i < c.n; i++) { x0 = Math.min(x0, c.X[i]); x1 = Math.max(x1, c.X[i]); }
-      for (let i = 0; i < c.n; i++) { xs.push(c.X[i]); ys.push(c.Y[i]); ord.push(li * 0.5 + 0.5 * (c.X[i] - x0) / (x1 - x0)); }
+      for (let i = 0; i < c.n; i++) { xs.push(c.X[i]); ys.push(c.Y[i]); ord.push((c.X[i] - x0) / (x1 - x0)); row.push(li); }
     });
-    const n = xs.length, X = Float32Array.from(xs), Y = Float32Array.from(ys), D = Float32Array.from(ord);
-    const SX = new Float32Array(n), SY = new Float32Array(n);
-    for (let i = 0; i < n; i++) { const r = Math.sqrt(R(i, 131)) * 5, a = R(i, 132) * TAU; SX[i] = SCX + Math.cos(a) * r; SY[i] = SCY + Math.sin(a) * r * 0.8; }
-    return (QC = { n, X, Y, D, SX, SY, ox: new Float32Array(n), oy: new Float32Array(n), oa: new Float32Array(n) });
+    const n = xs.length;
+    return (QC = { n, X: Float32Array.from(xs), Y: Float32Array.from(ys), D: Float32Array.from(ord), L: Uint8Array.from(row),
+      ox: new Float32Array(n), oy: new Float32Array(n), oa: new Float32Array(n) });
   }
   T.register('darkq', {
     draw(ctx, V, lt, api) {
-      const tO = at(api, 'off'), tD = at(api, 'dark'), tQ = at(api, 'q'), tAbs = api.beat.start + lt;
-      const tC = tO + 4 * KIT.beat.BEAT, u = lt - tC;                       // the CRT switch-off
+      const tO = at(api, 'off'), tQ = at(api, 'q'), tAbs = api.beat.start + lt;
+      const tC = tO + 4 * KIT.beat.BEAT, u = lt - tC;                       // the CRT switch-off, on the beat
       const base = 0.7;                                                     // the dimmed screen from b01's stare
       const squash = u < 0 ? 1 : 1 - ease.in(clamp(u / 0.17));
-      const lineK = clamp((u - 0.17) / 0.26);                                // the line shrinking to a dot
-      const light = u < 0 ? base : u < 0.17 ? base : 0;
-      const frameA = u < 0 ? base / 0.7 : 1 - ease.out(clamp(u / 0.5));
+      const lineK = clamp((u - 0.17) / 0.26);
+      const frameA = u < 0 ? 1 : 1 - ease.out(clamp(u / 0.5));
       const youLight = u < 0 ? base : Math.max(0, 1 - ease.out(clamp(u / 0.6))) * base;
       const qk = prog(lt, tQ, tQ + 4.2);
       spill(u < 0.17 ? base : youLight * 0.6, youLight);
       // 你: lit by the screen, then only a faint shape; the question, when it comes, lends it a breath of light
       const youA = lerp(1, 0.42, ease.inOut(clamp(u / 1.4)));
-      you(lt, Math.max(youLight, 0.12 * sm(qk)), { a: youA, lit: u < 0 ? 0.18 : 0.5 });
+      you(lt, Math.max(youLight, 0.14 * sm(qk)), { a: youA, lit: u < 0 ? 0.18 : 0.5 });
       phoneFrame(frameA);
       const fi = feedInfo();
-      if (u < 0.17) screen({ light, s: 3, t: tAbs, lt, clock: fi.clock, caps: fi.caps, cardT0: fi.t0, on: 1, squash, flash: u > 0 ? 0.55 * ease.in(clamp(u / 0.17)) : 0 });
-      // the line, the dot, the residue, the question: one set of particles
+      if (u < 0.17) screen({ light: base, s: 3, t: tAbs, lt, clock: fi.clock, caps: fi.caps, cardT0: fi.t0, on: 1, squash, flash: u > 0 ? 0.55 * ease.in(clamp(u / 0.17)) : 0 });
       const q = qCloud(V.lines.q), n = q.n;
       PX.begin();
       if (u >= 0.12 && u < 0.43) {                                         // the bright line collapsing to a dot
-        const wd = lerp(SCR.w * 0.5, 3, ease.in(lineK)), hgt = lerp(2.5, 2, lineK), a = lerp(1, 1.4, lineK);
-        const m = 900; const out = PX.buf(m, 61);
-        for (let i = 0; i < m; i++) { out.X[i] = SCX + (R(i, 141) * 2 - 1) * wd; out.Y[i] = SCY + (R(i, 142) - 0.5) * hgt * 2; out.A[i] = 1; }
-        PX.points(out.X, out.Y, m, [0.85, 0.92, 1], { a: 0.5 * a * (wd > 40 ? 1 : 1.6), A: out.A, glow: 0.7 });
+        const wd = lerp(SCR.w * 0.5, 3, ease.in(lineK)), m = 900, out = PX.buf(m, 61);
+        for (let i = 0; i < m; i++) { out.X[i] = SCX + (R(i, 141) * 2 - 1) * wd; out.Y[i] = SCY + (R(i, 142) - 0.5) * 4; out.A[i] = 1; }
+        PX.points(out.X, out.Y, m, [0.85, 0.92, 1], { a: 0.5 * lerp(1, 1.4, lineK) * (wd > 40 ? 1 : 1.6), A: out.A, glow: 0.7 });
       }
       if (u >= 0.38) {
-        // dot brightness: a flare as the line closes, decaying to a faint, breathing residue that never quite dies
+        // the dot: a flare as the line closes, then a faint breathing residue that never quite dies; in the dark it
+        // sinks slowly to where the question will be
         const e = 0.06 + 0.94 * Math.exp(-(u - 0.38) / 0.45), br = 1 + 0.15 * Math.sin(tAbs * 1.7);
-        const rad = 1 + 1.8 * ease.out(clamp((u - 0.38) / 3));            // the residue loosens a little
+        const dy = lerp(SCY, QY, ease.inOut(prog(lt, tC + 1.6, tQ - 0.1))), rad = 1 + 1.6 * ease.out(clamp((u - 0.38) / 3));
+        const ka = ease.inOut(prog(lt, tQ, tQ + 1.4));                     // dot -> line
+        const kb = ease.inOut(prog(lt, tQ + 1.1, tQ + 2.0));               // line -> two rows
+        const settle = sm(prog(lt, tQ + 3.8, tQ + 6.0));
         for (let i = 0; i < n; i++) {
-          const kk = ease.inOut(clamp((lt - tQ - q.D[i] * 2.4 - R(i, 133) * 0.35) / 1.35));
-          const sx = SCX + (q.SX[i] - SCX) * rad + Math.sin(tAbs * 0.4 + R(i, 134) * 30) * 1.2, sy = SCY + (q.SY[i] - SCY) * rad + Math.cos(tAbs * 0.33 + R(i, 135) * 30) * 1.2;
-          const sw = Math.sin(kk * Math.PI) * (30 + 50 * R(i, 136));          // a gentle sideways arc in flight
-          q.ox[i] = lerp(sx, q.X[i], kk) + sw * (R(i, 137) - 0.5) * 2 + Math.sin(tAbs * 0.9 + i) * 0.5 * kk;
-          q.oy[i] = lerp(sy, q.Y[i], kk) + Math.cos(tAbs * 0.8 + i) * 0.5 * kk;
-          q.oa[i] = lerp(e * br * 0.045, 0.5, kk);
+          const r = Math.sqrt(R(i, 131)) * 4.5 * rad, an = R(i, 132) * TAU;
+          const sx = SCX + Math.cos(an) * r + Math.sin(tAbs * 0.4 + R(i, 134) * 30) * 0.8, sy = dy + Math.sin(an) * r * 0.8;
+          const kc = ease.out(prog(lt, tQ + 1.9 + q.D[i] * 0.9 + R(i, 133) * 0.25, tQ + 2.9 + q.D[i] * 0.9 + R(i, 133) * 0.25));   // rows -> letters
+          const rowc = QB[q.L[i]] - QSIZE * 0.36, ly = lerp(QY + (R(i, 135) - 0.5) * 2.5, rowc + (R(i, 135) - 0.5) * 2.5, kb);
+          q.ox[i] = lerp(sx, q.X[i], ka);
+          q.oy[i] = lerp(lerp(sy, ly, ka), q.Y[i], kc);
+          const aLine = lerp(e * br * 0.045, 0.1, ka);
+          q.oa[i] = lerp(aLine, 0.42, kc) * lerp(1, 0.5, settle);
         }
-        PX.points(q.ox, q.oy, n, [0.84, 0.9, 1], { a: 0.5, A: q.oa, glow: 0.65 });
+        PX.points(q.ox, q.oy, n, [0.84, 0.9, 1], { a: 0.5, A: q.oa, glow: 0.4 });
       }
-      PX.flush({ exposure: 1.5, glow: 1.2 });
+      PX.flush({ exposure: 1.5, glow: 1.1 });
       // the voice
       const outO = ease.in(prog(lt, tC + 0.25, tC + 1.4));
       KIT.caption([V.lines.off], prog(lt, tO + 0.4, tO + 2.4), { family: F.hand, size: 52, out: outO });
-      KIT.caption(V.lines.q, prog(lt, tQ + 1.3, tQ + 4.4), { at: 'mid', color: '#e9eef8' });
+      const qa = ease.inOut(prog(lt, tQ + 2.5, tQ + 4.4));                // the crisp question surfaces out of its particles
+      if (qa > 0) V.lines.q.forEach((l, li) => KIT.type(l, W / 2, QB[li], { size: QSIZE, family: F.serif, weight: 400, color: '#e9eef8', k: 1, alpha: qa }));
     },
     cues(V, api) {
       const t = n => at(api, n), tC = t('off') + 4 * KIT.beat.BEAT;
-      return [{ t: tC, type: 'off' }, { t: t('dark'), type: 'hush' }, { t: t('q'), type: 'glow' }, { t: t('q') + 2.6, type: 'title' }];
+      return [{ t: tC, type: 'off' }, { t: t('dark'), type: 'hush' }, { t: t('q'), type: 'glow' }, { t: t('q') + 2.4, type: 'title' }];
     },
   });
 })();

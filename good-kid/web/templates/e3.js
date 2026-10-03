@@ -226,7 +226,7 @@
   const hangA = (j, T) => (0.45 + 2.2 * Math.pow(R(j, 27), 4)) * twinkle(j, T);
 
   // ================================================================ the wind (warm motes drifting right -> left)
-  const NW = 760, DIE = 0.6;                                        // DIE: share of the bike's motes that burn out
+  const NW = 460, DIE = 0.6;                                        // DIE: share of the bike's motes that burn out
   function windPos(i, T, o) {
     const sp = 110 + 230 * R(i, 31) * R(i, 38), span = W + 500;
     const x = (((R(i, 32) * span - sp * T) % span) + span) % span - 250;
@@ -247,13 +247,13 @@
     const b = wbuf(), o = [0, 0], T1 = [], T2 = [];
     for (let i = 0; i < NW; i++) {
       b.A[i] = windPos(i, T, o); b.X[i] = o[0]; b.Y[i] = o[1];
-      const tl = 0.06 + 0.07 * R(i, 39);
+      const tl = 0.1 + 0.16 * R(i, 39);
       windPos(i, T - tl * 0.5, o); T1.push(o[0], o[1]); windPos(i, T - tl, o); T2.push(o[0], o[1]);
     }
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = C.free; ctx.lineWidth = 1.1; ctx.lineCap = 'round';
     const a0 = ctx.globalAlpha;
     for (let bk = 0; bk < 4; bk++) {
-      ctx.globalAlpha = a0 * a * (0.1 + bk * 0.09); ctx.beginPath();
+      ctx.globalAlpha = a0 * a * (0.08 + bk * 0.075); ctx.beginPath();
       for (let i = 0; i < NW; i++) {
         if (Math.min(3, Math.floor(b.A[i] * 4)) !== bk || b.X[i] < -20 || b.X[i] > W + 20) continue;
         ctx.moveTo(b.X[i], b.Y[i]); ctx.quadraticCurveTo(T1[i * 2], T1[i * 2 + 1], T2[i * 2], T2[i * 2 + 1]);
@@ -278,11 +278,11 @@
     // lane dashes
     for (let i = -4; i <= 4; i++) { const x = W / 2 + i * 130 + 30; draw(x - 34 * k, BIKE.y + 46, x + 34 * k, BIKE.y + 46, 0.12 * (1 - Math.abs(i) / 5), 1.2); }
     // the sea: a few short swells, closer together toward the horizon
-    for (let r = 0; r < 9; r++) {
-      const y = hz + 18 + Math.pow(r / 8, 1.7) * 330, cnt = 3 + (r % 3);
+    for (let r = 0; r < 7; r++) {
+      const y = hz + 18 + Math.pow(r / 6, 1.7) * 300, cnt = 2 + (r % 2);
       for (let c = 0; c < cnt; c++) {
         const u = (c + 0.5 + 0.35 * Math.sin(r * 3.1 + c * 1.7)) / cnt, x = 110 + u * (W - 220) + Math.sin(lt * 0.25 + r + c) * 6, l = (14 + r * 5) * k;
-        draw(x - l, y, x + l, y, 0.1 + 0.04 * Math.sin(lt * 0.6 + r * 1.3 + c), 1);
+        draw(x - l, y, x + l, y, 0.08 + 0.03 * Math.sin(lt * 0.6 + r * 1.3 + c), 1);
       }
     }
     // a low sun on the horizon (thin warm ring, half set), its path on the water
@@ -425,7 +425,13 @@
     const wo = sortIdx(N, j => m.WX[j] + (R(j, 45) - 0.5) * 50);
     for (let k = 0; k < N; k++) { const j = wo[k]; m.PXa[j] = pc.X[pi[k]]; m.PYa[j] = pc.Y[pi[k]]; }
     // per particle colour (flame: golden core, orange tips) and spark membership
-    m.CC = new Float32Array(N * 3);
+    m.CC = new Float32Array(N * 3); m.CB = new Float32Array(N * 3); m.EG = new Float32Array(N);
+    // the bike's motes arrive in the colour they had in b10 (see honest) and take the flame's colour as they gather
+    m.C10 = new Float32Array(NA * 3);
+    for (let j = 0; j < NA; j++) {
+      const w = 0.75 + 0.25 * R(j, 24);
+      m.C10[j * 3] = lerp(INK[0], FREE[0], w); m.C10[j * 3 + 1] = lerp(INK[1], lerp(FREE[1], WARM[1], R(j, 25) * 0.6), w); m.C10[j * 3 + 2] = lerp(INK[2], FREE[2], w);
+    }
     for (let j = 0; j < N; j++) {
       const up = clamp((WORD.bot - m.WY[j]) / (WORD.bot - WORD.top)), h = clamp(0.25 + 0.75 * R(j, 46) * (1 - up * 0.8));
       m.CC[j * 3] = 1; m.CC[j * 3 + 1] = lerp(0.5, 0.82, h); m.CC[j * 3 + 2] = lerp(0.26, 0.55, h);
@@ -436,7 +442,7 @@
   // free flight of each source before it is gathered (T absolute, lt local)
   function srcPos(m, j, T, lt, o) {
     const NA = m.NA;
-    if (j < NA) { const b = bike(); o[0] = b.HX[j] + hovX(j, T); o[1] = b.HY[j] + hovY(j, T); return R(j, 26) < DIE ? 0 : hangA(j, T) * 1.1; }
+    if (j < NA) { const b = bike(); o[0] = b.HX[j] + hovX(j, T); o[1] = b.HY[j] + hovY(j, T); return R(j, 26) < DIE ? 0 : hangA(j, T) * 0.55 / 0.4; }
     if (j < NA + NW) { windPos(j - NA, T, o); return 0; }        // (their light is drawn as streaks until gathered)
     const i = j - NA - NW, sp = 300 + 240 * R(i, 47), t = lt - 0.25 * R(i, 48);
     const y = 1960 + R(i, 50) * 900 - sp * t, rise = clamp((1990 - y) / 800);
@@ -488,6 +494,7 @@
     else { const i = j - m.NA - NW; d = (1960 + R(i, 50) * 900 - (1250 + 150 * R(i, 74))) / (330 + 260 * R(i, 47)) + 0.25 * R(i, 48); tr = 0.7 + 0.4 * R(j, 61); }
     const eg = ease.inOut(clamp((t - d) / tr));
     let x, y, a;
+    m.EG[j] = eg;
     if (eg < 1) {
       const a0 = srcPos(m, j, T, t, o), fx = o[0], fy = o[1];
       const af = flame(m, j, t, o, flare), wx = o[0], wy = o[1];
@@ -547,7 +554,12 @@
         B.A[j] = pos11(m, j, lt, T, flare, sy0, tF, o); B.X[j] = o[0]; B.Y[j] = o[1];
         pos11(m, j, lt - 0.045, T - 0.045, flare, sy1, tF, o); B1.X[j] = o[0]; B1.Y[j] = o[1];
       }
-      streaks(N, B.X, B.Y, B1.X, B1.Y, B.A, m.CC, { a: 0.4, glow: 0.38 });
+      let CCx = m.CC;
+      if (lt < 5) {
+        CCx = m.CB; CCx.set(m.CC);
+        for (let j = 0; j < m.NA; j++) { const k = smooth(m.EG[j]); for (let c = 0; c < 3; c++) CCx[j * 3 + c] = lerp(m.C10[j * 3 + c], m.CC[j * 3 + c], k); }
+      }
+      streaks(N, B.X, B.Y, B1.X, B1.Y, B.A, CCx, { a: 0.4, glow: 0.38 });
       // the wind fades out as it is gathered (its motes are part of the material above)
       PX.flush({ exposure: 1.6, glow: 0.9 });
 
