@@ -295,6 +295,38 @@
     });
   }
 
+  // ---------------------------------------------------------------- text that is part of the picture
+  /* ptext(str, x, y, o): a line of text made of particles that GATHER into the glyphs (k 0..1) and can DISSOLVE (out 0..1).
+     Call between PX.begin() and PX.flush(). It is meant to live inside the scene: written on the sheet, printed on the
+     paper, lying on the floor, rising out of the thing it is about — not as a caption strip.
+     o: size (64), family (F.serif), weight (500), align ('center'), spacing, color ([r,g,b] light, default ink),
+        a (intensity, 0.5), k (gather progress), out (dissolve progress), from ([x, y] where the particles come from;
+        default: scattered around the line), drift (px of wander when gathered, 0.6), t (seconds), seed,
+        step (sampling pitch; default size/34), crisp (0..1: also draw the text crisply once gathered, for legibility).
+     Returns the line's width. */
+  function ptext(str, x, y, o = {}) {
+    const k = o.k == null ? 1 : o.k, out = o.out || 0; if (k <= 0 || out >= 1) return 0;
+    const size = o.size || 64, fam = o.family || F.serif, wt = o.weight || 500, seed = o.seed || 3;
+    const cl = PX.text(str, { size, family: fam, weight: wt, x, y, align: o.align || 'center', spacing: o.spacing || 0, step: o.step || Math.max(1.3, size / 34), seed });
+    const n = cl.n, b = PX.buf(n, 1200 + (o.tag || 0)), t = o.t || 0, dr = o.drift == null ? 0.6 : o.drift, fr = o.from;
+    for (let i = 0; i < n; i++) {
+      const d = PX.rand(i, seed + 40) * 0.5, kk = ease.inOut(clamp((k * 1.5 - d))), ko = ease.in(clamp(out * 1.5 - PX.rand(i, seed + 41) * 0.5));
+      const an = PX.rand(i, seed + 42) * TAU, rr = size * (1.5 + 3 * PX.rand(i, seed + 43));
+      const sx = fr ? fr[0] + Math.cos(an) * size * 0.3 : cl.X[i] + Math.cos(an) * rr, sy = fr ? fr[1] + Math.sin(an) * size * 0.3 : cl.Y[i] + Math.sin(an) * rr;
+      const w = Math.sin(t * (0.8 + PX.rand(i, seed + 44)) + i) * dr;
+      let px = lerp(sx, cl.X[i], kk) + w, py = lerp(sy, cl.Y[i], kk) + w * 0.6;
+      px += Math.cos(an) * ko * size * 1.2; py += Math.sin(an) * ko * size * 1.2 - ko * size * 0.8;
+      b.X[i] = px; b.Y[i] = py; b.A[i] = (0.35 + 0.65 * kk) * (1 - ko);
+    }
+    PX.points(b.X, b.Y, n, o.color || LC.ink, { a: o.a == null ? 0.5 : o.a, A: b.A, glow: o.glow == null ? 0.3 : o.glow });
+    if (o.crisp) {
+      const c = o.color || LC.ink, ck = clamp((k - 0.85) / 0.15) * (1 - out) * o.crisp;
+      if (ck > 0) text(str, x, y, { size, family: fam, weight: wt, align: o.align || 'center', spacing: o.spacing || 0,
+        color: `rgb(${c.map(v => Math.round(v * 255))})`, alpha: ck * 0.9 });
+    }
+    return cl.w;
+  }
+
   // ---------------------------------------------------------------- beat helpers
   const BPM = 72, BEAT = 60 / BPM;
   const beat = { BPM, BEAT, pulse: (t, decay = 6) => Math.exp(-((t % BEAT + BEAT) % BEAT) * decay) };
@@ -302,5 +334,5 @@
   const stepK = (api, lt, name, d = 0.6, e = ease.out) => { const s = api.steps.find(s => s.show === name); return s ? e(prog(lt, s.lt, s.lt + (d === 'dur' ? s.dur : d))) : 0; };
   const stepDur = (api, name) => { const s = api.steps.find(s => s.show === name); return s ? s.dur : 0; };
 
-  window.KIT = { C, L: LC, rgb, GRADE, type, odo, you, spot, sheet, pen, caption, beat, at, stepK, stepDur };
+  window.KIT = { C, L: LC, rgb, GRADE, type, odo, you, spot, sheet, pen, caption, ptext, beat, at, stepK, stepDur };
 })();

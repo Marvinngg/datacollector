@@ -29,9 +29,17 @@ The world's recurring elements (all in `web/kit.js` — use them so the film is 
   small glyphs holding them.
 - **The answer sheet** (`KIT.sheet`) — a life of correct bubbles; it turns grey; at the end you stand up off it.
 - **The red pen** (`KIT.pen`) — the scorer's hand: ✓, circles, "100", strikes. Red appears ONLY as the scorer.
-- **The voice** (`KIT.caption`) — the film's sentences: serif, centred, one or two lines, always at the same place
-  (lower third, y≈1460; or mid-frame for the biggest statements), revealed calmly. This consistency is a large part
-  of the "premium" feel. Personal / intimate lines may use `family: F.hand` (LXGW WenKai).
+- **The voice — NO SUBTITLES.** (Revision after the director's review: the first cut put every sentence in a fixed
+  lower-third strip; it read as subtitles and was rejected.) A sentence is never a caption under a picture. Each
+  sentence is *part of the picture*, placed and moved by its meaning:
+  1. **Inside the world** — written on the answer sheet by the scorer's hand or by yours, printed on a receipt,
+     glowing on the phone screen, lying on the reunion table, scratched on the cliff face, lit on the floor, hanging
+     in a lamp's beam, rising out of the object it is about (the bike's particles become the words…).
+  2. **Or the sentence IS the frame** — a typographic moment where the picture recedes and the words are the image:
+     composed with intention (scale, line breaks, a key word larger or in its colour), not centred-and-bottom.
+  Vary position, scale and entrance from sentence to sentence; give each its own life (gathering from particles with
+  `KIT.ptext`, being written stroke by stroke, being printed, condensing out of light, cracking, floating weightless…),
+  while staying restrained and premium. `KIT.caption` is retired — don't use it.
 - Palette (`KIT.C` / light `KIT.L`): night background; warm = yours; lamp = theirs; red = the scorer; gray = the
   grey life; free = their wind and fire (orange); gold = honours.
 
