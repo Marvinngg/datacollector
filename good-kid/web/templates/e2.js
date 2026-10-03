@@ -279,7 +279,7 @@
         }
       }
 
-      PX.begin();
+      PX.begin(); fullFrame();          // the motes fill the frame: let their faint halo fill it too (no box edge)
       // ---- the line's crumbs: released where the erasure passes, then they float, every one its own way
       if (lt > tG + ERASE[0]) {
         const out = PX.buf(NL, 410); let m = 0;

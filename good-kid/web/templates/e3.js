@@ -368,7 +368,7 @@
       if (lt < tNo) bikeStrokes(m, lt, z, 'draw');
       else if (lt < r1 + 0.1) bikeStrokes(m, lt, z, 'loose', tRel);
       // light: wind + loosened motes
-      PX.begin(); fullFrame();
+      PX.begin();
       drawWind(T, ease.inOut(prog(lt, 0, 1.4)));
       if (lt > r0 - 0.4) {
         const [b, b1] = moteBuf(m.n), n = m.n;
@@ -540,7 +540,7 @@
       const strikeT = [0, 1, 2].map(i => tI + 2.3 + i * 1.25);
       let flare = 0; for (const s of strikeT) if (lt > s + 0.35) flare += 0.35 * Math.exp(-(lt - s - 0.35) * 1.6);
       // ---- particles
-      PX.begin(); fullFrame();
+      PX.begin();
       drawWind(T, 1 - smooth(prog(lt, 0.3, 2.4)));
       const B1 = m.B1, sy0 = stampY(lt, tS), sy1 = stampY(lt - 0.045, tS);
       for (let j = 0; j < N; j++) {
