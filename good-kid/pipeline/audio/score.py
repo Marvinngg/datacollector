@@ -143,6 +143,13 @@ def harm(t0, t1, names):
     for i, nm in enumerate(names): HARM.append((cuts[i], cuts[i + 1], nm))
 def H(vtype, name, names):
     harm(T(vtype, name), E(vtype, name), names)
+def HB(vtype, name, seq):
+    """chords with explicit lengths in beats; the last one fills the rest of the step (robust to retimed steps)"""
+    t0, t1 = T(vtype, name), E(vtype, name)
+    if not ok(t0, t1): return
+    for i, (nm, nb) in enumerate(seq):
+        a = t0; t0 = t1 if i == len(seq) - 1 else min(t1, t0 + nb * BT)
+        if t0 > a + 1e-6: HARM.append((a, t0, nm))
 def chord_at(t):
     for a, b, nm in reversed(HARM):
         if a - 1e-6 <= t < b: return nm
@@ -202,19 +209,29 @@ class Bus:
         if bg: place(s.big, t, x, g * bg, pan)
     def render(s):
         print(f'  reverb {s.name} ...', flush=True)
-        arrs = [s.dry.astype(np.float64), s.hall.astype(np.float64), s.big.astype(np.float64)]
-        if s.lp:                           # felt: the piano is filtered before it reaches the room
-            arrs = [filt(a, 'lp', s.lp, q=0.6, order=2) if np.abs(a).max() > 0 else a for a in arrs]
-        if s.hs:
-            arrs = [filt(a, 'hs', s.hs[0], gain_db=s.hs[1]) if np.abs(a).max() > 0 else a for a in arrs]
-        y = arrs[0]
+        y = s.dry.copy()
         # reverb per gate-delimited segment: a freeze also kills the room (tails never resurface after it)
         cuts = [0] + sorted(set(n_of(a) for a, _ in GATE if 0 < n_of(a) < NN)) + [NN]
         for i0, i1 in zip(cuts[:-1], cuts[1:]):
-            for arr, ir, k in ((arrs[1], IR_HALL, 0.55), (arrs[2], IR_BIG, 0.6)):
+            for arr, ir, k in ((s.hall, IR_HALL, 0.55), (s.big, IR_BIG, 0.6)):
                 seg = arr[i0:i1]
-                if np.abs(seg).max() > 0: y[i0:i1] += convolve(seg, ir) * k
+                if np.any(seg): y[i0:i1] += conv_seg(seg, ir) * k
+        y = y.astype(np.float64)
+        # the bus filters are linear and time-invariant: filtering after the room = filtering before it
+        if s.lp: y = filt(y, 'lp', s.lp, q=0.6, order=2)   # felt: soft hammers, a close dark piano
+        if s.hs: y = filt(y, 'hs', s.hs[0], gain_db=s.hs[1])
         return y
+def conv_seg(seg, ir, chunk=24.0):
+    """reverb of one segment: 24 s chunks (silent ones skipped), float32 FFTs on every core, cut at the segment end"""
+    import scipy.fft
+    out = np.zeros(seg.shape, np.float32); n = len(seg); C = n_of(chunk); ir32 = ir.astype(np.float32)
+    with scipy.fft.set_workers(os.cpu_count() or 1):
+        for c0 in range(0, n, C):
+            ch = seg[c0:c0 + C]
+            if not np.any(ch): continue
+            y = np.stack([signal.oaconvolve(ch[:, k], ir32[:, k]) for k in range(2)], 1)
+            j = min(n, c0 + len(y)); out[c0:j] += y[:j - c0]
+    return out
 PNOB = Bus('piano', lp=2600, hs=(6000, -6))     # the felt piano: close, soft, dark
 MUS = Bus('music')
 BLUR = Bus('blur', lp=950)                       # the reunion: their warmth, heard through a wall
@@ -398,12 +415,13 @@ def roomtone(dur, seed=0, hum=True):
     if hum:
         h = sum(a * np.sin(2 * np.pi * mtof(m('E2')) * r * t) for r, a in [(1, 1.0), (2, 0.45), (3, 0.2), (5, 0.06)])
         h *= 0.8 + 0.2 * smooth_rand(n, 0.3, seed + 5)
-        x += 0.5 * to_stereo(h)
+        x += 0.25 * to_stereo(h)
     return x
 
 # ================================================================ registry, ducks
 DUCK = []          # (t0, t1, depth, release) on the music buses
 CUTS = {}          # bus-level stops: name -> [(t, fade)]
+PRINTING = []      # printer spans (overlapping print cues are one printer running longer)
 DONE = {}          # sync-hit registry (form and cues share handlers; no double hits)
 def seen(kind, t, win=0.12):
     ts = DONE.setdefault(kind, [])
@@ -413,12 +431,12 @@ def cue_in(kind, t0, t1):
     return any(c.get('type') == kind and t0 - 0.05 <= c['t'] < t1 - 0.05 for c in CUES)
 
 # ================================================================ instrument voices
-def pno(key, t, dur, vel, g=1.0, pan=0.0, rv=0.35, bg=0.15, cut=None, human=0.006, tail=4.0, mech=1.0, seed=None, free=False, cutf=0.12):
+def pno(key, t, dur, vel, g=1.0, pan=0.0, rv=0.35, bg=0.15, cut=None, human=0.006, tail=4.0, mech=1.0, seed=None, free=False, cutf=0.12, nominal=None):
     """the felt piano: soft velocities, the hammer's thock, a little late or early like a hand"""
     if t is None: return
     sd = int(key * 7 + t * 100) if seed is None else seed
     dt = (h01(sd, 3) - 0.5) * 2 * human if human else 0.0
-    note(PNO, key, t + dt, dur, vel, g, pan, rv=rv, bg=bg, bus=PNOB, tail=tail, cut=cut, cutf=cutf, nominal=t, free=free)
+    note(PNO, key, t + dt, dur, vel, g, pan, rv=rv, bg=bg, bus=PNOB, tail=tail, cut=cut, cutf=cutf, nominal=t if nominal is None else nominal, free=free)
     if mech:
         PNOB.add(t + dt - 0.004, felt(sd % 6), 0.010 * mech * g * (vel / 64) ** 1.4 * (1.3 if key < m('C3') else 1.0),
                  pan, rv=0.08, cut=cut, cutf=cutf)
@@ -426,7 +444,7 @@ def pno(key, t, dur, vel, g=1.0, pan=0.0, rv=0.35, bg=0.15, cut=None, human=0.00
 def pchord(keys, t, dur, vel, g=1.0, roll=0.018, pan=(-0.3, 0.3), **kw):
     for j, k in enumerate(sorted(keys)):
         p = pan[0] + (pan[1] - pan[0]) * j / max(1, len(keys) - 1)
-        pno(k, t + j * roll if t is not None else None, dur, vel - 2 * j, g, p, mech=1.0 if j == 0 else 0.3, **kw)
+        pno(k, t + j * roll if t is not None else None, dur, vel - 2 * j, g, p, mech=1.0 if j == 0 else 0.3, nominal=t, **kw)
 
 def melody(t, seq, voice, unit=BT, **kw):
     """seq: [(note | None, beats)], voice(key, t, dur) -> places one note"""
@@ -468,7 +486,7 @@ def basses(t0, t1, preset, vel=60, g=0.5, octave=1, rv=0.3, every=None, dur=None
             if piano: pno(CHORDS[nm][0] + 12 * octave, x, L, vel, g, 0, rv=rv, cut=cut)
             else: note(preset, CHORDS[nm][0] + 12 * octave, x, L, vel, g, 0, rv=rv, tail=tail, cut=cut, cutf=cutf, bus=bus)
 
-def pulse(t0, t1, cell, vel=44, g=1.0, octave=0, div=E8, dur=None, seed=1, dens=(1.0, 1.0), accent=5, cut=None,
+def pulse(t0, t1, cell, vel=44, g=1.0, octave=0, div=E8, dur=None, seed=1, dens=(1.0, 1.0), accent=5, cut=None, cutf=0.12,
           pan=0.0, rv=0.35, bg=0.1, inst=None, human=0.006):
     """an ostinato over the harmony map: cell entries are chord-tone indices (None = rest), aligned to the global grid"""
     if not ok(t0, t1): return
@@ -481,8 +499,8 @@ def pulse(t0, t1, cell, vel=44, g=1.0, octave=0, div=E8, dur=None, seed=1, dens=
         key = tones[c % len(tones)] + 12 * (c // len(tones) + octave)
         v = vel + (accent if k % len(cell) == 0 else 0) + int(round((h01(k, seed + 9) - 0.5) * 6))
         L = dur or div * 2.5
-        if inst is None: pno(key, t, L, v, g, pan, rv=rv, bg=bg, cut=cut, human=human)
-        else: note(inst, key, t, L, v, g, pan, rv=rv, bg=bg, cut=cut)
+        if inst is None: pno(key, t, L, v, g, pan, rv=rv, bg=bg, cut=cut, cutf=cutf, human=human)
+        else: note(inst, key, t, L, v, g, pan, rv=rv, bg=bg, cut=cut, cutf=cutf)
 
 def theme(t, seq, vel=50, g=0.5, oct=0, pan=0.08, rv=0.4, bg=0.35, unit=BT, strings_too=None, **kw):
     """the theme on the felt piano (optionally doubled by sustained strings)"""
@@ -529,8 +547,14 @@ def h_swipe(t, **_):
 def h_tick(t, **_):
     if seen('tick', t, 0.04): return
     bt = btype_at(t)
-    if bt == 'rules':                         # the scoring form's dry metronome
-        FX.add(t, tick(2400, 0.003, 1, body=0.8), 0.07, 0.0, rv=0.0); return
+    if bt == 'rules':                         # a box on the scoring form ticked: dry pencil
+        FX.add(t, tick(3200, 0.002, 2, body=0.3), 0.05, 0.15, rv=0.0); return
+    if bt == 'exchange':                      # the balance's escapement: a soft wooden tock
+        FX.add(t, tick(1300, 0.007, 4, body=1.0), 0.05, 0.3 if len(DONE['tick']) % 2 else -0.3, rv=0.3); return
+    if bt == 'trap':                          # the ranking re-sorts, you climb: each step a notch higher
+        r = len([x for x in DONE['tick'] if beat_of(x) is beat_of(t)]) - 1
+        FX.add(t, tick(2800, 0.003, r % 6, body=0.4), 0.05, 0.1, rv=0.15)
+        note(CEL, m('B5') + [0, 3, 7, 8][r % 4], t, 0.3, 56, 0.08, 0.2, rv=0.4, bus=FX); return
     bus = POST if gated(t) else FX
     bus.add(t, tick(3000, 0.0025, int(t * 10) % 6, body=0.4), 0.05, 0.1 * np.sin(t * 3), rv=0.15)
     if bt in ('fuel', 'tries'):
@@ -548,13 +572,15 @@ def h_ticks(t, dur=1.0, n=8, p0=0.2, p1=0.8, **_):
     g0 = 0.075 / np.sqrt(max(1.0, len(slots) / 12))
     for i, s in enumerate(slots):
         tt = s * div; u = i / max(1, len(slots) - 1)
-        if gated(tt): continue
         p = np.clip(p0 + (p1 - p0) * u, 0, 1)
+        if gated(tt):                        # in a frozen silence the scoring clock alone goes on ticking
+            POST.add(tt, tick(2300 + 1600 * p, 0.0022, i % 6, body=0.55), g0 * 0.07, 0.2 * np.sin(i * 1.3), rv=0.0)
+            continue
         FX.add(tt, tick(2300 + 1600 * p, 0.0022, i % 6, body=0.55), g0 * (1.0 if i % 4 == 0 else 0.7), 0.25 * np.sin(i * 1.3), rv=0.12)
         if i % 4 == 0:                       # a faint pitch every beat-quarter: the clock is almost music
             key = scale_note(round(p * 7), m('E5'), PENT)
             note(MBOX, key, tt, 0.2, 36, 0.035, 0.2 * np.sin(i), rv=0.3, bus=FX, tail=1.0)
-    if n > len(slots) * 1.5 and dur > 0.3:
+    if n > len(slots) * 1.5 and dur > 0.3 and not gated(t):
         a = air(dur, 5000, 8000, q=2, seed=n) * np.hanning(n_of(dur))[:, None]
         FX.add(t, a, 0.006, 0, rv=0.3)
 
@@ -564,11 +590,16 @@ def h_pen(t, dur=None, **_):
     if seen('pen', t, 0.2): return
     d = float(dur) if isinstance(dur, (int, float)) and dur > 0 else 0.35
     d = min(1.2, max(0.15, d))
-    FX.add(t, scratch(round(d, 2), int(t * 10) % 7), 0.05, 0.15, rv=0.15)
+    FX.add(t, scratch(round(d, 2), int(t * 10) % 7), 0.03 if btype_at(t) == 'tries' else 0.05, 0.15, rv=0.15)
     bt, s = step_of(t); bt = tl.btype(bt); sname = (s or {}).get('show')
-    if bt == 'rules':                         # the red 0 on 个性: a muted thud, nothing rewarding
-        FX.add(t + d * 0.6, thump(80, 46, 0.10, 0.6, 180), 0.55, 0, rv=0.08)
+    if bt == 'rules':
+        if sname == 'score':                  # the red 0 on 个性: a muted thud, nothing rewarding
+            FX.add(t + d * 0.6, thump(80, 46, 0.10, 0.6, 180), 0.55, 0, rv=0.08)
+        return                                # a rule written onto the form: the dry nib only
+    if bt == 'tries':                         # your own hand crossing out a wrong character: no scorer, no reward
         return
+    if bt in ('yourbill', 'bills'):           # 不是: a plain stroke, a dull low tick
+        FX.add(t + d * 0.7, tick(900, 0.008, 1, body=1.0), 0.03, 0.1, rv=0.1); return
     up = CHORDS[chord_at(t)][1]; j = len(DONE['pen']) - 1
     k = up[j % len(up)] + 24
     while k > m('B6'): k -= 12
@@ -600,6 +631,10 @@ def h_stamp(t, **_):
 def h_print(t, dur=2.0, **_):
     """the receipt printer, its 16ths snapped to the music's grid"""
     dur = min(12.0, max(0.3, float(dur or 2.0)))
+    if any(a - 0.05 <= t < b for a, b in PRINTING): return                # already printing (merged below)
+    ov = [c for c in CUES if c.get('type') == 'print' and t <= c['t'] < t + dur]
+    for c in ov: dur = max(dur, c['t'] + min(12.0, float(c.get('dur') or 2.0)) - t)
+    PRINTING.append((t, t + dur))
     t0 = snap(t, S16)
     if seen('print', t0, 0.15): return
     x = printer(dur, int(t * 10) % 100)
@@ -613,16 +648,17 @@ def h_click(t, **_):
     (POST if gated(t) else FX).add(t, eclick(int(t) % 4), 0.06, 0.05, rv=0.08)
 
 @sync
-def h_off(t, **_):
+def h_off(t, soft=False, **_):
     """phone off: a tiny click, then real silence; a lamp off: a relay, the light's hum gone"""
     if seen('off', t, 0.2): return
     bt = btype_at(t)
     if bt == 'darkq':
         POST.add(t, eclick(1), 0.07, 0.05, rv=0.0)
         return
-    if bt in ('leave', 'scorer'):
-        FX.add(t, eclick(2), 0.05, 0.0, rv=0.25)
-        FX.add(t, thump(70, 40, 0.07, 0.4, 160, 2), 0.20, 0, rv=0.3)
+    if bt in ('leave', 'scorer', 'exchange'):
+        k = 0.45 if soft else 1.0
+        FX.add(t, eclick(2), 0.05 * k, 0.0, rv=0.25)
+        FX.add(t, thump(70, 40, 0.07, 0.4, 160, 2), 0.20 * k, 0, rv=0.3)
         n = n_of(0.5); FX.add(t, filt(wnoise(n, 81), 'lp', 3000) * np.exp(-tvec(n) / 0.08), 0.006, 0, rv=0.4)
         return
     FX.add(t, eclick(3), 0.04, 0, rv=0.2)
@@ -630,8 +666,10 @@ def h_off(t, **_):
 @sync
 def h_hush(t, dur=None, **_):
     if seen('hush', t, 0.3): return
-    d = float(dur) if isinstance(dur, (int, float)) and dur > 0 else 1.5 * BT
-    DUCK.append((t, t + d, 0.35, 1.5 * BT))
+    d = float(dur) if isinstance(dur, (int, float)) and dur > 0 else BT
+    nt = [x for x in cue_times('title', t, t + 1.5)]
+    if nt: DUCK.append((t, nt[0] - 0.05, 0.4, 0.05)); return
+    DUCK.append((t, t + d, 0.62, 2 * BT))
 
 @sync
 def h_swell(t, dur=3.0, **_):
@@ -639,9 +677,10 @@ def h_swell(t, dur=3.0, **_):
     if seen('swell', t, 0.3): return
     dur = min(12.0, max(0.5, float(dur or 3.0))); bass, up = CHORDS[chord_at(t + dur - 0.05)]
     env = [(0, 0), (dur, 1), (dur + 1.2, 0.5)]
+    hi = 24 if btype_at(t) == 'weightless' else 12
     for j, k in enumerate(up):
-        note(SSTR, k + 12, t, dur + 1.2, 72, 0.12, -0.5 + j / max(1, len(up) - 1), rv=0.5, bg=0.5, bus=FX, tail=3, env=env)
-    note(CELLO, bass + 12, t, dur + 1.2, 70, 0.14, 0, rv=0.4, bus=FX, tail=3, env=env)
+        note(SSTR, k + hi, t, dur + 1.2, 68, 0.10, -0.5 + j / max(1, len(up) - 1), rv=0.5, bg=0.5, bus=FX, tail=3, env=env)
+    if hi == 12: note(CELLO, bass + 12, t, dur + 1.2, 66, 0.12, 0, rv=0.4, bus=FX, tail=3, env=env)
     a = air(dur, 500, 2500, q=0.8, seed=9) * np.linspace(0, 1, n_of(dur))[:, None] ** 2
     FX.add(t, a, 0.012, 0, rv=0.4)
 
@@ -713,6 +752,10 @@ def h_glow(t, **_):
     k = up[(idx + 1) % len(up)] + 12
     while k > m('B5'): k -= 12
     while k < m('E5'): k += 12
+    if bt == 'darkq':                         # the question lights up in the dark: barely a breath of light
+        FX.add(t, glow_tone(mtof(m('B5')), 4.0, 1.0, 1.6), 0.012, 0.1, rv=0.5, bg=0.7); return
+    if bt == 'reunion':                       # his stories light the table: warm, but behind the wall
+        BLUR.add(t, glow_tone(mtof(k), 4.0, 0.3, 1.6), 0.10, 0.25 * np.sin(idx * 1.9), rv=0.5); return
     FX.add(t, glow_tone(mtof(k), 4.5, 0.4, 1.9), 0.055, 0.25 * np.sin(idx * 1.9), rv=0.5, bg=0.5)
     note(VIB, k, t, 1.0, 48, 0.07, 0.15, rv=0.5, bg=0.5, bus=FX, tail=2)
 
@@ -722,7 +765,7 @@ def h_title(t, **_):
     if seen('title', t, 0.3): return
     bt = btype_at(t)
     if bt == 'leave':
-        b = beat_of(t); L = max(4.0, b['end'] - t) + 2.0
+        b, s_ = step_of(t); L = max(4.0, (s_['t'] + s_['dur'] if s_ else b['end']) - t) + 2.0
         pno(m('E1'), t, 7.0, 84, 0.8, -0.05, rv=0.3, bg=0.7, human=0, tail=8)
         pno(m('E2'), t + 0.012, 7.0, 62, 0.45, 0.05, rv=0.3, bg=0.7, human=0, tail=8)
         pno(m('B2'), t + 0.024, 7.0, 54, 0.35, 0.1, rv=0.3, bg=0.7, human=0, tail=8)
@@ -735,6 +778,10 @@ def h_title(t, **_):
         note(OOHS, m('B3'), t + 0.4, L - 0.4, 48, 0.05, 0.0, rv=0.4, bg=0.8, tail=5, env=[(0, 0), (2.5, 1)], bus=FX)
         FX.add(t, thump(55, 32, 0.4, 1.6, 110), 0.16, 0, bg=0.4)
         return
+    if bt == 'darkq': return                   # the question's title is the theme itself (composed)
+    if bt == 'end':                           # 'Have a try' appears: a warm light, high
+        FX.add(t, glow_tone(mtof(m('B5')), 4.0, 0.3, 1.6), 0.03, 0.2, rv=0.5, bg=0.7)
+        note(CEL, m('E6'), t, 1.0, 44, 0.06, 0.25, rv=0.5, bg=0.8, bus=FX); return
     if bt == 'yourbill':
         b = beat_of(t); L = max(3.0, b['end'] - t) + 1.5
         for j, k in enumerate(ms('C1', 'G1', 'C2')):
@@ -808,14 +855,14 @@ H('exchange', 'scale', ['Em9', 'Cmaj7', 'Em9', 'Cmaj7']); H('exchange', 'trade',
 H('yourbill', 'print', 'Em'); H('yourbill', 'word', 'Cmaj9')
 H('never', 'a18', 'Am9'); H('never', 'a20', 'F#m7b5'); H('never', 'a25', 'B7'); H('never', 'never', 'B7')
 H('fall', 'cliff', 'B(b9)'); H('fall', 'step', 'B(b9)'); H('fall', 'drop', 'B(b9)'); H('fall', 'land', 'Cmaj9')
-H('fall', 'floor', ['Cmaj7', 'Am7', 'D', 'D', 'D'])
+HB('fall', 'floor', [('Cmaj7', 2), ('Am7', 2), ('D', 99)])
 # e6 Have a try
 H('stand', 'not', 'Em9'); H('stand', 'up', ['C', 'D', 'G/B', 'Cadd9']); H('stand', 'given', ['Am9', 'Am9', 'Dsus4'])
 H('stand', 'kid', ['Em9', 'Em9', 'Em9', 'Cmaj7'])
 H('tries', 'try', ['G', 'D/F#', 'Em7']); H('tries', 't1', ['C', 'G']); H('tries', 't2', ['D', 'Em7']); H('tries', 't3', ['C', 'G/B'])
 H('tries', 't4', ['Am7', 'D']); H('tries', 'fine', ['C', 'G', 'D'])
-H('lamp', 'take', ['Cmaj7', 'Dadd9', 'Eadd9', 'Eadd9', 'Eadd9'])
-H('end', 'years', ['E', 'Amaj7', 'Bsus4', 'B']); H('end', 'try', ['E/G#', 'Aadd9', 'Eadd9', 'Eadd9', 'Eadd9', 'Eadd9'])
+HB('lamp', 'take', [('Cmaj7', 2), ('Dadd9', 2), ('Eadd9', 99)])
+HB('end', 'years', [('E', 2), ('Amaj7', 2), ('Bsus4', 2), ('B', 99)]); HB('end', 'try', [('E/G#', 1), ('Aadd9', 1), ('Eadd9', 99)])
 H('end', 'life', 'Eadd9')
 
 # ================================================================ FORM
@@ -923,8 +970,8 @@ if B('reunion'):
     # stories: laughter rolls across the table, three times
     s0, s1 = T('reunion', 'stories'), E('reunion', 'stories')
     if ok(s0):
-        for i in range(3):
-            BLUR.add(snap(s0 + (s1 - s0) * (i + 0.6) / 3, BT), laugh(1.8, 3 + i), 0.22, 0, rv=0.4)
+        lt_ = cue_times('glow', s0, s1) or [snap(s0 + (s1 - s0) * (i + 0.6) / 3, BT) for i in range(3)]
+        for i, x in enumerate(lt_[:4]): BLUR.add(x + 0.5, laugh(1.8, 3 + i), 0.22, 0.3 * np.sin(i * 2.1), rv=0.4)
     # arrive: everyone turns toward him (a lift in the warmth)
     if ok(T('reunion', 'arrive')):
         t_ar = T('reunion', 'arrive')
@@ -938,7 +985,7 @@ if B('reunion'):
     if ok(T('reunion', 'none')):
         tn = T('reunion', 'none')
         pno(m('E2'), tn + 2 * BT, 4.0, 36, 0.5, -0.1, rv=0.5, bg=0.5)
-        pno(m('B2'), tn + 2 * BT + 0.02, 4.0, 30, 0.4, 0.0, rv=0.5, bg=0.5)
+        pno(m('B2'), tn + 2 * BT + 0.02, 4.0, 30, 0.4, 0.0, rv=0.5, bg=0.5, nominal=tn + 2 * BT)
         note(CELLO, m('E2'), tn + 2 * BT, 4 * BT, 40, 0.10, 0, rv=0.5, bg=0.5, env=[(0, 0), (1.5, 1), (4 * BT, 0)])
 
 # ---------------------------------------------------------------- e1 · b05 scorer + b06 leave: the school, then the holders leave
@@ -950,9 +997,11 @@ if B('scorer'):
     if not offs and B('leave'):
         offs = [go0 + 2 * BT, go0 + 4 * BT, go0 + 6 * BT]
         for x in offs: h_off(x)
-    offs = sorted(offs) or [go1]
     NL = 3                                      # layers: the praise (music box), the pulse, the warm chord
-    cut = [offs[max(0, min(len(offs) - 1, int(round((i + 1) * len(offs) / NL)) - 1))] for i in range(NL)]
+    offs = sorted(offs)[:NL]
+    cut = list(offs); cf = [0.15] * len(cut)
+    while len(cut) < NL:                        # fewer lamps than layers: the rest fade as the last beam fades
+        cut.append(max((cut[-1] + 2 * BT) if cut else go0, go1 - 2 * BT)); cf.append(1.6)
     SCHOOL = cut
     # layer 1: the music box / celesta: the theme made correct and complete, in G major
     mb = [(T('scorer', 'school'), [('G5', 1), ('D6', 1), ('C6', 1), ('B5', 1)]),
@@ -962,19 +1011,19 @@ if B('scorer'):
           (go0, [('G5', 1), ('E6', 1), ('D6', 1), ('B5', 1), ('C6', 2), ('B5', 2)])]
     for t0, seq in mb:
         if t0 is None: continue
-        def vb(k, tt, d): note(MBOX, k, tt, d, 64, 0.20, 0.3, rv=0.4, bg=0.3, cut=cut[0], cutf=0.15, tail=2)
-        def vc(k, tt, d): note(CEL, k - 12, tt, d, 56, 0.12, -0.2, rv=0.4, bg=0.3, cut=cut[0], cutf=0.15, tail=2)
+        def vb(k, tt, d): note(MBOX, k, tt, d, 64, 0.20, 0.3, rv=0.4, bg=0.3, cut=cut[0], cutf=cf[0], tail=2)
+        def vc(k, tt, d): note(CEL, k - 12, tt, d, 56, 0.12, -0.2, rv=0.4, bg=0.3, cut=cut[0], cutf=cf[0], tail=2)
         melody(t0, seq, vb); melody(t0, seq, vc)
     # layer 2: the orderly pulse: piano broken chords in 8ths and a pizzicato root on every other beat
-    pulse(a, go1, [0, 2, 1, 2], 40, 0.36, octave=0, div=E8, dur=E8 * 1.6, seed=11, human=0.0, cut=cut[1], rv=0.35, bg=0.1)
+    pulse(a, go1, [0, 2, 1, 2], 40, 0.36, octave=0, div=E8, dur=E8 * 1.6, seed=11, human=0.0, cut=cut[1], cutf=cf[1], rv=0.35, bg=0.1)
     for k, t in grid(a, go1, 2 * BT):
-        note(PIZZ, CHORDS[chord_at(t + 0.01)][0] + 12, t, 0.4, 70, 0.34, -0.05, rv=0.35, cut=cut[1])
+        note(PIZZ, CHORDS[chord_at(t + 0.01)][0] + 12, t, 0.4, 70, 0.34, -0.05, rv=0.35, cut=cut[1], cutf=cf[1])
     # layer 3: the warm chord (strings + pad), being seen
     t_seen = T('scorer', 'seen') or a
-    pads(T('scorer', 'marks') or a, go1 + BT, SSTR, 50, 0.13, rv=0.45, bg=0.35, fi=2.0, cut=cut[2], overlap=0.5)
-    pads(t_seen, go1 + BT, STR, 48, 0.06, rv=0.45, bg=0.35, fi=1.5, octave=1, which=[1, 2], cut=cut[2])
-    pads(a, go1 + BT, PAD, 46, 0.09, rv=0.4, bg=0.3, fi=1.0, cut=cut[2])
-    basses(t_seen, go1 + BT, CELLO, 54, 0.16, 1, rv=0.4, cut=cut[2])
+    pads(T('scorer', 'marks') or a, go1 + BT, SSTR, 50, 0.13, rv=0.45, bg=0.35, fi=2.0, cut=cut[2], cutf=cf[2], overlap=0.5)
+    pads(t_seen, go1 + BT, STR, 48, 0.06, rv=0.45, bg=0.35, fi=1.5, octave=1, which=[1, 2], cut=cut[2], cutf=cf[2])
+    pads(a, go1 + BT, PAD, 46, 0.09, rv=0.4, bg=0.3, fi=1.0, cut=cut[2], cutf=cf[2])
+    basses(t_seen, go1 + BT, CELLO, 54, 0.16, 1, rv=0.4, cut=cut[2], cutf=cf[2])
     # the red pen: a mark for each item (only if the template does not cue its own pens)
     m0, m1 = T('scorer', 'marks'), E('scorer', 'marks')
     if ok(m0) and not cue_in('pen', m0, m1):
@@ -1038,7 +1087,7 @@ if B('weightless'):
         t_e = b; L = t_e - t_g
         h_fall(t_g, dur=2 * BT)
         for j, k in enumerate(ms('B5', 'E6', 'F#6')):
-            note(SSTR, k, t_g + 0.1, L, 50, 0.07, -0.5 + 0.5 * j, rv=0.5, bg=0.8, env=[(0, 0), (2.5, 1), (L - 1.5, 1), (L, 0.2)])
+            note(SSTR, k, t_g, L, 50, 0.07, -0.5 + 0.5 * j, rv=0.5, bg=0.8, env=[(0, 0), (2.5, 1), (L - 1.5, 1), (L, 0.2)])
         note(GLASS, m('E5'), t_g, L, 48, 0.06, 0.2, rv=0.5, bg=0.8, env=[(0, 0), (2.0, 1), (L - 1, 0.6)])
         sh = shimmer(ms('B5', 'E6', 'F#6', 'B6'), L, 0.4, 3) * local_env(n_of(L), [(0, 0), (3.0, 1), (L - 1.0, 1), (L, 0)])[:, None]
         MUS.add(t_g, sh, 0.012, 0, rv=0.4, bg=0.8)
@@ -1055,7 +1104,7 @@ if B('rules'):
     a, b = T('rules'), E('rules'); t_s, t_e = T('rules', 'score'), T('rules', 'end')
     t_zero = first('pen', t_s or a, t_e or b, (t_s or a) + 3 * BT)
     for k, t in grid(a, t_zero, BT):            # the metronome: exact, dry, no room at all
-        if not cue_in('tick', a, b): FX.add(t, tick(2400, 0.003, 1, body=0.8), 0.06 if k % 4 else 0.08, 0.0, rv=0.0)
+        ONSETS.append(t); MUS.add(t, tick(2400, 0.003, 1, body=0.8), 0.045 if k % 4 else 0.06, 0.0, rv=0.0)
         if k % 2 == 0 and t < (t_s or b):
             note(PIZZ, CHORDS[chord_at(t + 0.01)][0] + 12, t, 0.3, 64, 0.30, -0.1, rv=0.08)
     for k, t in grid(a, t_s or b, E8):          # dry staccato piano on the off-beats: the form, filled in
@@ -1069,7 +1118,7 @@ if B('rules'):
             pno(k, x, 0.5, 40 + int(rng.integers(-4, 6)), 0.38, 0.4 * np.sin(i), rv=0.35, bg=0.2, human=0.0, free=True)
             x += rng.uniform(0.11, 0.26)
         if not cue_in('pen', t_s, t_e or b): h_pen(t_zero)
-        note(CELLO, m('E2'), t_zero + 0.3, (t_e or b) - t_zero, 44, 0.12, 0, rv=0.4, bg=0.4, env=[(0, 0), (1.0, 1), ((t_e or b) - t_zero, 0.5)])
+        note(CELLO, m('E2'), snap(t_zero, E8) + E8, (t_e or b) - t_zero, 44, 0.12, 0, rv=0.4, bg=0.4, env=[(0, 0), (1.0, 1), ((t_e or b) - t_zero, 0.5)])
     if ok(t_e):                                 # 你不是没有个性: tender
         pads(t_e, b, SSTR, 50, 0.12, rv=0.5, bg=0.5, fi=1.5, fo=1.5, overlap=0.6)
         basses(t_e, b, CELLO, 50, 0.15, 1, rv=0.45)
@@ -1084,7 +1133,7 @@ if B('honest'):
     if ok(t_b):                                 # the feed's warm pad and the sea wind, remembered
         pads(t_b, t_q or b, PAD, 50, 0.13, rv=0.4, bg=0.4, fi=1.5, fo=1.0, overlap=0.8)
         MUS.add(t_b, wind((t_q or b) - t_b + 1, 31, 300, 1200, 0.5) * local_env(n_of((t_q or b) - t_b + 1), [(0, 0), (1.5, 1), ((t_q or b) - t_b + 1, 0)])[:, None], 0.05, 0, rv=0.3)
-        pno(m('C3'), t_b, 3.5, 36, 0.45, -0.2); pno(m('G3'), t_b + 0.02, 3.5, 30, 0.4, -0.1)
+        pno(m('C3'), t_b, 3.5, 36, 0.45, -0.2); pno(m('G3'), t_b + 0.02, 3.5, 30, 0.4, -0.1, nominal=t_b)
         pno(m('E4'), t_b + 2 * BT, 2.5, 34, 0.45, 0.1); pno(m('B4'), t_b + 3 * BT, 2.5, 32, 0.45, 0.2)
     if ok(t_q):                                 # the honest question: an open, rising piano figure
         pads(t_q, t_n or b, SSTR, 46, 0.10, rv=0.5, bg=0.5, fi=1.0, fo=1.0)
@@ -1181,12 +1230,12 @@ if B('trap'):
         if t0 is None: continue
         melody(t0, seq, lambda k, t, d: (note(MBOX, k, t, d, 64, 0.20, 0.3, rv=0.4, bg=0.3, tail=2),
                                          note(CEL, k - 12, t, d, 56, 0.12, -0.2, rv=0.4, bg=0.3, tail=2)))
-    if ok(t_c):                                 # #1 again: a tidy little reward, right before the freeze
+    if ok(t_c) and not cue_in('pen', t_c, t_fr):  # #1 again: a tidy little reward, right before the freeze
         FX.add(t_fr - 0.5 * BT, bell(mtof(m('G6')), 2.0, 0.6), 0.03, 0.2, rv=0.3)
     if ok(t_rk):                                # 'rank': a cold single tone
         L = b - t_rk; n = n_of(L); tt = tvec(n)
         x = np.sin(2 * np.pi * mtof(m('B5')) * tt) + 0.06 * np.sin(2 * np.pi * mtof(m('B5')) * 3 * tt)
-        MUS.add(t_rk, x * local_env(n, [(0, 0), (0.08, 1), (L - 1.2, 0.85), (L, 0)]), 0.035, 0.0, rv=0.15)
+        MUS.add(t_rk, x * local_env(n, [(0, 0), (0.08, 1), (L - 1.2, 0.85), (L, 0)]), 0.018, 0.0, rv=0.15)
 
 # ---------------------------------------------------------------- e4 · b14 exchange: a pendulum; the empty chair
 if B('exchange'):
@@ -1194,10 +1243,12 @@ if B('exchange'):
     e_sw = t_e or b
     for k, t in grid(a, e_sw, BT):              # the pendulum: one swing per beat, left / right
         bs, up = CHORDS[chord_at(t + 0.01)]
-        side = -0.55 if k % 2 == 0 else 0.55
-        keys = [bs + 12, up[1]] if k % 2 == 0 else [up[0], up[-1]]
+        ph = np.sin(2 * np.pi * (t - a) / (8 * BT))       # where the balance is in its swing
+        side = 0.6 * ph
+        keys = [bs + 12, up[1]] if ph >= 0 else [up[0], up[-1]]
         u = (t - a) / max(1e-6, e_sw - a)
-        for j, kk in enumerate(keys): pno(kk, t + 0.015 * j, BT * 1.2, 38 - int(6 * max(0, u - 0.7) / 0.3), 0.36, side, rv=0.35, bg=0.2, human=0)
+        for j, kk in enumerate(keys):
+            pno(kk, t + 0.015 * j, BT * 1.2, 38 - int(6 * max(0, u - 0.7) / 0.3), 0.36, side, rv=0.35, bg=0.2, human=0, nominal=t)
         note(HARP, up[-1] + 12, t, 0.8, 46, 0.10, -side, rv=0.45, bg=0.3)
     pads(a, e_sw, SSTR, 46, 0.09, rv=0.5, bg=0.4, fi=2.0, fo=1.5)
     if ok(t_t):
@@ -1218,9 +1269,11 @@ if B('yourbill'):
         note(SSTR, m('B3'), t_p + 2 * BT, e_p - t_p - 2 * BT, 42, 0.06, 0.2, rv=0.5, bg=0.4, env=[(0, 0), (2.0, 1)], cut=e_p, cutf=0.05)
         if not cue_in('print', t_p, e_p): h_print(t_p, dur=(e_p - t_p) * 0.75)
     if ok(t_w):
-        tw = first(('stamp', 'title', 'land'), t_w - BT, b, t_w)
+        pr = cue_list('print', t_w - BT, b)
+        tw = first(('stamp', 'title', 'land'), t_w - BT, b,
+                   (float(pr[-1]['t']) + float(pr[-1].get('dur') or 0)) if pr else t_w)
         h_title(tw)
-        theme(t_w + 4 * BT, [('B4', 1), ('C5', 1), ('B4', 2)], vel=34, g=0.45, rv=0.5, bg=0.6)
+        theme(snap(tw, BT) + 2 * BT, [('B4', 1), ('C5', 1), ('B4', 2)], vel=34, g=0.45, rv=0.5, bg=0.6)
 
 # ---------------------------------------------------------------- e5 · b16 never: three soft notes, left unresolved
 if B('never'):
@@ -1258,7 +1311,7 @@ if B('fall'):
     if ok(t_land):
         h_land(t_land)
         e_ld = E('fall', 'land') or b           # 原来摔一跤，人是不会死的: one tender line over the bloom
-        theme(t_land + 2 * BT, [('G4', 1), ('B4', 1), ('E5', 2)], vel=36, g=0.45, rv=0.5, bg=0.7)
+        theme(snap(t_land, BT) + 2 * BT, [('G4', 1), ('B4', 1), ('E5', 2)], vel=36, g=0.45, rv=0.5, bg=0.7)
     if ok(t_fl):                                # 知道底下有地: the theme harmonised, warmer; its F# finally held (D)
         pads(t_fl, b, SSTR, 54, 0.12, rv=0.5, bg=0.6, fi=1.0, fo=2.0, overlap=0.6)
         pads(t_fl, b, PAD, 48, 0.08, rv=0.4, bg=0.5, fi=1.0, fo=2.0)
@@ -1310,9 +1363,9 @@ if B('tries'):
     basses(a, bl, None, 38, 0.42, 0, piano=True, rv=0.4)
     pads(a, bl, SSTR, 46, 0.09, rv=0.5, bg=0.5, fi=2.0)
     FIG = {'t1': [('D5', 0.5), ('E5', 0.5), ('G5', 1)],                                 # a small first step
-           't2': [('F#5', 0.5), ('A5', 0.5), ('G5', 0.5), ('E5', 0.5), ('B5', 1)],          # a stranger's city
+           't2': [('F#5', 0.5), ('A5', 0.5), ('A#5', 0.5), ('B5', 0.5), ('D6', 1)],         # a stranger's city: a wrong note, left in
            't3': [('E5', 0.5), ('F#5', 0.5), (None, 1), ('D5', 0.5)],                       # an unready word: it falters
-           't4': [('C5', 0.5), ('E5', 0.5), ('G#5', 0.5), ('G5', 0.5), ('A5', 1)]}          # the wrong note, left in
+           't4': [('C5', 0.5), ('E5', 0.5), ('A5', 0.5), ('G5', 0.5), ('B5', 1)]}           # something you will never be good at
     for nm, seq in FIG.items():
         t0 = T('tries', nm)
         if not ok(t0): continue
@@ -1373,7 +1426,7 @@ if B('end'):
     if ok(t_l):                                 # 试试不一样的生活: the long warm last chord, fading to silence
         L = b - t_l; env = [(0, 1), (L * 0.3, 0.8), (L - 0.3, 0.0)]
         for j, k in enumerate(ms('E1', 'E2', 'B2', 'G#3', 'B3', 'F#4', 'G#4', 'B4')):
-            pno(k, t_l + 0.025 * j, L, 50 - 2 * j, 0.42, -0.4 + 0.1 * j, rv=0.45, bg=0.9, tail=2, human=0, mech=0.6 if j == 0 else 0.2)
+            pno(k, t_l + 0.025 * j, L, 50 - 2 * j, 0.42, -0.4 + 0.1 * j, rv=0.45, bg=0.9, tail=2, human=0, mech=0.6 if j == 0 else 0.2, nominal=t_l)
             note(SSTR, k + 12, t_l, L, 52, 0.07, 0.4 - 0.1 * j, rv=0.5, bg=0.9, tail=1, env=[(0, 0.8), (1.0, 1), (L * 0.55, 0.6), (L - 0.3, 0.0)])
         note(OOHS, m('B4'), t_l, L, 46, 0.04, 0.0, rv=0.5, bg=0.9, tail=1, env=[(0, 0.6), (L * 0.5, 0.5), (L - 0.3, 0)])
         for i, (k, d) in enumerate([('E6', 2), ('B6', 2), ('G#6', 4)]):       # the theme's head, a last high echo
@@ -1415,16 +1468,15 @@ def env_from(spans, kind):
     return g
 G = env_from(GATE, 'gate')[:, None]; HD = env_from(DUCK, 'duck')[:, None]
 # section trims (dB, by visual type) on the music buses, 80 ms cosine moves on the beat lines
-TRIM = {}
+TRIM = {'feed': -4.0, 'answers': -3.5, 'darkq': -2.5, 'weightless': 1.0}
 pts = []
 for b_ in BEATS:
     g_ = 10 ** (TRIM.get(tl.btype(b_), 0.0) / 20)
     pts += [(b_['start'] + 0.04, g_), (b_['end'] - 0.04, g_)]
 HD = HD * env_points(nn, pts)[:, None]
-FXL = np.array([fxg(i / 10) for i in range(int(nn / SR * 10) + 1)])
-FXE = np.repeat(FXL, SR // 10)[:nn]
-if len(FXE) < nn: FXE = np.pad(FXE, (0, nn - len(FXE)), mode='edge')
-FXE = np.convolve(FXE, np.ones(SR // 10) / (SR // 10), mode='same')[:, None]
+_tf = np.arange(int(nn / SR * 20) + 2) / 20
+_gf = np.convolve(np.array([fxg(x) for x in _tf]), np.ones(3) / 3, mode='same')      # 0.15 s smoothing
+FXE = np.interp(np.arange(nn) / SR, _tf, _gf)[:, None]
 music = (pnob * 1.0 + mus + blur) * HD
 fxs = fxb * FXE
 if '--stems' in sys.argv:        # debug: loudness of each bus per step
@@ -1476,6 +1528,7 @@ for a, b_ in sorted(set(GATE)):
     pk = np.abs(x).max() if len(x) else 0.0
     print(f'  silence {a:.2f}-{b_:.2f} ({btype_at(a)}): peak {db(pk) if pk > 0 else -999:.1f} dBFS ({"digital zero" if pk == 0 else "post-bus clicks only"})')
 on = np.array(ONSETS); off = np.abs(on / S16 - np.round(on / S16)) * S16
+if os.environ.get('GK_GRID'): print('off-grid:', sorted(set(np.round(on[off > 0.013], 3))))
 print(f'grid: {len(on)} composed onsets, {np.mean(off < 0.002) * 100:.1f}% exactly on the 16th grid (max off {off.max() * 1000:.1f} ms: the felt hand, <= 12 ms); {len(FREE)} deliberately free notes (个性 scribble, imperfect tries)')
 tail = mix[n_of(end_t):]
 print(f'end: last step ends {end_t:.3f}s; after it peak {db(np.abs(tail).max()) if len(tail) and np.abs(tail).max() > 0 else -999:.1f} dBFS')
