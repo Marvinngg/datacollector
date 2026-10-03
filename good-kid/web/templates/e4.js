@@ -405,7 +405,7 @@
   const PIV = -560, ARM = 300, HANG = 280;
   const PER = beat.BEAT * 8, AMP = 0.15;
   // the world (the final, pulled-back layout) — the balance stands on the desk at (SX, SY) at scale SZ
-  const SX = 420, SYD = 1024, SZ = 0.44;
+  const SX = 458, SYD = 1024, SZ = 0.42;
   const CAM0 = { x: 540, y: 1310, z: 1.12 }, CAM1 = { x: 540, y: 940, z: 1.1, fx: 540, fy: 1000 };   // screen anchor + scale: start (the balance), end (the desk)
   const DESK = { yb: 1000, yf: 1042, xb0: 140, xb1: 940, xf0: 100, xf1: 980, face: 26, apron: 44, floor: 1404 };
   function theta(lt, t0) {
@@ -504,7 +504,7 @@
     if (a <= 0) return;
     ctx.save(); ctx.globalAlpha *= a; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     const k = 0.6 + 0.4 * light;
-    const cx = 680, w = 200, top = 620, seatB = 1150, seatF = 1184, sk = 10;   // sk: the chair is turned a little
+    const cx = 732, w = 200, top = 620, seatB = 1150, seatF = 1184, sk = 10;   // sk: the chair is turned a little
     const xl = cx - w / 2, xr = cx + w / 2;
     ctx.strokeStyle = INK(0.5 * k); ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -562,7 +562,7 @@
     ctx.restore();
   }
   // the desk lamp: base, two arms, a cone shade aimed at the balance
-  const LAMPG = { bx: 214, by: 1018, ex: 186, ey: 826, hx: 296, hy: 744, ang: -0.95 };
+  const LAMPG = { bx: 178, by: 1018, ex: 152, ey: 828, hx: 244, hy: 750, ang: -0.95 };
   function drawLamp(a, on) {
     if (a <= 0) return;
     const G = LAMPG;

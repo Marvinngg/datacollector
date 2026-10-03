@@ -268,89 +268,132 @@
 
   // ================================================================================================ b17 fall
   // world (identity camera = the opening shot): cliff top at YT, the edge at XE, the floor HC below
-  const YT = 860, XE = 600, HC = 300, YF = YT + HC, YOU = 150;
+  const YT = 860, XE = 600, HC = 300, YF = YT + HC, YOU = 150, XL = XE + 95;   // XL: where 你 comes down
   const FEET = 0.47;                                     // KIT.you: feet ≈ centre + 0.47 x size
-  let CLIFF = null;
-  function faceX(y) {                                    // x of the cliff face at height y (world)
-    const c = cliff(), u = clamp((y - YT) / HC) * (c.face.length - 1), i = Math.min(c.face.length - 2, u | 0), k = u - i;
-    return lerp(c.face[i], c.face[i + 1], k);
+  // the silhouette: a plateau rising gently to the left, a worn lip, a jagged face stepping back to the floor
+  const FACE = [[XE, YT], [XE + 7, YT + 12], [XE - 3, YT + 30], [XE - 15, YT + 56], [XE - 9, YT + 88], [XE - 24, YT + 124],
+    [XE - 33, YT + 160], [XE - 27, YT + 198], [XE - 42, YT + 238], [XE - 47, YT + 272], [XE - 55, YF]];
+  function faceX(y) {
+    if (y <= FACE[0][1]) return FACE[0][0];
+    for (let i = 1; i < FACE.length; i++) if (y <= FACE[i][1]) return lerp(FACE[i - 1][0], FACE[i][0], (y - FACE[i - 1][1]) / (FACE[i][1] - FACE[i - 1][1]));
+    return FACE[FACE.length - 1][0];
   }
-  function cliff() {
-    if (CLIFF) return CLIFF;
-    const r = rng(5150), NB = 26, bandH = (HC + 40) / NB;
-    const face = []; const NF = 22;
-    for (let i = 0; i <= NF; i++) { const u = i / NF; face.push(XE - 34 * u - 10 * Math.sin(u * 7) * u + (i > 0 && i < NF ? (r() - 0.5) * 16 : 0) + (i === 1 ? 8 : 0)); }
-    CLIFF = { face, bands: [], bandH, NB };
-    const segs = Array.from({ length: NB }, () => []);
-    const add = (x1, y1, x2, y2, w = 1) => { const b = clamp(Math.floor(((y1 + y2) / 2 - YT + 20) / bandH), 0, NB - 1); segs[b].push([x1, y1, x2, y2, w]); };
-    const poly = (pts, w) => { for (let i = 1; i < pts.length; i++) add(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], w); };
-    // the top surface (slightly irregular, with a worn lip at the edge)
-    const top = []; for (let x = -260; x <= XE - 30; x += 26) top.push([x, YT + Math.sin(x * 0.021) * 2.5 + (r() - 0.5) * 2.2]);
-    top.push([XE - 14, YT + 0.5], [XE - 4, YT + 2.5], [XE, YT + 7]);
-    poly(top, 1.5);
-    // the face, down to the floor
-    const fp = []; for (let i = 0; i <= 60; i++) { const y = YT + 7 + (HC - 7) * i / 60; fp.push([faceX(y) + (r() - 0.5) * 3, y]); }
-    poly(fp, 1.5);
-    // strata: long wavy hairlines inside the rock, broken
-    for (let y = YT + 18, k = 0; y < YF - 6; y += 15 + r() * 12, k++) {
-      const tilt = (r() - 0.5) * 0.03, ph = r() * 9;
-      let prev = null;
-      for (let x = -260; x < faceX(y) - 6; x += 22) {
-        const yy = y + Math.sin(x * 0.012 + ph) * 3.5 + (x - XE) * tilt, xe = Math.min(x + 22, faceX(yy) - 6);
-        const yy2 = y + Math.sin(xe * 0.012 + ph) * 3.5 + (xe - XE) * tilt;
-        if (r() > 0.22) add(x, yy, xe, yy2, 0.55 + 0.45 * r());
-        prev = [xe, yy2];
-      }
-    }
-    // cracks running down from the top
-    for (let c = 0; c < 7; c++) {
-      let x = 40 + r() * (XE - 120), y = YT + 2; const len = 60 + r() * 190, pts = [[x, y]];
-      while (y < YT + len) { y += 10 + r() * 14; x += (r() - 0.5) * 12; pts.push([x, y]); }
-      poly(pts, 0.8);
+  const topY = x => YT - 72 * smooth(clamp((XE - 160 - x) / 760)) + Math.sin(x * 0.031) * 1.4 + Math.sin(x * 0.0113 + 1) * 3 * clamp((XE - 160 - x) / 300);
+  const vnoise = K.vnoise;
+  /* line art is stored as segments in 3 weights (strong / mid / weak), bucketed in horizontal bands so a frame can
+     light the rock by height (lit from above at the edge, from below by the floor, or all of it) */
+  function bandSet(y0, y1, NB) {
+    const bandH = (y1 - y0) / NB, segs = Array.from({ length: NB }, () => [[], [], []]);
+    const add = (x1, ya, x2, yb, w) => { const b = clamp(Math.floor(((ya + yb) / 2 - y0) / bandH), 0, NB - 1); segs[b][w].push([x1, ya, x2, yb]); };
+    const poly = (pts, w, keep) => { for (let i = 1; i < pts.length; i++) if (!keep || keep(i)) add(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], w); };
+    const build = () => segs.map((b, i) => ({ y: y0 + (i + 0.5) * bandH, p: b.map(list => { const P = new Path2D(); for (const [x1, ya, x2, yb] of list) { P.moveTo(x1, ya); P.lineTo(x2, yb); } return P; }) }));
+    return { add, poly, build };
+  }
+  // the rock's surface drawing, given a face function fx(y) over [ya, yb] (shared by the true cliff and the dream tile)
+  function rockFace(B, fx, ya, yb, r, seed) {
+    // contour lines parallel to the face, broken more the deeper into the rock they go
+    [10, 22, 37, 56, 80, 110, 148, 196].forEach((d, k) => {
+      const pts = []; for (let y = ya + 4 + d * 0.15; y <= yb; y += 6) pts.push([fx(y) - d - 5 * vnoise(y * 0.03, d + seed), y]);
+      const thr = 0.28 + k * 0.07;
+      B.poly(pts, k < 2 ? 1 : 2, i => vnoise(i * 0.09 + k * 3.1, seed + k) > thr);
+    });
+    // ledges: short shelves going in from where the face steps back
+    for (let y = ya + 26; y < yb - 10; y += 30 + r() * 26) {
+      const x = fx(y) - 2, l = 40 + r() * 110, dy = (r() - 0.5) * 6, pts = [];
+      for (let u = 0; u <= 1.001; u += 0.1) pts.push([x - l * u, y + dy * u + Math.sin(u * 3 + y) * 1.5]);
+      B.poly(pts, 1, i => i < 4 || r() > 0.3);
     }
     // hatching along the face (the rock turns away from the light)
-    for (let y = YT + 12; y < YF - 4; y += 6.5) {
-      const fx = faceX(y), l = 10 + r() * 22 * (0.6 + 0.4 * Math.sin(y * 0.05));
-      add(fx - 4, y, fx - 4 - l * 0.8, y + l * 0.55, 0.6);
+    for (let y = ya + 8; y < yb - 3; y += 5.5) {
+      const x = fx(y) - 3, l = 9 + 20 * vnoise(y * 0.05, seed + 9);
+      B.add(x, y, x - l * 0.75, y + l * 0.6, 2);
     }
-    // the base where the rock meets the floor: a few fallen stones
-    for (let k = 0; k < 9; k++) {
-      const x = faceX(YF) + 8 + r() * 120, w = 6 + r() * 16, h = 4 + r() * 7;
-      poly([[x - w / 2, YF], [x - w * 0.3, YF - h], [x + w * 0.35, YF - h * 0.8], [x + w / 2, YF]], 0.8);
+    // cracks
+    for (let c = 0; c < 3; c++) {
+      let y = ya + 20 + r() * (yb - ya - 80), x = fx(y) - 6; const pts = [[x, y]], len = 40 + r() * 90;
+      for (let u = 0; u < len; u += 9) { y += 8 + r() * 4; x -= 2 + r() * 7; pts.push([x, y]); }
+      B.poly(pts, 1);
     }
-    for (let b = 0; b < NB; b++) {
-      const p = new Path2D(), q = new Path2D();
-      for (const [x1, y1, x2, y2, w] of segs[b]) { const P = w > 0.9 ? p : q; P.moveTo(x1, y1); P.lineTo(x2, y2); }
-      CLIFF.bands.push({ y: YT - 20 + (b + 0.5) * bandH, strong: p, weak: q });
-    }
-    return CLIFF;
   }
+  let CLIFF = null, TILE = null;
+  function cliff() {
+    if (CLIFF) return CLIFF;
+    const r = rng(5150), B = bandSet(YT - 100, YF + 10, 28);
+    // silhouette
+    const top = []; for (let x = -320; x < XE - 20; x += 18) top.push([x, topY(x) + (r() - 0.5) * 1.6]);
+    top.push([XE - 10, YT - 0.5], [XE, YT]);
+    B.poly(top, 0);
+    const fp = []; for (let y = YT; y <= YF; y += 4) fp.push([faceX(y) + (r() - 0.5) * 2, y]);
+    B.poly(fp, 0);
+    // the plateau's thickness: lines under the top surface
+    [9, 21, 38].forEach((d, k) => {
+      const pts = []; for (let x = -320; x < faceX(YT + d) - 8 - d * 0.3; x += 14) pts.push([x, topY(x) + d + 3 * vnoise(x * 0.02, k)]);
+      B.poly(pts, k ? 2 : 1, i => vnoise(i * 0.12, 40 + k) > 0.3 + k * 0.08);
+    });
+    rockFace(B, faceX, YT + 6, YF, r, 3);
+    // long strata through the body, fading into the rock
+    for (let y = YT + 60; y < YF - 10; y += 34 + r() * 20) {
+      const x0 = faceX(y) - 70 - r() * 60, l = 160 + r() * 380, ph = r() * 6, pts = [];
+      for (let u = 0; u <= l; u += 16) pts.push([x0 - u, y + Math.sin(u * 0.012 + ph) * 4 - u * 0.02]);
+      B.poly(pts, 2, i => vnoise(i * 0.2, y) > 0.35);
+    }
+    // fallen stones at the foot
+    for (let k = 0; k < 8; k++) {
+      const x = faceX(YF) + 6 + r() * 70 + (k > 5 ? 60 : 0), w = 6 + r() * 15, h = 4 + r() * 7;
+      B.poly([[x - w / 2, YF], [x - w * 0.3, YF - h], [x + w * 0.35, YF - h * 0.8], [x + w / 2, YF]], 1);
+    }
+    return (CLIFF = B.build());
+  }
+  // the face of the dream: the same rock, endless (a periodic tile of height TP)
+  const TP = 640;
+  const tileX = y => XE - 34 + 12 * Math.sin(y * TAU / TP * 2) + 8 * Math.sin(y * TAU / TP * 5 + 1) + 4 * Math.sin(y * TAU / TP * 11);
+  function tile() {
+    if (TILE) return TILE;
+    const r = rng(77), B = bandSet(0, TP, 1);
+    const fp = []; for (let y = 0; y <= TP; y += 4) fp.push([tileX(y), y]);
+    B.poly(fp, 0);
+    rockFace(B, tileX, 0, TP, r, 11);
+    return (TILE = B.build()[0]);
+  }
+  const W8 = [[0.62, 1.5], [0.42, 1.2], [0.24, 1.0]];      // [alpha, width] of the three weights
   /** draw the cliff (world coords) through camera m = {s, ox, oy}; vis(y) -> 0..1 */
   function drawCliff(m, vis, a) {
-    const c = cliff();
+    if (a <= 0.003) return;
     ctx.save(); ctx.globalAlpha *= a; ctx.translate(m.ox, m.oy); ctx.scale(m.s, m.s);
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    for (const b of c.bands) {
+    for (const b of cliff()) {
       const v = vis(b.y); if (v <= 0.004) continue;
-      ctx.strokeStyle = ink(0.62 * v); ctx.lineWidth = 1.5 / m.s; ctx.stroke(b.strong);
-      ctx.strokeStyle = ink(0.34 * v); ctx.lineWidth = 1.1 / m.s; ctx.stroke(b.weak);
+      for (let w = 0; w < 3; w++) { ctx.strokeStyle = ink(W8[w][0] * v); ctx.lineWidth = W8[w][1] / m.s; ctx.stroke(b.p[w]); }
     }
     ctx.restore();
   }
-  // imprints of the others on the floor: [x, depth 0..1, size k, rotation, brightness]
+  function drawTile(m, y0, dx, a) {
+    if (a <= 0.003) return;
+    const T_ = tile();
+    ctx.save(); ctx.globalAlpha *= a; ctx.lineCap = 'round';
+    for (let k = 0; k < 40; k++) {
+      const yy = y0 + k * TP, sy0 = m.oy + yy * m.s; if (sy0 > H + 20) break; if (sy0 + TP * m.s < -20) continue;
+      ctx.save(); ctx.translate(m.ox + dx, sy0); ctx.scale(m.s, m.s);
+      for (let w = 0; w < 3; w++) { ctx.strokeStyle = ink(W8[w][0] * 0.8); ctx.lineWidth = W8[w][1] / m.s; ctx.stroke(T_.p[w]); }
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+  // imprints of the others on the floor: [x, depth 0..1, size, rotation, brightness, ring]
   let MARKS = null;
   function marks() {
     if (MARKS) return MARKS;
-    const r = rng(1717), out = [];
-    for (let i = 0; i < 92; i++) {
-      const g = i < 60, gx = () => { let s = 0; for (let k = 0; k < 4; k++) s += r(); return (s - 2) / 0.58; };
-      const x = g ? XE + 120 + gx() * 150 : faceX(YF) + 40 + r() * 760, d = g ? clamp(0.3 + gx() * 0.22, 0.02, 1) : r();
-      if (x < faceX(YF) + 22) continue;
-      out.push([x, d, 0.7 + 0.5 * r(), (r() - 0.5) * 1.2, 0.5 + 0.5 * r(), r()]);
+    const r = rng(1717), out = [], x0 = faceX(YF) + 30;
+    for (let i = 0; i < 160 && out.length < 64; i++) {
+      const g = r() < 0.55, gx = () => { let s = 0; for (let k = 0; k < 3; k++) s += r(); return (s - 1.5) / 0.5; };
+      const x = g ? XL + gx() * 170 : x0 + r() * 820, d = g ? clamp(0.35 + gx() * 0.25, 0.05, 1) : 0.05 + r() * 0.95;
+      if (x < x0 || Math.abs(x - XL) < 46 && d < 0.5) continue;
+      if (out.some(m => Math.abs(m[0] - x) < 34 && Math.abs(m[1] - d) < 0.16)) continue;   // no pile-ups: each one legible
+      out.push([x, d, 0.75 + 0.5 * r(), (r() - 0.5) * 1.4, 0.45 + 0.55 * r(), r()]);
     }
     return (MARKS = out);
   }
-  const FLOOR_D = 170, FLOOR_SQ = 0.24;                   // world depth of the floor band in front of the cliff, ellipse squash
+  const FLOOR_D = 190, FLOOR_SQ = 0.24;                   // world depth of the floor band in front of the cliff, ellipse squash
   function fallTimes(api) {
     const tC = at(api, 'cliff'), tS = at(api, 'step'), tD = at(api, 'drop'), tL = at(api, 'land'), tF = at(api, 'floor');
     return { tC, tS, tD, tL, tF, walk: [tS + 0.25, tS + 1.45], tip: tS + 2.3, stop: tL - 0.22, contact: tL + 0.3 };
@@ -360,25 +403,22 @@
   const fallD = tau => tau <= 0 ? 0 : tau < 1 ? 0.5 * G0 * tau * tau : 0.5 * G0 + G0 * GT * (Math.exp((tau - 1) / GT) - 1);
   const fallV = tau => tau <= 0 ? 0 : tau < 1 ? G0 * tau : G0 * Math.exp((tau - 1) / GT);
   function fallState(S, lt) {
-    // D: rush distance, v: rush speed (screen px / s), after the stop it decays fast (soft, not a crash)
+    // D: rush distance, v: rush speed (screen px / s); after the stop it decays fast (soft, not a crash)
     const tau = lt - S.tip, tauS = S.stop - S.tip;
     if (lt < S.stop) return { D: fallD(tau), v: fallV(tau) };
     const vS = fallV(tauS), k = 0.16, d = lt - S.stop;
     return { D: fallD(tauS) + vS * k * (1 - Math.exp(-d / k)), v: vS * Math.exp(-d / k) };
   }
-  // camera keyframes (world point shown at screen (540, 960), scale s)
-  const CAM_LAND = { s: 1.15 }, CAM_FLOOR = { s: 0.7, wx: 655, wy: 1010 };
-  const XL = XE + 44;                                      // where 你 comes down (world x)
+  // camera (world point shown at screen (540, 960), scale s)
+  const S_OPEN = 1.08, CAM_FLOOR = { s: 0.7, wx: 660, wy: 1005 }, LAND_AT = { x: 560, y: 918 };
   function camAt(S, lt) {
-    // opening: slow push towards 你 at the edge
     const pk = ease.inOut(prog(lt, S.tC, S.tS + 2.2));
-    let c = { s: lerp(1, 1.08, pk), wx: lerp(540, 575, pk), wy: lerp(960, 930, pk) };
+    let c = { s: lerp(1, S_OPEN, pk), wx: lerp(540, 575, pk), wy: lerp(960, 930, pk) };
     if (lt >= S.tL - 0.6) {                                   // landing shot (world-true), then the pull-back
-      const yc = YF - FEET * YOU;
-      c = { s: CAM_LAND.s, wx: XL - (560 - 540) / CAM_LAND.s, wy: yc - (918 - 960) / CAM_LAND.s };
-      const dk = prog(lt, S.tL, S.tF);
-      c.s *= 1 - 0.03 * ease.inOut(dk);
-      const fk = ease.inOut(prog(lt, S.tF + 0.2, S.tF + 5.2));
+      const yc = YF - FEET * YOU, s0 = S_OPEN;
+      c = { s: s0, wx: XL - (LAND_AT.x - 540) / s0, wy: yc - (LAND_AT.y - 960) / s0 };
+      c.s *= 1 + 0.025 * ease.inOut(prog(lt, S.tL, S.tF));
+      const fk = ease.inOut(prog(lt, S.tF + 0.2, S.tF + 5.4));
       if (fk > 0) c = { s: c.s * Math.pow(CAM_FLOOR.s / c.s, fk), wx: lerp(c.wx, CAM_FLOOR.wx, fk), wy: lerp(c.wy, CAM_FLOOR.wy, fk) };
     }
     c.ox = W / 2 - c.wx * c.s; c.oy = 960 - c.wy * c.s;
@@ -387,146 +427,141 @@
   }
   // 你: where it is on screen, and how it looks
   function youState(S, lt, cam) {
-    const st = { size: YOU * cam.s, rot: 0, drift: 0, gray: 0.35, own: 0, stream: 0, breathe: 0.45 };
+    const st = { size: YOU * cam.s, rot: 0, drift: 0, gray: 0.2, own: 0, stream: 0, breathe: 0.45 };
     if (lt < S.tip) {
-      // standing, then a few small steps to the edge; a breath; the step off
+      // standing; a few small steps to the very edge; a breath; a slight lean
       const wk = prog(lt, S.walk[0], S.walk[1]);
-      let wx = lerp(XE - 70, XE - 26, ease.inOut(wk)), wy = YT - FEET * YOU;
-      wy -= Math.abs(Math.sin(wk * Math.PI * 3)) * 5 * (wk > 0 && wk < 1 ? 1 : 0);
+      const wx = lerp(XE - 72, XE - 26, ease.inOut(wk)), wy = YT - FEET * YOU - Math.abs(Math.sin(wk * Math.PI * 3)) * 5 * (wk > 0 && wk < 1 ? 1 : 0);
       st.rot = 0.05 * ease.inOut(prog(lt, S.walk[1] + 0.2, S.tip));
       st.x = cam.X(wx); st.y = cam.Y(wy);
       return st;
     }
-    const tau = lt - S.tip;
-    // the step off: forward and a little up, then gravity. The camera catches it and falls with it.
-    const hop = ease.out(clamp(tau / 0.35));
-    const x0 = cam.X(XE - 26), y0 = cam.Y(YT - FEET * YOU);
-    const follow = smooth(clamp(tau / 1.0));
-    const fx = 26 + 44 * hop;                                     // world px forward
-    const yRaw = y0 - 14 * Math.sin(Math.PI * clamp(tau / 0.5)) * (tau < 0.5 ? 1 : 0) + fallD(tau) * (1 - follow);
-    const yHold = y0 + 78;                                        // where the camera keeps 你 while it falls
-    st.x = lerp(x0 + fx * cam.s, 560, follow) + Math.sin(tau * 0.7) * 12 * follow;
-    st.y = lerp(yRaw, yHold, follow) + Math.sin(tau * 1.3) * 6 * follow;
+    const tau = lt - S.tip, cT = camAt(S, S.tip);
+    st.size = YOU * cT.s;
+    // the step off: forward and a little up, then gravity; the camera catches 你 and falls with it
+    const hop = ease.out(clamp(tau / 0.35)), follow = smooth(clamp(tau / 1.0));
+    const x0 = cT.X(XE - 26 + 44 * hop), y0 = cT.Y(YT - FEET * YOU);
+    const yRaw = y0 - 14 * Math.sin(Math.PI * clamp(tau / 0.5)) + fallD(tau) * (1 - follow);
+    let x = lerp(x0, LAND_AT.x, follow) + Math.sin(tau * 0.7) * 12 * follow;
+    let y = lerp(yRaw, y0 + 78, follow) + Math.sin(tau * 1.3) * 6 * follow;
     st.rot = 0.05 + (0.11 * Math.sin(tau * 0.8 + 0.4) + 0.04) * clamp(tau / 2);
-    st.gray = 0.35 + 0.25 * clamp(tau / 4);
+    st.gray = 0.2 + 0.3 * clamp(tau / 4);
     st.stream = clamp(fallV(tau) / 9000);
-    st.drift = 3 + 10 * st.stream;
+    st.drift = 2 + 9 * st.stream;
     if (lt >= S.stop) {
-      // the soft landing: everything slows; 你 settles onto light
-      const lk = ease.out(prog(lt, S.stop, S.contact + 0.25)), yc = YF - FEET * YOU;
-      st.x = lerp(st.x, cam.X(XL), lk); st.y = lerp(st.y, cam.Y(yc), lk);
+      // the soft landing: everything slows; 你 settles onto light; the particles come home
+      const lk = ease.out(prog(lt, S.stop, S.contact + 0.3)), yc = YF - FEET * YOU;
+      x = lerp(x, cam.X(XL), lk); y = lerp(y, cam.Y(yc), lk);
+      st.size = YOU * cam.s;
       st.rot *= 1 - ease.inOut(prog(lt, S.stop, S.contact + 0.6));
       const sk = ease.out(prog(lt, S.stop, S.contact + 1.6));
       st.stream *= 1 - lk; st.drift = lerp(st.drift, 0, sk);
-      st.gray = lerp(st.gray, 0.1, sk);
-      st.own = 0.3 * ease.inOut(prog(lt, S.contact, S.contact + 3.5));
-      st.x = cam.X(XL) + (st.x - cam.X(XL)) * (1 - lk); st.y = cam.Y(yc) + (st.y - cam.Y(yc)) * (1 - lk);
+      st.gray = lerp(st.gray, 0.05, sk);
+      st.own = 0.32 * ease.inOut(prog(lt, S.contact, S.contact + 3.5));
     }
+    st.x = x; st.y = y;
     return st;
   }
-  // the rush: depth layers of thin streaks moving up (screen space), length ~ speed
-  const LAYERS = [{ n: 300, par: 0.32, a: 0.16, seed: 31 }, { n: 130, par: 0.75, a: 0.24, seed: 41 }, { n: 34, par: 1.7, a: 0.3, seed: 51 }];
+  // the rush: depth layers moving up (screen space): far dust, thin streaks, and a few big soft ones close by
+  const LAYERS = [
+    { n: 900, par: 0.22, a: 0.30, len: 0.03, seed: 31, size: 1 },
+    { n: 150, par: 0.7, a: 0.34, len: 0.05, seed: 41, size: 1 },
+    { n: 12, par: 2.2, a: 0.26, len: 0.07, seed: 51, size: 2 },
+  ];
   function rush(D, v, a, xHole) {
     if (a <= 0.003) return;
-    let tot = 0; for (const L of LAYERS) tot += L.n * 140; scratch(tot);
-    let j = 0;
     for (const L of LAYERS) {
-      const span = H + 900, len = clamp(v * L.par * 0.045, 1.5, 820), m = Math.max(1, Math.min(140, Math.round(len / 3)));
+      const span = H + 1400, len = clamp(v * L.par * L.len, 1, 1300), m = Math.max(1, Math.min(160, Math.round(len / (L.size > 1 ? 4 : 2.5))));
+      scratch(L.n * m); let j = 0;
       for (let i = 0; i < L.n; i++) {
-        const x = PX.rand(i, L.seed) * (W + 80) - 40, sp = 0.75 + 0.5 * PX.rand(i, L.seed + 1);
-        const y = ((PX.rand(i, L.seed + 2) * span - D * L.par * sp) % span + span) % span - 450;
-        const near = Math.abs(x - xHole) < 120 ? 0.35 : 1, A = (0.4 + 0.6 * PX.rand(i, L.seed + 3)) * near / Math.sqrt(m) * 2.2;
-        for (let q = 0; q < m; q++) { SX[j] = x; SY[j] = y + q * len * sp / m; SA[j] = A * (1 - q / m * 0.7); j++; }
+        const x = PX.rand(i, L.seed) * (W + 80) - 40, sp = 0.7 + 0.6 * PX.rand(i, L.seed + 1);
+        const y = ((PX.rand(i, L.seed + 2) * span - D * L.par * sp) % span + span) % span - 700;
+        if (y > H + 10 || y + len * sp < -10) continue;
+        const near = Math.abs(x - xHole) < 110 ? 0.4 : 1, A = (0.35 + 0.65 * PX.rand(i, L.seed + 3)) * near * Math.min(1, 3 / Math.sqrt(m));
+        for (let q = 0; q < m; q++) { SX[j] = x; SY[j] = y + q * len * sp / m; SA[j] = A * (q === 0 ? 1.4 : 1 - q / m * 0.75); j++; }
       }
+      PX.points(SX, SY, j, mix(LAMP, [0.55, 0.62, 0.78], 0.45), { a: a * L.a, A: SA, glow: L.size > 1 ? 0.7 : 0.25, size: L.size });
     }
-    PX.points(SX, SY, j, mix(LAMP, [0.55, 0.62, 0.78], 0.5), { a, A: SA, glow: 0.25 });
   }
-  // the face of the cliff, rushing past (subjective: it never ends), receding into the dark
-  function dreamFace(cam, D, a, tau) {
+  function vignette(a) {
     if (a <= 0.003) return;
-    const r0 = 7, span = 1400, recede = 260 * tau * tau;
-    ctx.save(); ctx.globalAlpha *= a; ctx.lineCap = 'round';
-    for (let k = 0; k < 64; k++) {
-      const y = (((k * 37.3 * r0) % span) - D * 1.0) % span; const yy = (y + span) % span - 200;
-      const fx = cam.X(XE) - 30 - recede + Math.sin(k * 1.7) * 18;
-      const len = 120 + (k * 53 % 300), st = clamp(fallV(tau) * 0.03, 0, 120);
-      ctx.strokeStyle = ink(0.22 + 0.12 * Math.sin(k)); ctx.lineWidth = 1.1;
-      ctx.beginPath(); ctx.moveTo(fx - len, yy + 3); ctx.lineTo(fx, yy); ctx.stroke();
-      if (st > 4) { ctx.strokeStyle = ink(0.07); ctx.beginPath(); ctx.moveTo(fx - len * 0.7, yy); ctx.lineTo(fx - len * 0.7, yy + st); ctx.stroke(); }
-    }
-    ctx.restore();
+    ctx.save(); ctx.globalAlpha *= Math.min(1, a);
+    const g = ctx.createRadialGradient(W / 2, 900, 220, W / 2, 900, 1100);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.85)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.restore();
   }
   T.register('fall', {
     draw(ctx, V, lt, api) {
       const S = fallTimes(api), cam = camAt(S, lt), you = youState(S, lt, cam);
       const tau = lt - S.tip, falling = lt >= S.tip, F_ = falling ? fallState(S, lt) : { D: 0, v: 0 };
       const landShot = lt >= S.tL - 0.6;
-      const cT = S.contact, lightK = lt >= S.stop ? 1 : 0;
+      const cT = S.contact, lightK = lt >= S.stop;
       const R = lt > cT ? 1500 * (1 - Math.exp(-(lt - cT) / 2.0)) : 0;                         // light spread (world px)
-      const reveal = ease.inOut(prog(lt, S.tF + 0.6, S.tF + 4.6));
+      const reveal = ease.inOut(prog(lt, S.tF + 0.8, S.tF + 4.8));
       // ---------- darkness deepens during the fall
-      const dark = falling && !landShot ? 0.25 * ease.inOut(clamp(tau / 4)) : landShot ? 0.25 * (1 - ease.out(prog(lt, S.tL, S.tL + 2.5))) : 0;
+      const dark = falling && !landShot ? 0.3 * ease.inOut(clamp(tau / 4)) : landShot ? 0.3 * (1 - ease.out(prog(lt, S.tL, S.tL + 2.5))) : 0;
       veil(dark);
-      // ---------- the cliff (opening), the dream face (fall), the true cliff (landing, reveal)
+      // ---------- the cliff: lit from above (opening), an endless face (fall), the true cliff (landing, reveal)
       if (!landShot) {
-        const fo = falling ? 1 - ease.in(prog(tau, 0.2, 1.6)) : 1;
-        const m = { s: cam.s, ox: cam.ox, oy: cam.oy - (falling ? F_.D * smooth(clamp(tau / 1.0)) : 0) };
-        drawCliff(m, y => Math.pow(clamp(1 - (y - YT) / 250), 1.6) * 0.95 + 0.05 * clamp(1 - (y - YT) / 400), fo);
-        if (falling) dreamFace(cam, F_.D, clamp(tau / 0.8) * (1 - ease.in(prog(tau, 1.4, 3.6))) * 0.8, tau);
+        const follow = falling ? smooth(clamp(tau / 1.0)) : 0;
+        const m = { s: cam.s, ox: cam.ox, oy: cam.oy - (falling ? F_.D * follow : 0) };
+        const fo = falling ? 1 - ease.in(prog(tau, 0.6, 2.4)) : 1;
+        drawCliff(m, y => Math.pow(clamp(1 - (y - YT) / 270), 1.5) + 0.04, fo);
+        if (falling) {
+          const recede = -260 * ease.in(clamp(tau / 3.2));
+          drawTile(m, YT + 150, recede * 1, clamp(tau / 0.5) * (1 - ease.in(prog(tau, 1.2, 3.4))) * 0.75);
+        }
       } else {
         const m = { s: cam.s, ox: cam.ox, oy: cam.oy };
-        const floorLit = y => clamp(1 - (YF - y) / 170) * clamp(R / 240);
-        drawCliff(m, y => Math.max(floorLit(y) * 0.8, reveal * (0.5 + 0.35 * clamp((y - YT) / HC))), 1);
+        const floorLit = y => clamp(1 - (YF - y) / 105) * clamp(R / 200);
+        drawCliff(m, y => Math.max(floorLit(y) * 0.85, reveal * (0.62 + 0.3 * clamp((y - YT) / HC))), 1);
       }
-      // ---------- the floor (landing on): line, pool, ripples, others' imprints
+      // ---------- the floor: the imprints of everyone who fell before (flattened 人, lit as the light reaches them)
+      if (lightK && R > 0) {
+        ctx.save(); ctx.translate(cam.ox, cam.oy); ctx.scale(cam.s, cam.s);
+        ctx.font = `600 54px ${F.serif}`; ctx.textAlign = 'center';
+        for (const [mx, md, ms, mr, mb, mz] of marks()) {
+          const y = YF + 10 + md * FLOOR_D, dist = Math.hypot(mx - XL, (y - YF) / FLOOR_SQ);
+          const lit = clamp((R - dist) / 300); if (lit <= 0.01) continue;
+          const pk = 0.65 + 0.55 * md, flash = Math.exp(-Math.max(0, R - dist) / 200);
+          ctx.save(); ctx.translate(mx, y); ctx.scale(ms * pk, ms * pk * FLOOR_SQ * 1.5); ctx.rotate(mr);
+          ctx.globalAlpha = lit * mb * (0.16 + 0.22 * flash) * (0.6 + 0.4 * md);
+          ctx.fillStyle = warmS(1); ctx.fillText('人', 0, 18);
+          if (mz > 0.45) { ctx.strokeStyle = warmS(0.35); ctx.lineWidth = 1.2 / (ms * pk); ctx.beginPath(); ctx.ellipse(0, 0, 50, 50, 0, 0, TAU); ctx.stroke(); }
+          ctx.restore();
+        }
+        ctx.restore();
+      }
       PX.begin(); fullFrame();
       if (lightK) {
-        const xc = XL, ex = (lt - S.stop) / 0.5;
-        const pre = clamp(ex);                                   // the light appears just below before you touch it
+        const xc = XL, pre = clamp((lt - S.stop) / 0.5);           // the light appears just below before you touch it
         // floor line: warm particles along y = YF, spreading from the contact point
         const n = 5200; scratch(n);
-        const span = 2600, x0 = faceX(YF) - 4;
+        const span = 2600, x0 = faceX(YF) - 2;
         let j = 0;
         for (let i = 0; i < n; i++) {
           const x = x0 + (i + PX.rand(i, 61)) / n * span, dx = Math.abs(x - xc);
-          const lit = Math.max(pre * Math.exp(-dx / 70) * (lt < cT ? 1 : 0.6), clamp((R - dx) / 140) * (0.25 + 0.75 * Math.exp(-dx / 520)));
+          const lit = Math.max(pre * Math.exp(-dx / 70) * (lt < cT ? 1 : 0.6), clamp((R - dx) / 140) * (0.22 + 0.78 * Math.exp(-dx / 480)));
           if (lit <= 0.01) continue;
           SX[j] = cam.X(x); SY[j] = cam.Y(YF) + (PX.rand(i, 62) - 0.5) * 1.6; SA[j] = lit * (0.6 + 0.4 * PX.rand(i, 63)); j++;
         }
         PX.points(SX, SY, j, WARM, { a: 0.55, A: SA, glow: 0.6 });
         // ripples: rings spreading over the floor plane from the contact point
         if (lt > cT) {
-          const m = 900; scratch(m * 3); j = 0;
-          [0, 0.5, 1.15].forEach((d, ri) => {
+          const m = 1100; scratch(m * 3); j = 0;
+          [0, 0.55, 1.25].forEach((d, ri) => {
             const tr = lt - cT - d; if (tr <= 0) return;
-            const rr = 1100 * (1 - Math.exp(-tr / 1.5)), al = Math.exp(-tr * 0.55) * (1 - rr / 1150) * (ri ? 0.7 : 1);
+            const rr = 1150 * (1 - Math.exp(-tr / 1.6)), al = Math.exp(-tr * 0.5) * (1 - rr / 1200) * (ri ? 0.6 : 1);
             if (al <= 0.01) return;
             for (let i = 0; i < m; i++) {
               const an = (i + PX.rand(i, 71 + ri)) / m * TAU, x = xc + Math.cos(an) * rr, y = YF + Math.sin(an) * rr * FLOOR_SQ;
               if (Math.sin(an) < 0 && x < faceX(YF) + 6) continue;          // behind the rock
-              if (y < YF - 22 || y > YF + FLOOR_D * 1.4) continue;
-              SX[j] = cam.X(x); SY[j] = cam.Y(y); SA[j] = al * (0.6 + 0.4 * PX.rand(i, 74)) * (Math.sin(an) < 0 ? 0.5 : 1); j++;
+              if (y > YF + FLOOR_D * 1.3) continue;
+              SX[j] = cam.X(x); SY[j] = cam.Y(y); SA[j] = al * (0.6 + 0.4 * PX.rand(i, 74)) * (Math.sin(an) < 0 ? 0.45 : 1); j++;
             }
           });
-          PX.points(SX, SY, j, WARM, { a: 0.42, A: SA, glow: 0.5 });
+          PX.points(SX, SY, j, WARM, { a: 0.4, A: SA, glow: 0.5 });
         }
-        // the imprints of everyone who fell before (flattened glyphs 人, lit as the light reaches them)
-        const mk = marks(), cl = PX.text('人', { size: 80, family: F.serif, weight: 600, x: 0, y: 30, step: 1.7, seed: 9 });
-        const per = Math.min(cl.n, 150); scratch(mk.length * (per + 40)); j = 0;
-        for (const [mx, md, ms, mr, mb, mz] of mk) {
-          const y = YF + 6 + md * FLOOR_D, dist = Math.hypot(mx - xc, (y - YF) / FLOOR_SQ);
-          const lit = clamp((R - dist) / 260); if (lit <= 0.01) continue;
-          const flash = R > dist ? Math.exp(-((R - dist) / 260)) : 0;
-          const pk = 0.55 + 0.6 * md, sz = ms * pk * 0.42, cs = Math.cos(mr), sn = Math.sin(mr);
-          const A = lit * mb * (0.55 + 0.9 * flash) * (0.6 + 0.4 * md);
-          for (let i = 0; i < per; i++) {
-            const px = cl.X[i] * sz, py = cl.Y[i] * sz;
-            SX[j] = cam.X(mx + px * cs - py * sn); SY[j] = cam.Y(y + (px * sn + py * cs) * FLOOR_SQ * 1.25); SA[j] = A; j++;
-          }
-          // a faint ring: its own old ripple
-          for (let i = 0; i < 40; i++) { const an = i / 40 * TAU; SX[j] = cam.X(mx + Math.cos(an) * 46 * sz * 2.2); SY[j] = cam.Y(y + Math.sin(an) * 46 * sz * 2.2 * FLOOR_SQ); SA[j] = A * 0.35 * (mz > 0.4 ? 1 : 0); j++; }
-        }
-        PX.points(SX, SY, j, mix(WARM, [0.95, 0.9, 0.82], 0.35), { a: 0.3, A: SA, glow: 0.3 });
       }
       // ---------- the rush
       if (falling) {
@@ -537,29 +572,31 @@
       if (!falling || tau < 1.2) {
         const n = 320; scratch(n); const va = ease.out(prog(lt, 0.3, 2.5)) * (falling ? 1 - clamp(tau / 1.2) : 1);
         for (let i = 0; i < n; i++) {
-          const x = cam.X(XE + 20 + PX.rand(i, 81) * 700), y0 = YT + 40 + PX.rand(i, 82) * 1100;
-          const y = YT + 40 + ((y0 - YT - 40 - lt * (10 + 18 * PX.rand(i, 83))) % 1100 + 1100) % 1100;
+          const x = cam.X(XE + 30 + PX.rand(i, 81) * 700), y0 = PX.rand(i, 82) * 1100;
+          const y = YT + 40 + ((y0 - lt * (10 + 18 * PX.rand(i, 83))) % 1100 + 1100) % 1100;
           SX[i] = x + Math.sin(lt * 0.4 + i) * 6; SY[i] = cam.Y(y) - (falling ? F_.D : 0); SA[i] = (0.3 + 0.7 * PX.rand(i, 84)) * clamp((y - YT - 40) / 300) * (1 - clamp((y - YT - 600) / 500));
         }
         PX.points(SX, SY, n, LAMP, { a: 0.22 * va, A: SA, glow: 0.2 });
       }
       // ---------- 你
-      const yo = KIT.you(you.x, you.y, you.size, { t: lt, rot: you.rot, gray: you.gray, own: you.own, drift: you.drift, breathe: you.breathe, a: 1 });
+      const yo = KIT.you(you.x, you.y, you.size, { t: lt, rot: you.rot, gray: you.gray, own: you.own, drift: you.drift, breathe: you.breathe, a: 1.35 });
       if (you.stream > 0.02) {
         // its particles stream upward (the air of the fall)
         const n = yo.n, m = 3, len = 30 + 260 * you.stream; scratch(Math.ceil(n / 2) * m); let j = 0;
         for (let i = 0; i < n; i += 2) {
-          const r = PX.rand(i, 91); if (r > 0.25 + 0.6 * you.stream) continue;
+          if (PX.rand(i, 91) > 0.25 + 0.6 * you.stream) continue;
           for (let q = 1; q <= m; q++) { SX[j] = yo.X[i] + Math.sin(lt * 3 + i) * 2; SY[j] = yo.Y[i] - q / m * len * (0.3 + 0.7 * PX.rand(i, 92)); SA[j] = (1 - q / (m + 1)) * 0.8; j++; }
         }
         PX.points(SX, SY, j, [0.62, 0.66, 0.74], { a: 0.2 * you.stream + 0.04, A: SA, glow: 0.2 });
       }
       PX.flush({ exposure: 1.45, glow: 0.95 });
+      if (falling && !landShot) vignette(0.9 * ease.inOut(clamp((tau - 0.5) / 4)));
+      else if (landShot) vignette(0.9 * (1 - ease.out(prog(lt, S.stop, S.stop + 1.2))));
       // ---------- soft warm light pool on the floor (canvas, additive)
       if (lightK) {
         const pre = clamp((lt - S.stop) / 0.5);
-        softLight(cam.X(XL), cam.Y(YF + 10), Math.max(60, R) * cam.s * 0.9, '255,201,133', 0.13 * Math.max(pre, clamp(R / 300)), 0.22);
-        softLight(cam.X(XL), cam.Y(YF), 160 * cam.s, '255,201,133', 0.18 * pre * (1 - 0.5 * reveal), 0.35);
+        softLight(cam.X(XL), cam.Y(YF + 14), Math.max(60, R) * cam.s * 0.9, '255,201,133', 0.12 * Math.max(pre, clamp(R / 300)), 0.24);
+        softLight(cam.X(XL), cam.Y(YF), 170 * cam.s, '255,201,133', 0.16 * pre * (1 - 0.5 * reveal), 0.35);
       }
       // ---------- the voice
       cap(V.lines.cliff, lt, S.tC + 0.9, S.tS + 0.7);
@@ -575,7 +612,7 @@
         { t: S.tip, type: 'fall', dur: +(S.stop - S.tip).toFixed(3) },
         { t: S.contact, type: 'land' },
         { t: S.contact + 0.15, type: 'glow' },
-        { t: S.tF + 0.2, type: 'swell', dur: 5 },
+        { t: S.tF + 0.2, type: 'swell', dur: 5.2 },
         { t: S.tF + 4.1, type: 'resolve' },
       ];
     },
