@@ -254,7 +254,6 @@
   }
 
   // ---------------------------------------------------------------- card 2: the gym, a coach laughing (warm window light)
-  const SKY2 = [-175, -70, -175, -112, -150, -112, -150, -132, -122, -132, -122, -98, -98, -98, -98, -150, -70, -150, -70, -120, -44, -120, -44, -104, -10, -104, -10, -138, 22, -138, 22, -94, 50, -94, 50, -126, 86, -126, 86, -108, 112, -108, 112, -160, 140, -160, 140, -116, 175, -116, 175, -70];
   function card2(t) {
     let g = ctx.createLinearGradient(0, -HH, 0, HH); g.addColorStop(0, '#0d1220'); g.addColorStop(0.6, '#121420'); g.addColorStop(1, '#0a0d16');
     ctx.fillStyle = g; ctx.fillRect(-HW, -HH, 2 * HW, 2 * HH);
@@ -467,7 +466,7 @@
     draw(ctx, V, lt, api) {
       const tS = ['swipe1', 'swipe2', 'swipe3'].map(n => at(api, n)), tSt = at(api, 'stare'), tAbs = api.beat.start + lt;
       const on = ease.out(prog(lt, 0.35, 1.05));
-      const dim = 1 - 0.3 * sm(prog(lt, tSt + 1.4, tSt + 5.0));          // the screen auto-dims while you stare
+      const dim = 1 - 0.22 * sm(prog(lt, tSt + 1.4, tSt + 5.0));          // the screen auto-dims while you stare
       const light = on * dim;
       const s = tS.reduce((a, t0) => a + mom(lt - t0), 0);
       spill(light);
@@ -499,7 +498,7 @@
       V.lines.facts.forEach((f, i) => {
         const ti = tF + 0.3 + i * 1.25, k = prog(lt, ti, ti + 0.9);
         if (k <= 0) return;
-        const xa = 490, ya = 800 + i * 130, xb = 192 + i * 290, yb = 352;
+        const xa = 462, ya = 800 + i * 130, xb = 192 + i * 290, yb = 352;
         const x = lerp(xa, xb, up), y = lerp(ya, yb, up), sc = lerp(1, 0.62, up);
         ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc);
         KIT.type(f, 0, 0, { size: 56, family: F.serif, weight: 400, align: 'left', color: gray > 0 ? `rgb(${mix3(KIT.rgb(C.ink), KIT.rgb(C.gray), gray * 0.8).map(v => Math.round(v * 255)).join(',')})` : C.ink, k, alpha: lerp(1, 0.8, up), spacing: 4 });
@@ -507,10 +506,10 @@
         ctx.restore();
       });
       // the answer sheet fills itself, row by row, every bubble right
-      const sk = ease.out(prog(lt, tFi + 0.25, tFi + 1.1));
-      const fill = prog(lt, tFi + 1.0, tFi + 4.0);
-      KIT.sheet(SH.x, SH.y, SH.w, SH.h, { rows: 20, k: sk, fill, marks: prog(lt, tFi + 1.12, tFi + 4.12), gray, title: '答题卡 · 人生' });
-      KIT.pen('score', SH.x + SH.w - 92, SH.y + 50, 42, prog(lt, tFi + 4.2, tFi + 4.9), { text: '100', gray, seed: 11 });
+      const sk = ease.out(prog(lt, tFi + 0.75, tFi + 1.6));
+      const fill = prog(lt, tFi + 1.45, tFi + 4.25);
+      KIT.sheet(SH.x, SH.y, SH.w, SH.h, { rows: 20, k: sk, fill, marks: prog(lt, tFi + 1.57, tFi + 4.37), gray, title: '答题卡 · 人生' });
+      KIT.pen('score', SH.x + SH.w - 92, SH.y + 50, 42, prog(lt, tFi + 4.4, tFi + 5.0), { text: '100', gray, seed: 11 });
       ctx.restore();
       // the drain: a cold veil over the paper (never over the voice)
       if (gray > 0) { ctx.save(); ctx.globalAlpha *= 0.22 * gray; ctx.fillStyle = '#06080d'; ctx.fillRect(0, 0, W, H); ctx.restore(); }
@@ -520,8 +519,8 @@
     cues(V, api) {
       const t = n => at(api, n), out = [];
       for (let i = 0; i < 3; i++) out.push({ t: t('facts') + 0.3 + i * 1.25 + 0.75, type: 'pen' });
-      out.push({ t: t('fill') + 1.0, type: 'ticks', dur: 3.0, n: 20, p0: 0.45, p1: 0.75 });
-      out.push({ t: t('fill') + 4.2, type: 'pen' });
+      out.push({ t: t('fill') + 1.45, type: 'ticks', dur: 2.8, n: 20, p0: 0.45, p1: 0.75 });
+      out.push({ t: t('fill') + 4.4, type: 'pen' });
       out.push({ t: t('gray'), type: 'hush' });
       return out;
     },
@@ -556,7 +555,7 @@
     draw(ctx, V, lt, api) {
       const tO = at(api, 'off'), tQ = at(api, 'q'), tAbs = api.beat.start + lt;
       const tC = tO + 4 * KIT.beat.BEAT, u = lt - tC;                       // the CRT switch-off, on the beat
-      const base = 0.7;                                                     // the dimmed screen from b01's stare
+      const base = 0.78;                                                    // the dimmed screen from b01's stare
       const squash = u < 0 ? 1 : 1 - ease.in(clamp(u / 0.17));
       const lineK = clamp((u - 0.17) / 0.26);
       const frameA = u < 0 ? 1 : 1 - ease.out(clamp(u / 0.5));

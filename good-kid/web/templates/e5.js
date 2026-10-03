@@ -150,7 +150,7 @@
         const redK = lt > S.wordA - 0.2 && lt < S.wordB + 0.2 ? 1 : 0, hk = onA * (1 - prog(lt, S.stop - 0.05, S.stop + 0.3));
         const n = 1000; scratch(n);
         for (let i = 0; i < n; i++) { SX[i] = sx(PX0 + 5) + (PW - 10) * SC * (i + PX.rand(i, 5)) / n; SY[i] = head + (PX.rand(i, 6) - 0.5) * 1.6; SA[i] = 0.6 + 0.4 * PX.rand(i, 7); }
-        PX.points(SX, SY, n, mix(LAMP, RED, redK * 0.55), { a: 0.3 * hk, A: SA, glow: 0.6 });
+        PX.points(SX, SY, n, mix(LAMP, RED, redK * 0.55), { a: 0.22 * hk, A: SA, glow: 0.5 });
       }
       PX.flush({ exposure: 1.5, glow: 0.9 });
 
@@ -177,9 +177,10 @@
     age = lerp(age, 20, ease.inOut(prog(lt, t[1], t[1] + 1.5)));
     age = lerp(age, 25, ease.inOut(prog(lt, t[2], t[2] + 2.2)));
     const pk = ease.inOut(prog(lt, t[3] + 0.1, t[3] + 2.8));
+    const walk = age;
     age = lerp(age, 21.55, pk);
     const s = Math.pow(0.55, pk) * (1 + 0.01 * Math.max(0, lt - t[3] - 2.8));
-    return { t, pk, s, cx: wxAge(age), X: wx => W / 2 + (wx - wxAge(age)) * s, Y: wy => LINE_Y + (wy - LINE_Y) * s };
+    return { t, pk, s, walk, cx: wxAge(age), X: wx => W / 2 + (wx - wxAge(age)) * s, Y: wy => LINE_Y + (wy - LINE_Y) * s };
   }
   // partial dashed rectangle (perimeter progress k, starting top-centre, both ways like a pen opening a frame)
   function frameDraw(x, y, w, h, k, dash) {
@@ -254,7 +255,14 @@
         }
         ctx.restore();
       });
-      // a year marker under the camera: where you are on the line (faint, moves with the dolly)
+      // you on the line: a small grey bead that travels with the camera, then on past 25 to today
+      const ageNow = lerp(cam.walk, 25.35, ease.inOut(prog(lt, t[3] + 0.6, t[3] + 3.6)));
+      const bx = X(wxAge(ageNow)), ba = ease.out(prog(lt, 0.2, 1.2));
+      PX.begin(); fullFrame();
+      const D = PX.disc(260, 0, 0, 1); scratch(D.n);
+      for (let i = 0; i < D.n; i++) { SX[i] = bx + D.X[i] * 7; SY[i] = LINE_Y + D.Y[i] * 7; SA[i] = 0.4 + 0.8 * Math.exp(-(D.X[i] ** 2 + D.Y[i] ** 2) * 3); }
+      PX.points(SX, SY, D.n, [0.78, 0.8, 0.84], { a: 0.16 * ba, A: SA, glow: 0.5 });
+      PX.flush({ exposure: 1.4, glow: 0.9 });
       cap(V.lines.never, lt, t[3] + 1.0, null, { dur: 1.5 });
     },
     cues(V, api) {
@@ -269,7 +277,7 @@
   // ================================================================================================ b17 fall
   // world (identity camera = the opening shot): cliff top at YT, the edge at XE, the floor HC below
   const YT = 860, XE = 600, HC = 300, YF = YT + HC, YOU = 150, XL = XE + 140;   // XL: where 你 comes down
-  const FEET = 0.47;                                     // KIT.you: feet ≈ centre + 0.47 x size
+  const FEET = 0.41;                                     // KIT.you: feet ≈ centre + 0.47 x size
   // the silhouette: a plateau rising gently to the left, a worn lip, a jagged face stepping back to the floor
   const FACE = [[XE, YT], [XE + 7, YT + 12], [XE - 3, YT + 30], [XE - 15, YT + 56], [XE - 9, YT + 88], [XE - 24, YT + 124],
     [XE - 33, YT + 160], [XE - 27, YT + 198], [XE - 42, YT + 238], [XE - 47, YT + 272], [XE - 55, YF]];
@@ -292,9 +300,9 @@
   // the rock's surface drawing, given a face function fx(y) over [ya, yb] (shared by the true cliff and the dream tile)
   function rockFace(B, fx, ya, yb, r, seed) {
     // contour lines parallel to the face, broken more the deeper into the rock they go
-    [10, 22, 37, 56, 80, 110, 148, 196].forEach((d, k) => {
+    [9, 20, 34, 52, 78].forEach((d, k) => {
       const pts = []; for (let y = ya + 4 + d * 0.15; y <= yb; y += 6) pts.push([fx(y) - d - 5 * vnoise(y * 0.03, d + seed), y]);
-      const thr = 0.28 + k * 0.07;
+      const thr = 0.3 + k * 0.09;
       B.poly(pts, k < 2 ? 1 : 2, i => vnoise(i * 0.09 + k * 3.1, seed + k) > thr);
     });
     // ledges: short shelves going in from where the face steps back
@@ -437,7 +445,7 @@
       return st;
     }
     const tau = lt - S.tip, cT = camAt(S, S.tip);
-    st.size = YOU * cT.s;
+    st.size = YOU * cT.s * (1 - 0.2 * ease.inOut(clamp((tau - 1) / 6)));      // the dark grows around you
     // the step off: forward and a little up, then gravity; the camera catches 你 and falls with it
     const hop = ease.out(clamp(tau / 0.35)), follow = smooth(clamp(tau / 1.0));
     const x0 = cT.X(XE - 26 + 44 * hop), y0 = cT.Y(YT - FEET * YOU);
@@ -526,7 +534,7 @@
           const lit = clamp((R - dist) / 300); if (lit <= 0.01) continue;
           const pk = 0.65 + 0.55 * md, flash = Math.exp(-Math.max(0, R - dist) / 200);
           ctx.save(); ctx.translate(mx, y); ctx.scale(ms * pk, ms * pk * 0.46); ctx.rotate(mr);
-          ctx.globalAlpha = lit * mb * (0.16 + 0.22 * flash) * (0.6 + 0.4 * md);
+          ctx.globalAlpha = lit * mb * (0.11 + 0.16 * flash) * (0.55 + 0.45 * md);
           ctx.fillStyle = warmS(1); ctx.fillText('你', 0, 18);
           if (mz > 0.45) { ctx.strokeStyle = warmS(0.35); ctx.lineWidth = 1.2 / (ms * pk); ctx.beginPath(); ctx.ellipse(0, 0, 50, 50, 0, 0, TAU); ctx.stroke(); }
           ctx.restore();
@@ -542,7 +550,7 @@
         let j = 0;
         for (let i = 0; i < n; i++) {
           const x = x0 + (i + PX.rand(i, 61)) / n * span, dx = Math.abs(x - xc);
-          const lit = Math.max(pre * Math.exp(-dx / 70) * (lt < cT ? 1 : 0.6), clamp((R - dx) / 140) * (0.22 + 0.78 * Math.exp(-dx / 480)));
+          const lit = Math.max(pre * Math.exp(-dx / 240) * (lt < cT ? 0.55 : 0.35), clamp((R - dx) / 140) * (0.22 + 0.78 * Math.exp(-dx / 480)));
           if (lit <= 0.01) continue;
           SX[j] = cam.X(x); SY[j] = cam.Y(YF) + (PX.rand(i, 62) - 0.5) * 1.6; SA[j] = lit * (0.6 + 0.4 * PX.rand(i, 63)); j++;
         }
@@ -597,7 +605,7 @@
       if (lightK) {
         const pre = clamp((lt - S.stop) / 0.5);
         softLight(cam.X(XL), cam.Y(YF + 14), Math.max(60, R) * cam.s * 0.9, '255,201,133', 0.12 * Math.max(pre, clamp(R / 300)), 0.24);
-        softLight(cam.X(XL), cam.Y(YF), 170 * cam.s, '255,201,133', 0.16 * pre * (1 - 0.5 * reveal), 0.35);
+        softLight(cam.X(XL), cam.Y(YF), 260 * cam.s, '255,201,133', 0.12 * pre * (1 - 0.5 * reveal), 0.3);
       }
       // ---------- the voice
       cap(V.lines.cliff, lt, S.tC + 0.9, S.tS + 0.7);

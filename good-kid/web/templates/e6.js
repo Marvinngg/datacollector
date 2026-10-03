@@ -37,8 +37,8 @@
   const FOC = 1000;
   // cu: how far the far end of the page curls up to face the camera (0..1); fade: soften the page's near rows
   const CAM0 = { th: 0, D: 1000, Cy: 380, Yc: 960, cx: 0, cu: 0, fade: 0 };          // flat: the sheet at 1:1, x 100..980, y 180..1340
-  const CAM1 = { th: 56 * DEG, D: 950, Cy: 900, Yc: 480, cx: 90, cu: 0, fade: 1 };   // the floor (b18 'up' .. b20)
-  const CAM2 = { th: 52 * DEG, D: 1700, Cy: 1200, Yc: 840, cx: 0, cu: 0, fade: 0.4 }; // b21: risen and eased back, room above
+  const CAM1 = { th: 66 * DEG, D: 1000, Cy: 560, Yc: 760, cx: 90, cu: 0, fade: 0.6 };  // the floor, seen from ~40deg (b18 'up' .. b20)
+  const CAM2 = { th: 72 * DEG, D: 1300, Cy: 900, Yc: 760, cx: 150, cu: 0, fade: 0.3 }; // b21: risen and eased back, room above
   const camMix = (a, b, k) => { const o = {}; for (const key in a) o[key] = lerp(a[key], b[key], k); return cam(o); };
   const cam = o => (o.c = Math.cos(o.th), o.s = Math.sin(o.th), o);
   cam(CAM0); cam(CAM1); cam(CAM2);
@@ -85,9 +85,9 @@
     K.text(GIVER, PAD + SW - 26, PAD + 46, { ctx: head.getContext('2d'), size: 27, family: F.sans, weight: 400, color: 'rgba(236,231,220,0.62)', align: 'right', spacing: 3 });
     // the imprint 你 leaves on the paper (same glyph, same place as the particle body lying there)
     const yc = youCloud(), print = mk(cw, ch), pg = print.getContext('2d');
-    pg.font = `600 ${yc.fs}px ${F.serif}`; pg.textAlign = 'center'; pg.fillStyle = 'rgba(138,143,152,0.3)';
+    pg.font = `600 ${yc.fs}px ${F.serif}`; pg.textAlign = 'center'; pg.fillStyle = 'rgba(138,143,152,0.16)';
     const bl = PAD + PRINT_V - yc.baseYoff + 0.38 * yc.fs;
-    pg.fillText('你', PAD + PRINT_U, bl); pg.fillStyle = 'rgba(138,143,152,0.12)'; pg.fillText('你', PAD + PRINT_U + 1.5, bl + 1.5);
+    pg.fillText('你', PAD + PRINT_U, bl); pg.fillStyle = 'rgba(138,143,152,0.06)'; pg.fillText('你', PAD + PRINT_U + 1.5, bl + 1.5);
     return (LAY = { fk, sheet, warm, head, print });
   }
   /* map rows v0..v1 of a flat layer onto the screen through the camera, in thin strips (each strip is an affine map;
@@ -101,14 +101,16 @@
       P(cm, -PAD, v0, 0, q); P(cm, -PAD, v1, 0, r);
       g.drawImage(cv, 0, v0 + PAD - oy, cv.width, v1 - v0, q.x, q.y, cv.width * q.s, r.y - q.y);
     } else {
+      // strips meet on whole pixel rows (no seams, no double-covered rows)
       const n = Math.max(2, Math.ceil((v1 - v0) / 6)), m = {}, a0 = g.globalAlpha;
-      P(cm, -PAD, v0, 0, q);
+      let va = v0, ya = Math.round(P(cm, -PAD, v0, 0, q).y);
       for (let k = 1; k <= n; k++) {
-        const va = v0 + (v1 - v0) * (k - 1) / n, vb = v0 + (v1 - v0) * k / n;
-        P(cm, -PAD, vb, 0, r); P(cm, -PAD, (va + vb) / 2, 0, m);
+        const vb = v0 + (v1 - v0) * k / n, yb = Math.round(P(cm, -PAD, vb, 0, r).y);
+        if (yb <= ya && k < n) continue;
+        P(cm, -PAD, (va + vb) / 2, 0, m);
         const x = W / 2 + (-PAD - SW / 2 - cm.cx) * m.s, f = cm.fade > 0 ? fadeAt(cm, m.y + yOff) : 1;
-        if (f > 0.01) { g.globalAlpha = a0 * f; g.drawImage(cv, 0, va + PAD - oy, cv.width, vb - va, x, q.y, cv.width * m.s, r.y - q.y + 0.6); }
-        q.y = r.y;
+        if (f > 0.01 && yb > ya) { g.globalAlpha = a0 * f; g.drawImage(cv, 0, va + PAD - oy, cv.width, vb - va, x, ya, cv.width * m.s, yb - ya); }
+        va = vb; ya = yb;
       }
     }
     g.restore();
@@ -161,7 +163,7 @@
     const S = 420, c = PX.text('你', { size: S, family: F.serif, weight: 600, x: 0, y: S * 0.38, step: 2.0, seed: 17 }), n = c.n;
     let y0 = 1e9, y1 = -1e9; for (let i = 0; i < n; i++) { if (c.Y[i] < y0) y0 = c.Y[i]; if (c.Y[i] > y1) y1 = c.Y[i]; }
     const sc = PSIZE / S, GX = new Float32Array(n), UP = new Float32Array(n), hgt = (y1 - y0) * sc;
-    for (let i = 0; i < n; i++) { GX[i] = c.X[i] * sc; UP[i] = (y1 - c.Y[i]) * sc; }
+    for (let i = 0; i < n; i++) { GX[i] = (c.X[i] + (R(i, 26) - 0.5) * 1.6) * sc; UP[i] = (y1 - c.Y[i] + (R(i, 27) - 0.5) * 1.6) * sc; }
     // four small lights to kindle, each on a stroke: pick the particle nearest to a target spot
     const tgt = [[-0.30, 0.70], [0.16, 0.80], [0.04, 0.38], [0.30, 0.22]], EM = [];
     for (const [tx, ty] of tgt) {
@@ -228,7 +230,7 @@
     // sprite pixel (px, py) -> cloud (X = px - ox, Y = py - oy) -> (gx = X sc, up = (y1 - Y) sc)
     const y1 = Y.baseYoff / sc;
     const ctx = K.ctx; ctx.save();
-    ctx.globalAlpha *= 0.9 * st.occ;
+    ctx.globalAlpha *= 0.8 * st.occ;
     ctx.transform(axx, axy, -ayx, -ayy, f.x - o.ox * axx + (y1 + o.oy) * ayx, f.y - o.ox * axy + (y1 + o.oy) * ayy);
     ctx.drawImage(o.c, 0, 0); ctx.restore();
   }
@@ -318,7 +320,7 @@
       PX.begin();
       drawKid(cm, { k: ss(S.kid + 0.6, S.kid + 3.2, ct), phi: 104 * DEG, t: lt });
       drawYou(cm, { u: st.u, v: st.v, phi: st.phi, occ: st.occ, yaw: st.yaw, lift: st.lift, flutter: st.fl, t: lt,
-        gray: 1, a: lerp(0.62, 0.95, st.kRise), shim: 1 + st.fl });
+        gray: 1, a: lerp(1.5, 2.2, st.kRise), shim: 1 + st.fl });
       PX.flush({ exposure: 1.4 });
       cap(V.lines.not, ct, S.not, S.up + 0.2);
       cap(['而是从那张打分表上站起来，', '看一眼它。'], ct, S.up + 0.4, S.given);

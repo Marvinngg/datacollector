@@ -18,7 +18,7 @@
   const smooth = k => k * k * (3 - 2 * k);
   const at = (api, n) => KIT.at(api, n);
   const R = (i, k) => PX.rand(i, k);
-  const FREE = KIT.L.free, WARM = KIT.L.warm, INK = [0.93, 0.9, 0.84];
+  const FREE = KIT.L.free, WARM = KIT.L.warm, INK = [0.93, 0.9, 0.84], GOLDW = [1, 0.86, 0.64];
   const CXF = new Float32Array([2, W - 3]), CYF = new Float32Array([2, H - 3]);
   const fullFrame = () => PX.points(CXF, CYF, 2, [0, 0, 0], { a: 0.001, glow: 1 });
   /* motion blur: each particle is splatted as a short tapered streak from where it was dt ago to where it is now,
@@ -210,7 +210,7 @@
       const sx = BIKE.x + m.LX[j] * BIKE.s, sy = BIKE.y + m.LY[j] * BIKE.s;
       m.SX[j] = ZOOM.cx + (sx - ZOOM.cx) * Z; m.SY[j] = ZOOM.cy + (sy - ZOOM.cy) * Z;   // screen place at the end of the push-in
       const pi = m.PC[j], rp = R(pi, 6), rq = R(j, 7);
-      m.DX[j] = -(18 + 120 * Math.pow(rp, 1.6)) * (0.75 + 0.5 * rq) - 16 * R(j, 8);
+      m.DX[j] = -(24 + 170 * Math.pow(rp, 1.6)) * (0.75 + 0.5 * rq) - 16 * R(j, 8);
       m.DY[j] = -(4 + 46 * R(pi, 9)) * (0.6 + 0.8 * R(j, 10)) + (R(j, 11) - 0.5) * 54;
       m.TD[j] = 2.2 + 1.3 * R(j, 12);                                 // seconds to come to rest
       m.HX[j] = m.SX[j] + m.DX[j]; m.HY[j] = m.SY[j] + m.DY[j];
@@ -226,7 +226,7 @@
   const hangA = (j, T) => (0.45 + 2.2 * Math.pow(R(j, 27), 4)) * twinkle(j, T);
 
   // ================================================================ the wind (warm motes drifting right -> left)
-  const NW = 460, DIE = 0.6;                                        // DIE: share of the bike's motes that burn out
+  const NW = 340, DIE = 0.6, WIND_CALM = 0.5;                                        // DIE: share of the bike's motes that burn out
   function windPos(i, T, o) {
     const sp = 110 + 230 * R(i, 31) * R(i, 38), span = W + 500;
     const x = (((R(i, 32) * span - sp * T) % span) + span) % span - 250;
@@ -247,7 +247,7 @@
     const b = wbuf(), o = [0, 0], T1 = [], T2 = [];
     for (let i = 0; i < NW; i++) {
       b.A[i] = windPos(i, T, o); b.X[i] = o[0]; b.Y[i] = o[1];
-      const tl = 0.1 + 0.16 * R(i, 39);
+      const tl = 0.05 + 0.12 * R(i, 39) * R(i, 40);
       windPos(i, T - tl * 0.5, o); T1.push(o[0], o[1]); windPos(i, T - tl, o); T2.push(o[0], o[1]);
     }
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = C.free; ctx.lineWidth = 1.1; ctx.lineCap = 'round';
@@ -261,7 +261,7 @@
       ctx.stroke();
     }
     ctx.restore();
-    PX.points(b.X, b.Y, NW, FREE, { a: a * 0.32, A: b.A, glow: 0.4 });
+    PX.points(b.X, b.Y, NW, FREE, { a: a * 0.5, A: b.A, glow: 0.4 });
   }
 
   function scenery(lt, a) {
@@ -349,7 +349,7 @@
       const hv = smooth(u);
       X[j] = m.SX[j] + m.DX[j] * e + hovX(j, T - s) * hv;
       Y[j] = m.SY[j] + m.DY[j] * e - lift + hovY(j, T - s) * hv;
-      const flash = u > 0 ? Math.exp(-u * 4) * 0.35 : 0, live = R(j, 26) < DIE ? 1 - smooth(u) : 1;
+      const flash = u > 0 ? Math.exp(-u * 4) * 0.2 : 0, live = R(j, 26) < DIE ? 1 - smooth(u) : 1;
       A[j] = f * live * (lerp(1, hangA(j, T - s), smooth(clamp(u * 1.6))) + flash);
     }
   }
@@ -369,7 +369,7 @@
       else if (lt < r1 + 0.1) bikeStrokes(m, lt, z, 'loose', tRel);
       // light: wind + loosened motes
       PX.begin();
-      drawWind(T, ease.inOut(prog(lt, 0, 1.4)));
+      drawWind(T, ease.inOut(prog(lt, 0, 1.4)) * lerp(1, WIND_CALM, smooth(prog(lt, tWhat - 1, tWhat + 1.5))));
       if (lt > r0 - 0.4) {
         const [b, b1] = moteBuf(m.n), n = m.n;
         motesAt(m, lt, T, tRel, 0, b); motesAt(m, lt, T, tRel, 0.045, b1);
@@ -378,7 +378,7 @@
           const u = clamp((lt - tRel(m.pieces[m.PC[j]].ord)) / 1.2), w = smooth(u) * (0.75 + 0.25 * R(j, 24));
           b.C[j * 3] = lerp(INK[0], FREE[0], w); b.C[j * 3 + 1] = lerp(INK[1], lerp(FREE[1], WARM[1], R(j, 25) * 0.6), w); b.C[j * 3 + 2] = lerp(INK[2], FREE[2], w);
         }
-        streaks(n, b.X, b.Y, b1.X, b1.Y, b.A, b.C, { a: 0.55, glow: 0.25 });
+        streaks(n, b.X, b.Y, b1.X, b1.Y, b.A, b.C, { a: 0.55, glow: 0.16 });
       }
       PX.flush({ exposure: 1.6, glow: 0.9 });
       // the voice
@@ -425,7 +425,7 @@
     const wo = sortIdx(N, j => m.WX[j] + (R(j, 45) - 0.5) * 50);
     for (let k = 0; k < N; k++) { const j = wo[k]; m.PXa[j] = pc.X[pi[k]]; m.PYa[j] = pc.Y[pi[k]]; }
     // per particle colour (flame: golden core, orange tips) and spark membership
-    m.CC = new Float32Array(N * 3); m.CB = new Float32Array(N * 3); m.EG = new Float32Array(N);
+    m.CC = new Float32Array(N * 3); m.CB = new Float32Array(N * 3); m.EG = new Float32Array(N); m.U = new Float32Array(N);
     // the bike's motes arrive in the colour they had in b10 (see honest) and take the flame's colour as they gather
     m.C10 = new Float32Array(NA * 3);
     for (let j = 0; j < NA; j++) {
@@ -509,6 +509,7 @@
       const ord = clamp((WORD.bot - m.WY[j]) / (WORD.bot - WORD.top) * 0.35 + R(j, 64) * 0.65);
       const t1 = tF + 0.1 + ord * 1.1, t2 = t1 + 1.25 + 0.45 * R(j, 65);
       const u = clamp((t - t1) / (t2 - t1));
+      m.U[j] = u;
       if (u > 0) {
         const e = ease.inOut(u), v = 1 - e;
         // a cubic path that rises from below, bowing out to one side
@@ -525,9 +526,10 @@
       // 3. hold (breathing), then fly on: upward and outward, the left wing left, the right wing right
       if (u >= 1) {
         x += Math.sin(t * 1.3 + R(j, 68) * 30) * 1.2; y += Math.cos(t * 1.1 + R(j, 69) * 30) * 1.2;
-        const t3 = tF + 3.55 + 0.55 * Math.abs(px - 540) / 420 + 0.5 * R(j, 70), ue = clamp((t - t3) / (1.8 + 0.6 * R(j, 71)));
+        // a flock lifting off: each leaves at its own moment, so the phrase thins like embers rising
+        const t3 = tF + 3.7 + 1.1 * Math.pow(R(j, 70), 0.8) + 0.15 * Math.abs(px - 540) / 420, ue = clamp((t - t3) / (1.9 + 0.7 * R(j, 71)));
         if (ue > 0) {
-          const th = -Math.PI / 2 + (px - 540) / 540 * 1.0 + (R(j, 72) - 0.5) * 0.7, dist = 1500 * Math.pow(ue, 1.9);
+          const th = -Math.PI / 2 + (px - 540) / 540 * 0.9 + (R(j, 72) - 0.5) * 0.8, dist = 1600 * Math.pow(ue, 1.8);
           const curl = Math.sin(ue * 3 + R(j, 73) * 6) * 50 * ue;
           x += Math.cos(th) * dist - Math.sin(th) * curl; y += Math.sin(th) * dist + Math.cos(th) * curl;
           a *= 1 - 0.5 * ue;
@@ -548,18 +550,21 @@
       let flare = 0; for (const s of strikeT) if (lt > s + 0.35) flare += 0.35 * Math.exp(-(lt - s - 0.35) * 1.6);
       // ---- particles
       PX.begin();
-      drawWind(T, 1 - smooth(prog(lt, 0.3, 2.4)));
+      drawWind(T, WIND_CALM * (1 - smooth(prog(lt, 0.3, 2.4))));
       const B1 = m.B1, sy0 = stampY(lt, tS), sy1 = stampY(lt - 0.045, tS);
       for (let j = 0; j < N; j++) {
-        B.A[j] = pos11(m, j, lt, T, flare, sy0, tF, o); B.X[j] = o[0]; B.Y[j] = o[1];
         pos11(m, j, lt - 0.045, T - 0.045, flare, sy1, tF, o); B1.X[j] = o[0]; B1.Y[j] = o[1];
+        B.A[j] = pos11(m, j, lt, T, flare, sy0, tF, o); B.X[j] = o[0]; B.Y[j] = o[1];
       }
       let CCx = m.CC;
       if (lt < 5) {
         CCx = m.CB; CCx.set(m.CC);
         for (let j = 0; j < m.NA; j++) { const k = smooth(m.EG[j]); for (let c = 0; c < 3; c++) CCx[j * 3 + c] = lerp(m.C10[j * 3 + c], m.CC[j * 3 + c], k); }
+      } else if (lt > tF) {                                   // in flight they burn brighter, toward gold-white
+        CCx = m.CB;
+        for (let j = 0; j < N; j++) { const k = Math.sin(Math.PI * m.U[j]) * 0.8 + 0.2 * smooth(m.U[j]); for (let c = 0; c < 3; c++) CCx[j * 3 + c] = lerp(m.CC[j * 3 + c], GOLDW[c], k); }
       }
-      streaks(N, B.X, B.Y, B1.X, B1.Y, B.A, CCx, { a: 0.4, glow: lerp(0.25, 0.38, smooth(prog(lt, 0, 3))) });
+      streaks(N, B.X, B.Y, B1.X, B1.Y, B.A, CCx, { a: 0.4, glow: lerp(0.16, 0.38, smooth(prog(lt, 0, 3))) });
       // the wind fades out as it is gathered (its motes are part of the material above)
       PX.flush({ exposure: 1.6, glow: 0.9 });
 
@@ -572,8 +577,10 @@
         KIT.type(str, W / 2, iy[i] - outI * 30, { size: 42, family: F.serif, weight: 400, color: C.ink, k, alpha: 0.82 * al, mode: 'rise' });
         if (sk > 0) {
           const w = K.measure(str, { size: 42, family: F.serif, spacing: 42 * 0.04 }) + 36;
-          ctx.save(); ctx.globalAlpha *= (1 - outI) * 0.85;
-          KIT.pen('strike', W / 2 - w / 2 + w * sk / 2, iy[i] - 14 - outI * 30, w * sk, 1, { color: C.ink, width: 1.8, seed: 11 + i });
+          // one fine, unhurried ink line (not the scorer's red), very slightly rising
+          const x0 = W / 2 - w / 2, yy = iy[i] - 14 - outI * 30, x1 = x0 + w * sk;
+          ctx.save(); ctx.globalAlpha *= (1 - outI) * 0.8; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.7; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(x0, yy + 2); ctx.quadraticCurveTo((x0 + x1) / 2, yy + 1 - 2 * sk, x1, yy - 3 * sk); ctx.stroke();
           ctx.restore();
         }
       });

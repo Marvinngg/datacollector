@@ -54,7 +54,8 @@
         "show": "stare",
         "beats": 6
        }
-      ]
+      ],
+      "fadeOut": 0
      }
     },
     {
