@@ -156,6 +156,7 @@
   // ================================================================ 你 as a 3D particle body
   // 你 lies printed a little left of centre; it stands up beside its imprint (glyph size in world units = px when flat)
   const PSIZE = 420, PRINT_U = 370, PRINT_V = 770, STAND_U = 610, STAND_V = 830;
+  const NEM = 6, EM0 = new Array(NEM).fill(0);
   let YOU = null;
   function youCloud() {
     const fk = document.fonts.check(`600 40px ${F.serif}`, '你');
@@ -165,14 +166,14 @@
     const sc = PSIZE / S, GX = new Float32Array(n), UP = new Float32Array(n), hgt = (y1 - y0) * sc;
     for (let i = 0; i < n; i++) { GX[i] = (c.X[i] + (R(i, 26) - 0.5) * 1.6) * sc; UP[i] = (y1 - c.Y[i] + (R(i, 27) - 0.5) * 1.6) * sc; }
     // four small lights to kindle, each on a stroke: pick the particle nearest to a target spot
-    const tgt = [[-0.30, 0.70], [0.16, 0.80], [0.04, 0.38], [0.30, 0.22]], EM = [];
+    const tgt = [[-0.30, 0.70], [0.16, 0.80], [0.04, 0.38], [0.30, 0.22], [-0.33, 0.28], [0.12, 0.58]], EM = [];   // six small lights
     for (const [tx, ty] of tgt) {
       let best = 1e9, bi = 0; const X = tx * PSIZE, Y = ty * hgt;
       for (let i = 0; i < n; i++) { const d = (GX[i] - X) ** 2 + (UP[i] - Y) ** 2; if (d < best) { best = d; bi = i; } }
       EM.push([GX[bi], UP[bi]]);
     }
-    const EW = new Float32Array(n * 4);
-    for (let i = 0; i < n; i++) for (let e = 0; e < 4; e++) { const d2 = (GX[i] - EM[e][0]) ** 2 + (UP[i] - EM[e][1]) ** 2; EW[i * 4 + e] = Math.exp(-d2 / (2 * 26 * 26)); }
+    const EW = new Float32Array(n * NEM);
+    for (let i = 0; i < n; i++) for (let e = 0; e < NEM; e++) { const d2 = (GX[i] - EM[e][0]) ** 2 + (UP[i] - EM[e][1]) ** 2; EW[i * NEM + e] = Math.exp(-d2 / (2 * 24 * 24)); }
     return (YOU = { fk, n, GX, UP, hgt, EM, EW, fs: S * sc, baseYoff: y1 * sc, X: new Float32Array(n), Y: new Float32Array(n), A: new Float32Array(n), Cc: new Float32Array(n * 3) });
   }
 
@@ -182,12 +183,12 @@
   function drawYou(cm, st) {
     const Y = youCloud(), n = Y.n, OX = Y.X, OY = Y.Y, OA = Y.A, CC = Y.Cc;
     const t = st.t || 0, phi = st.phi, cyaw = Math.cos(st.yaw || 0), syaw = Math.sin(st.yaw || 0), fl = st.flutter || 0;
-    const lit = st.lit || 0, own = st.own || 0, gray = st.gray || 0, a = st.a == null ? 1 : st.a, em = st.em || [0, 0, 0, 0];
+    const lit = st.lit || 0, own = st.own || 0, gray = st.gray || 0, a = st.a == null ? 1 : st.a, em = st.em || EM0;
     const br = 0.4 * (st.shim == null ? 1 : st.shim);
     // KIT.you's colour formula
     const base = [0.62, 0.64, 0.68], lum = 0.3 * base[0] + 0.59 * base[1] + 0.11 * base[2];
     const col = [0, 1, 2].map(k => lerp(base[k] * 0.55 * (1 - 0.7 * own) + LC.lamp[k] * lit * 0.9 + LC.warm[k] * own * 1.25, lum * (0.55 + lit * 0.9 + own), gray));
-    const wr = LC.warm, emOn = em[0] + em[1] + em[2] + em[3] > 0.001;
+    const wr = LC.warm, emOn = em.some(e => e > 0.001);
     const q = {}; let s0 = 1;
     if (st.occ > 0) occlude(cm, st, Y, cyaw, syaw);
     for (let i = 0; i < n; i++) {
@@ -200,7 +201,7 @@
       OY[i] = q.y + Math.cos(t * (0.9 + r2) + r1 * 30) * br * 1.6;
       let A = 1, cr = col[0], cg = col[1], cb = col[2];
       if (emOn) {
-        const w = Y.EW[i * 4] * em[0] + Y.EW[i * 4 + 1] * em[1] + Y.EW[i * 4 + 2] * em[2] + Y.EW[i * 4 + 3] * em[3];
+        let w = 0; for (let e = 0, b = i * NEM; e < NEM; e++) w += Y.EW[b + e] * em[e];
         if (w > 0.002) { const k = Math.min(1.6, w); A += k * 2.4; cr += wr[0] * k * 0.9; cg += wr[1] * k * 0.9; cb += wr[2] * k * 0.9; }
       }
       OA[i] = A; CC[i * 3] = cr; CC[i * 3 + 1] = cg; CC[i * 3 + 2] = cb;
@@ -377,12 +378,14 @@
 
   // ================================================================ b19 tries + b20 lamp (one chain)
   const TRY = [
-    { x: 112, y: 400, align: 'left', rot: -0.03, kind: 'wobble' },
-    { x: 948, y: 512, align: 'right', rot: 0.02, kind: 'strike' },
-    { x: 124, y: 622, align: 'left', rot: -0.012, kind: 'slip' },
-    { x: 940, y: 734, align: 'right', rot: 0.026, kind: 'fall' },
+    { x: 150, y: 378, align: 'left', rot: -0.02, kind: 'plain' },     // 周末摆一个小摊
+    { x: 952, y: 454, align: 'right', rot: 0.016, kind: 'fall' },     // 用一笔亏得起的钱，试试炒股 — the one that goes badly
+    { x: 112, y: 530, align: 'left', rot: -0.03, kind: 'wobble' },    // 报一个你完全不会的课 — 不会 wobbles
+    { x: 948, y: 606, align: 'right', rot: 0.02, kind: 'strike' },    // 一个人去一座陌生的城市 — 成 struck, 城市
+    { x: 124, y: 682, align: 'left', rot: -0.012, kind: 'slip' },     // 在会上说一句没准备好的话 — the line slips
+    { x: 940, y: 778, align: 'right', rot: 0.024, kind: 'uneven' },   // 学一样你注定学不好的东西 — uneven hand
   ];
-  const HS = 46, CPS = 0.15;                       // hand size, seconds per character
+  const HS = 44, CPS = 0.15;                       // hand size, seconds per character
   let LAYOUT = null, HEAD = null;
   function layout(V) {
     if (LAYOUT) return LAYOUT;
@@ -397,14 +400,14 @@
     {
       let chars = [...str], strike = -1;
       if (L.kind === 'strike') { const j = chars.indexOf('城'); if (j > 0) { chars = [...chars.slice(0, j), '成', ...chars.slice(j)]; strike = j; } }
-      const sizes = chars.map((_, i) => HSZ * (1 + (R(i + li * 31, 3) - 0.5) * (L.kind === 'fall' ? 0.2 : 0.08)));
+      const sizes = chars.map((_, i) => HSZ * (1 + (R(i + li * 31, 3) - 0.5) * (L.kind === 'uneven' ? 0.2 : 0.08)));
       const ws = chars.map((ch, i) => K.measure(ch, { size: sizes[i], family: F.hand }) + 2);
       const tw = ws.reduce((a, b) => a + b, 0);
       let x = L.align === 'left' ? L.x : L.x - tw;
       const cs = chars.map((ch, i) => {
         const n = chars.length, f = i / (n - 1);
         let dy = (R(i + li * 31, 4) - 0.5) * 6, rot = (R(i + li * 31, 5) - 0.5) * 0.08;
-        if (L.kind === 'slip') { dy += f * f * 44; rot += f * f * 0.16; }
+        if (L.kind === 'slip') { dy += f * f * 30; rot += f * f * 0.13; }
         const c = { ch, x, y: L.y + dy + (x - L.x) * L.rot, rot: rot + L.rot, size: sizes[i], w: ws[i], i };
         x += ws[i]; return c;
       });
@@ -513,7 +516,7 @@
     });
   }
   function triesState(ct, S, V) {
-    const Ls = layout(V), tk = ['t1', 't2', 't3', 't4'].map(n => S[n]);
+    const Ls = layout(V), tk = ['t1', 't2', 't3', 't4', 't5', 't6'].map(n => S[n]);
     const t0 = tk.map(t => t + 0.25), done = Ls.map((L, i) => t0[i] + L.dur), kin = done.map(d => d + 0.8);
     return { Ls, t0, done, kin };
   }
@@ -522,7 +525,7 @@
     const yc = youCloud();
     // the lights: each try kindles one; the lamp's light fills the rest
     const em = tr.kin.map(k => { const e = ss(k, k + 0.5, ct); return e * (1 + 0.9 * Math.exp(-Math.max(0, ct - k) * 2.2)) * (0.92 + 0.08 * Math.sin(ct * 1.7 + k)); });
-    const ownTry = 0.11 * em.reduce((a, b) => a + Math.min(1, b), 0);
+    const ownTry = 0.08 * em.reduce((a, b) => a + Math.min(1, b), 0);
     const kOwn = ss(take + 5.9, take + 8.0, ct);
     const own = lerp(ownTry, 1, kOwn), gray = Math.max(0, 1 - own * 1.9);
     const emK = em.map(e => e * (1 - 0.7 * kOwn));
