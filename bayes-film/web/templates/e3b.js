@@ -279,7 +279,7 @@
         const jl = jolt(t, S.imp1, CARD_XY[0].x, CARD_XY[0].y, x, y, 1500, 22); x += jl.x; y += jl.y;
         const tp = S.sv1 + D1[i] / v1, lk = ease.out(prog(t, tp, tp + 0.3)), fl = t > tp ? Math.exp(-(t - tp) * 5) : 0;
         const base = gold ? 1.0 : 0.78;
-        const a = lerp(base, gold ? 1.55 : 1.3, lk) + fl * 2.2 + jl.b * 0.9;
+        const a = lerp(base, gold ? 2.1 : 1.5, lk) + fl * 2.2 + jl.b * 0.9;
         mixc(tc, gold ? GOLD : STEEL, lc, lk); if (fl > 0) mixc(tc, tc, [1, 1, 1], fl * 0.6);
         push(big, x + shx, y + shy, a * fadeOpen(t, S), (9 * cs / BR) * (1 + 0.18 * lk + fl * 0.25), tc);
         continue;
@@ -336,7 +336,7 @@
     }
     KIT.beads(dust.X, dust.Y, dust.n, { C: dust.C, A: dust.A, R: dust.R, r: BR, k: 14, a: 1.0, glow: 0.15 });
     KIT.beads(big.X, big.Y, big.n, { C: big.C, A: big.A, R: big.R, r: BR, k: 40, a: 1.0, glow: 0.3 });
-    KIT.beads(pile.X, pile.Y, pile.n, { C: pile.C, A: pile.A, R: pile.R, r: BR, k: 48, a: 1.0, glow: 0.4 });
+    KIT.beads(pile.X, pile.Y, pile.n, { C: pile.C, A: pile.A, R: pile.R, r: BR, k: 64, a: 1.0, glow: 0.4 });
     PX.points(trails.X, trails.Y, trails.n, null, { a: 1, A: trails.A, C: trails.C, glow: 0.6 });
 
     // ---------------------------------------------------------------- waves, rings, dust puffs
@@ -455,14 +455,6 @@
     const odo = t < S.roll2 ? lerp(10, 36, k1) : lerp(36, 27, k2);
     return { p: o / (1 + o), odo, k1, k2 };
   }
-  // gold team: figure j's presence (1 → 5 figures at ×5; 5 → 3⅓ at ×⅔)
-  function goldPresence(t, S, j) {
-    if (j === 0) return 1;
-    const born = ease.inOut(prog(t, S.x5 + 0.15 + 0.12 * j, S.x5 + 0.95 + 0.12 * j));
-    const keep = j <= 2 ? 1 : j === 3 ? 1 / 3 : 0;
-    const lose = ease.inOut(prog(t, S.x23 + 0.25, S.x23 + 1.2));
-    return born * lerp(1, keep, lose);
-  }
   function rope(t, S, A, pp, shx, shy) {
     const kx = ROPE.gIn + (1 - pp.p) * (ROPE.sIn - ROPE.gIn);
     // tension wave while the knot travels
@@ -481,7 +473,7 @@
       const edge = Math.min(1, (x - ROPE.x0) / 40, (ROPE.x1 - x) / 40);
       b.A[q] = (0.55 + 0.45 * Math.cos(x / 6.5 + strand * Math.PI + t * 0.6)) * edge;
     }
-    PX.points(b.X, b.Y, n, ROPE ? ROPEC : null, { a: 0.42 * A, A: b.A, glow: 0.35 });
+    PX.points(b.X, b.Y, n, ROPEC, { a: 0.42 * A, A: b.A, glow: 0.35 });
     // centre mark (the even line, 50 %)
     { const m = 160, c = pbuf('mark', m); for (let q = 0; q < m; q++) { c.X[q] = W / 2 + (PX.rand(q, 111) - 0.5) * 2 + shx; c.Y[q] = ROPE.y + 16 + (q / m) * 22 + shy; c.A[q] = 1; } PX.points(c.X, c.Y, m, [0.8, 0.8, 0.85], { a: 0.35 * A, A: c.A, glow: 0.2 }); }
     // knot: a bright bead with a short ribbon
@@ -490,31 +482,31 @@
         if (q < 360) { const rr = 11 * Math.sqrt(PX.rand(q, 121)), an = PX.rand(q, 122) * TAU; c.X[q] = kx + Math.cos(an) * rr + shx; c.Y[q] = ky + Math.sin(an) * rr + shy; c.A[q] = 1.3 - rr / 14; }
         else { const v = (q - 360) / 160; c.X[q] = kx + (PX.rand(q, 123) - 0.5) * 5 + sw * v + shx; c.Y[q] = ky + 12 + v * 34 + shy; c.A[q] = 0.9 * (1 - v * 0.6); }
       }
-      PX.points(c.X, c.Y, m, KNOT, { a: 1.0 * A, A: c.A, glow: 0.9 }); }
+      PX.points(c.X, c.Y, m, KNOT, { a: 0.55 * A, A: c.A, glow: 0.45 }); }
     // teams of 人 (particle clouds), leaning back against the pull
     const fig = FIG(), fb = ROPE.y + ROPE.fig * 0.43;                       // figure baseline (rope at hand height)
     const bob = (j, side) => Math.sin(t * Math.PI * 2 / (B * 2) + j * 0.9 + side) * 1.6;
     // a figure that is losing its particles lets them fall; one that is being born gathers them from the ×5
     const drawFig = (fx, j, side, presence, col, born, aMul) => {
-      const nn = fig.n, f = pbuf('fig' + side + j, nn), lean = side < 0 ? 0.24 : 0.2;
+      const nn = fig.n, f = pbuf('fig' + side + j, nn), lean = 0.13, back = j % 2, sc = back ? 0.84 : 1, yo = back ? -12 : 0;
       const shown = presence * nn;
       let k = 0;
       for (let q = 0; q < nn; q++) {
-        let x = fig.X[q], y = fig.Y[q];
+        let x = fig.X[q] * sc, y = fig.Y[q] * sc;
         x += -side * lean * (-y);                                           // lean back (top goes outward)
-        let X = fx + x, Y = fb + y + bob(j, side), a = 1;
+        let X = fx + x, Y = fb + y + yo + bob(j, side), a = back ? 0.55 : 1;
         if (q >= shown) {
           // leaving: only meaningful after ×⅔
           const tl = (S.x23 + 0.25) + PX.rand(q, 131) * 0.5, u = t - tl;
           if (u <= 0 || presence >= 1) continue;
           if (born < 1) continue;
-          X += (PX.rand(q, 132) - 0.5) * 60 * u; Y += gravY(u, 500) * 0.6 + 20 * u; a = Math.max(0, 1 - u * 1.1);
+          X += (PX.rand(q, 132) - 0.5) * 60 * u; Y += gravY(u, 500) * 0.6 + 20 * u; a *= Math.max(0, 1 - u * 1.1);
           if (a <= 0) continue;
         } else if (born < 1) {
           // gathering: particles fly up from the ×5 into this figure
           const d = PX.rand(q, 133) * 0.4, kk = ease.inOut(clamp((born - d) / 0.6));
           const sx = W / 2 + (PX.rand(q, 134) - 0.5) * 300, sy = BIG_Y - 80 + (PX.rand(q, 135) - 0.5) * 120;
-          X = lerp(sx, X, kk) + Math.sin(kk * Math.PI) * (PX.rand(q, 136) - 0.5) * 120; Y = lerp(sy, Y, kk); a = kk > 0 ? 0.4 + 0.6 * kk : 0;
+          X = lerp(sx, X, kk) + Math.sin(kk * Math.PI) * (PX.rand(q, 136) - 0.5) * 120; Y = lerp(sy, Y, kk); a *= kk > 0 ? 0.4 + 0.6 * kk : 0;
           if (a <= 0) continue;
         }
         f.X[k] = X + shx; f.Y[k] = Y + shy; f.A[k] = a; k++;
@@ -526,9 +518,9 @@
       if (born <= 0) continue;
       const keep = j <= 2 ? 1 : j === 3 ? 1 / 3 : 0, lose = ease.inOut(prog(t, S.x23 + 0.25, S.x23 + 0.6));
       const presence = born < 1 ? 1 : lerp(1, keep, lose);
-      drawFig(ROPE.gIn - 16 - j * 42, j, -1, presence, GOLD, born, 1);
+      drawFig(ROPE.gIn - 14 - j * 25, j, -1, presence, GOLD, born, 1);
     }
-    for (let j = 0; j < 9; j++) drawFig(ROPE.sIn + 16 + j * 28, j, 1, 1, LSTEEL, 1, 0.9 - j * 0.03);
+    for (let j = 0; j < 9; j++) drawFig(ROPE.sIn + 14 + j * 25, j, 1, 1, LSTEEL, 1, 0.9);
   }
 
   // ---------------------------------------------------------------- HUD: the odds and the odometer (top, then at the rope)
@@ -587,7 +579,7 @@
       const sc = (1 - k) * (PX.rand(q, 141) - 0.5) * 80;
       b.X[q] = cx + ox * s + sc + Math.sin(t * 3 + q) * 0.6 + shx; b.Y[q] = cy + oy * s + sc * 0.6 - out * 50 + shy; b.A[q] = 1;
     }
-    PX.points(b.X, b.Y, n, mixc(tc2, col, [1, 1, 1], fl * 0.7), { a: (0.36 + 0.9 * fl) * clamp(u * 6) * (1 - out), A: b.A, glow: 0.6 });
+    PX.points(b.X, b.Y, n, mixc(tc2, col, [1, 1, 1], fl * 0.7), { a: (0.8 + 1.2 * fl) * clamp(u * 6) * (1 - out), A: b.A, glow: 0.6 });
   }
   function timesOne(t, S, str) {
     if (t < S.x1 - 0.05 || t > S.txt + 0.6) return;

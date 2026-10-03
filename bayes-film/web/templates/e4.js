@@ -582,7 +582,7 @@
           const y = ((PX.rand(i, 143) * span - cam.fall * d * 1.3) % span + span) % span - 150;
           for (let r = 0; r < reps; r++) { SX[j] = x; SY[j] = y + r * st * d / reps; SA[j] = d * d * (r === 0 ? 1.4 : 0.9) * (1 - r / reps * 0.6) / Math.pow(reps, 0.35); j++; }
         }
-        PX.points(SX, SY, j, COL.cool, { a: 0.7 * wk, A: SA, glow: 0.3 });
+        PX.points(SX, SY, j, COL.cool, { a: 1.0 * wk, A: SA, glow: 0.3 });
       }
       // ---------- the new piece of evidence: one bead rises into the canyon and glints
       const tB = tFind + 1.0, bk = prog(lt, tB, tB + 2.2);
