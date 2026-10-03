@@ -334,11 +334,12 @@ def h_freeze(t, dur=None, **_):
         b, s = step_of(t); t1 = s['t'] + s['dur'] if s else min(b['end'], t + 2 * BT)
     GATE.append((t, t1))
     # the crack decays to digital zero within ~0.4 s; afterwards true silence until t1
+    if tl.btype(beat_of(t)) != 'gut': return
     rng = np.random.default_rng(7)
     for j in range(4):
         f = mtof(m('A6')) * rng.uniform(0.9, 1.7)
         x = glass(f, 0.4, 0.04, j) * local_env(n_of(0.4), [(0, 1), (0.25, 1), (0.4, 0)])
-        POST.add(t + 0.01 + j * 0.012, x, 0.03, rng.uniform(-0.5, 0.5))
+        POST.add(t + 0.01 + j * 0.012, x, 0.012, rng.uniform(-0.5, 0.5))
 
 def h_silence(t, dur=1.5, **_):
     GATE.append((t, t + max(0.05, dur)))
@@ -356,13 +357,13 @@ def h_shatter(t, **_):
     for i in range(90):
         dt = 2.6 * rng.random() ** 2.4
         f = mtof(pool[rng.integers(len(pool))]) * (1 + rng.normal(0, 0.0015))
-        a = 0.06 * (1 - dt / 2.7) ** 1.3 * rng.uniform(0.35, 1)
+        a = 0.035 * (1 - dt / 2.7) ** 1.3 * rng.uniform(0.35, 1)
         FX.add(t + dt, glass(f, 1.6, rng.uniform(0.12, 0.5), i % 7), a, rng.uniform(-0.95, 0.95), rv=0.3, bg=1.1)
     for i, k in enumerate(['A6', 'D6', 'F6', 'E6', 'C7', 'A5', 'D7', 'G6']):
         dt = 0.04 + 1.8 * (i / 8) ** 1.6 + rng.uniform(0, 0.08)
-        note(CEL if i % 2 else GLK, m(k), t + dt, 0.6, 76 - i * 4, 0.16, rng.uniform(-0.8, 0.8), rv=0.3, bg=1.0, bus=FX)
+        note(CEL if i % 2 else GLK, m(k), t + dt, 0.6, 76 - i * 4, 0.10, rng.uniform(-0.8, 0.8), rv=0.3, bg=1.0, bus=FX)
     n = n_of(0.25); FX.add(t, filt(wnoise(n, 31), 'hp', 2500) * np.exp(-tvec(n) / 0.02), 0.10, 0, rv=0.2, bg=0.8)
-    FX.add(t, filt(kick(70, 34, 0.5, 1.5, 0.0), 'lp', 200), 0.35, 0, bg=0.4)
+    FX.add(t, filt(kick(70, 34, 0.5, 1.5, 0.0), 'lp', 200), 0.22, 0, bg=0.4)
 
 def h_gather(t, dur=4.0, **_):
     """slow reversed swell that lands exactly at t + dur"""
@@ -378,20 +379,20 @@ def h_gather(t, dur=4.0, **_):
     wet = convolve(loc, IR_BIG) * 1.2 + loc * 0.2
     r = wet[:n_of(dur)][::-1].copy()
     r *= local_env(len(r), [(0, 0), (dur * 0.5, 0.25), (dur - 0.03, 1.0), (dur, 0.0)])[:, None]
-    MUS.add(t, r, 0.7 if big else 0.45, 0)
+    MUS.add(t, r, 0.28 if big else 0.3, 0)
 
 def h_title(t, **_):
     """the title chord: one low piano note + a soft D minor add9 pad, long tail; the theme's head on celesta"""
     if seen('title', t, 0.3): return
     b = beat_of(t); L = max(3.0, b['end'] - t) + 2.0
-    note(PNO, m('D1'), t, 6.0, 96, 1.0, -0.05, rv=0.4, bg=0.7, tail=8)
-    note(PNO, m('D2'), t, 6.0, 72, 0.6, 0.05, rv=0.4, bg=0.7, tail=8)
+    note(PNO, m('D1'), t, 6.0, 96, 0.55, -0.05, rv=0.4, bg=0.7, tail=8)
+    note(PNO, m('D2'), t, 6.0, 72, 0.32, 0.05, rv=0.4, bg=0.7, tail=8)
     for k, p in zip(['D3', 'A3', 'E4', 'F4', 'A4'], [-0.4, -0.2, 0.0, 0.2, 0.4]):
-        note(PAD, m(k), t, L, 56, 0.20, p, rv=0.3, bg=0.6, tail=5, env=[(0, 0), (0.9, 1)])
-        note(SSTR, m(k), t + 0.1, L, 52, 0.32, -p, rv=0.4, bg=0.6, tail=5, env=[(0, 0), (1.5, 1)])
-    note(CHOIR, m('A4'), t + 0.4, L - 0.4, 48, 0.12, 0.0, rv=0.4, bg=0.8, tail=5, env=[(0, 0), (2.0, 1)])
-    theme_head(t + BT, CEL, 70, 0.5, bus=MUS, bg=0.9)
-    theme_head(t + BT, PNO, 52, 0.35, bus=MUS, bg=0.6, oct=0)
+        note(PAD, m(k), t, L, 56, 0.11, p, rv=0.3, bg=0.6, tail=5, env=[(0, 0), (0.9, 1)])
+        note(SSTR, m(k), t + 0.1, L, 52, 0.17, -p, rv=0.4, bg=0.6, tail=5, env=[(0, 0), (1.5, 1)])
+    note(CHOIR, m('A4'), t + 0.4, L - 0.4, 48, 0.07, 0.0, rv=0.4, bg=0.8, tail=5, env=[(0, 0), (2.0, 1)])
+    theme_head(t + BT, CEL, 70, 0.3, bus=MUS, bg=0.9)
+    theme_head(t + BT, PNO, 52, 0.2, bus=MUS, bg=0.6, oct=0)
 
 def theme_head(t, preset, vel, g, bus=None, bg=0.5, oct=0, unit=BT):
     for k, (nm, d) in enumerate([('F5', 1), ('E5', 1), ('A4', 3)]):
@@ -672,10 +673,10 @@ if B('pitch'):
     span = max(1e-3, t_h - t0)
     # muted synth bass 8ths, opening its filter as the pitch rises
     oc = [0, 0, 12, 0, 0, 12, 0, 12]
-    synth_line(t0, t_h, lambda k, t: CHORDS[chord_at(t + 0.01)][0] + 12 + oc[k % 8], E8, 0.34, 0.20, bright=(2.5, 7.5), decay=0.16,
+    synth_line(t0, t_h, lambda k, t: CHORDS[chord_at(t + 0.01)][0] + 12 + oc[k % 8], E8, 0.34, 0.34, bright=(3.0, 8.0), decay=0.16,
                vel_fn=lambda k, t: (1.0 if k % 2 == 0 else 0.72) * (0.6 + 0.4 * (t - t0) / span))
     # tight ticks (16ths, accented off-beats), side stick on 2 & 4 after the money, kick 1 / 2& / 3
-    perc_grid(t0, t_h, 'hat', 0.05, S16, accent=[0.5, 0.3, 1.0, 0.3])
+    perc_grid(t0, t_h, 'hat', 0.065, S16, accent=[0.5, 0.3, 1.0, 0.3])
     for k, t in grid(t_m, t_h, BT):
         if k % 2 == 1: drum(37, t, 80, 0.10, 0.1)
     ring_kick(t_m, t_h, [1, 0, 0, 0.55, 1, 0, 0, 0], 0.32)
@@ -683,7 +684,7 @@ if B('pitch'):
     for k, t in grid(t_tag, t_h, E8):
         if k % 2 == 0: continue
         up = CHORDS[chord_at(t)][1]; lift = 12 if t >= (T('pitch', 'tag3') or 1e9) else 0
-        for j, kk in enumerate(up[:3]): note(STR, kk + lift, t, 0.14, 84, 0.13, -0.3 + 0.3 * j, rv=0.25, tail=0.8)
+        for j, kk in enumerate(up[:3]): note(STR, kk + lift, t, 0.14, 84, 0.17, -0.3 + 0.3 * j, rv=0.25, tail=0.8)
         note(PIZZ, up[-1] + 12 + lift, t, 0.2, 80, 0.12, 0.3, rv=0.25)
     # piano chord on each bar line from the money on (confident)
     for a, b_, nm in chord_spans(t_m, t_h):
@@ -705,8 +706,8 @@ if B('gut'):
     for j, (k, t) in enumerate(grid(t0, t_fr, 2 * BT)):
         lift = j + (2 if t >= t_more else 0); u = (t - t0) / (t_fr - t0)
         for i, base in enumerate(ms('D4', 'Eb4', 'E4')):
-            note(TREM, base + lift, t, 2 * BT + 0.1, int(60 + 50 * u), 0.22 + 0.25 * u, -0.4 + 0.4 * i, rv=0.3, tail=1.0)
-        note(SSTR, m('D3') + lift, t, 2 * BT + 0.1, int(60 + 50 * u), 0.2 + 0.2 * u, 0, rv=0.3, tail=1.0)
+            note(TREM, base + lift, t, 2 * BT + 0.1, int(60 + 50 * u), 0.18 + 0.16 * u, -0.4 + 0.4 * i, rv=0.3, tail=1.0)
+        note(SSTR, m('D3') + lift, t, 2 * BT + 0.1, int(60 + 50 * u), 0.16 + 0.12 * u, 0, rv=0.3, tail=1.0)
     # low pulse under it (the groove's bass, muted, 8ths)
     synth_line(t0, t_fr, lambda k, t: m('D2') + (12 if k % 4 == 3 else 0), E8, 0.3, 0.14, bright=(2.0, 6.0), decay=0.12,
                vel_fn=lambda k, t: 0.5 + 0.5 * (t - t0) / (t_fr - t0))
@@ -804,12 +805,13 @@ if B('missing'):
 MAR_CELL = [0, 2, 1, 3, 2, 0, 3, 1]
 if B('pie_vs_odds'):
     a, b = T('pie_vs_odds'), E('pie_vs_odds'); t_tug, t_rel = T('pie_vs_odds', 'tug'), T('pie_vs_odds', 'rel')
-    ostinato(a, b, MAR, MAR_CELL, 50, 0.24, 0.25, rv=0.3, dens=(0.5, 0.9), seed=13)
+    ostinato(a, b, MAR, MAR_CELL, 54, 0.32, 0.25, rv=0.3, dens=(0.75, 0.95), seed=13)
+    synth_line(a, t_tug, lambda k, t: CHORDS[chord_at(t + 0.01)][0] + 12 if k % 2 == 0 else None, E8, 0.4, 0.2, bright=(2.5, 3.5), decay=0.2)
     # the pie: nervous little stabs (pizzicato, syncopated, irregular)
     for k, t in grid(a, t_tug, S16):
         if h01(k, 21) < 0.22 and k % 4 in (1, 3, 2):
             up = CHORDS[chord_at(t)][1]
-            note(PIZZ, up[int(h01(k, 5) * len(up))] + 12, t, 0.15, 76, 0.2, -0.4 + 0.8 * h01(k, 6), rv=0.3)
+            note(PIZZ, up[int(h01(k, 5) * len(up))] + 12, t, 0.15, 80, 0.3, -0.4 + 0.8 * h01(k, 6), rv=0.3)
             if h01(k, 22) < 0.4: note(STR, up[0], t, 0.1, 76, 0.10, 0, rv=0.25, tail=0.6)
     perc_grid(a, t_tug, 'tick', 0.025, S16, accent=[0, 0.5, 1, 0.5], prob=0.6, seed=2)
     # the tug-of-war: a low rocking ostinato (8ths)
@@ -930,18 +932,18 @@ if B('ai'):
         up = CHORDS[chord_at(t + 0.01)][1]; tones = [x + 12 * o for o in range(span) for x in up]
         seq = list(range(len(tones))) + list(range(len(tones) - 2, 0, -1))
         return tones[seq[k % len(seq)]] + 12
-    synth_line(a, b, lambda k, t: arp(k, t), S16, 0.22, 0.17, bright=(5, 16), decay=0.11, detune=True, pan=-0.1,
+    synth_line(a, b, lambda k, t: arp(k, t), S16, 0.22, 0.23, bright=(5, 16), decay=0.11, detune=True, pan=-0.1,
                vel_fn=lambda k, t: 1.0 if k % 4 == 0 else 0.7)
-    synth_line(t_fl, b, lambda k, t: arp(k * 3, t, 2) + 12, S16, 0.16, 0.09, bright=(8, 18), decay=0.08, pan=0.35,
+    synth_line(t_fl, b, lambda k, t: arp(k * 3, t, 2) + 12, S16, 0.16, 0.13, bright=(8, 18), decay=0.08, pan=0.35,
                vel_fn=lambda k, t: 0.8 if k % 3 == 0 else 0.55)
-    synth_line(t_fa, b, lambda k, t: arp(k * 5, t, 3) + 12, S16 / 2, 0.08, 0.05, bright=(10, 18), decay=0.05, pan=-0.35)
+    synth_line(t_fa, b, lambda k, t: arp(k * 5, t, 3) + 12, S16 / 2, 0.08, 0.07, bright=(10, 18), decay=0.05, pan=-0.35)
     synth_line(a, b, lambda k, t: CHORDS[chord_at(t + 0.01)][0] + 12 + (12 if k % 2 else 0), E8, 0.3, 0.28, bright=(3, 6), decay=0.14,
                vel_fn=lambda k, t: 1.0 if k % 2 == 0 else 0.6)
-    ring_kick(a, b, [1, 0], 0.34, f0=120, tau=0.15)
+    ring_kick(a, b, [1, 0], 0.28, f0=120, tau=0.15)
     for k, t in grid(a, b, BT):
         if k % 2 == 1: drum(39, t, 90, 0.16, 0.0, rv=0.2)
     perc_grid(a, b, 'hat', 0.06, S16, accent=[0.5, 0.3, 1.0, 0.3])
-    pads(t_fl, b, SSTR, 64, 0.16, rv=0.4, bg=0.2, fi=2.0)
+    pads(t_fl, b, SSTR, 64, 0.22, rv=0.4, bg=0.2, fi=2.0)
     for k, t in grid(t_fl, b, S16):                 # glitchy ticks, increasingly dense
         u = (t - t_fl) / max(1e-6, b - t_fl)
         if h01(k, 50) < 0.08 + 0.18 * u: h_glitch(t)
@@ -954,8 +956,8 @@ if B('human'):
         note(SSTR, m('D3'), t_cur + 2 * BT, t_dec - t_cur - 2 * BT + 0.5, 40, 0.14, 0, rv=0.5, bg=0.5, env=[(0, 0), (2.0, 1)])
     if ok(t_dec, t_rope):    # decide: a warm chord
         for j, k in enumerate(ms('Bb1', 'F2', 'D3', 'A3', 'C4', 'D4', 'F4')):
-            note(SSTR, k + (12 if j < 2 else 0), t_dec, t_rope - t_dec + 0.8, 64, 0.22, -0.5 + j * 0.16, rv=0.5, bg=0.5, env=[(0, 0), (0.8, 1)])
-            note(PNO, k, t_dec + 0.02 * j, 3.0, 60, 0.26, -0.5 + j * 0.16, rv=0.4, bg=0.5)
+            note(SSTR, k + (12 if j < 2 else 0), t_dec, t_rope - t_dec + 0.8, 64, 0.17, -0.5 + j * 0.16, rv=0.5, bg=0.5, env=[(0, 0), (0.8, 1)])
+            note(PNO, k, t_dec + 0.02 * j, 3.0, 60, 0.2, -0.5 + j * 0.16, rv=0.4, bg=0.5)
         note(CHOIR, m('F4'), t_dec, t_rope - t_dec + 0.8, 48, 0.10, 0, rv=0.5, bg=0.5, env=[(0, 0), (1.5, 1)])
     if ok(t_rope, t_who):    # rope: a precise mechanical pulse (no humanising at all)
         perc_grid(t_rope, t_who, 'tick', 0.045, S16, accent=[1.0, 0.45, 0.7, 0.45])
@@ -979,18 +981,18 @@ if B('recall'):
     for k, (_, t) in enumerate(grid(a, t_sl, BT)): h_heartbeat(t, k=k + 4)        # the e0 pulse flashes back
     synth_line(a, t_sl, lambda k, t: m('D2') + (12 if k % 4 == 3 else 0), E8, 0.3, 0.16, bright=(3, 5), decay=0.14)
     for i, base in enumerate(ms('D4', 'Eb4', 'E4')):
-        note(TREM, base + 4, a, t_sl - a, 70, 0.18, -0.4 + 0.4 * i, rv=0.3, env=[(0, 1), (t_sl - a - 0.3, 0.5), (t_sl - a, 0)], tail=0.5)
+        note(TREM, base + 4, a, t_sl - a, 70, 0.13, -0.4 + 0.4 * i, rv=0.3, env=[(0, 1), (t_sl - a - 0.3, 0.5), (t_sl - a, 0)], tail=0.5)
     # time slows: half-time, sustains (piano roots + inner voice every half bar), strings under the theme
     end_t = E('end', 'final') if B('end') else E('recall')
     fin = T('end', 'final') if B('end') else None
     body_end = fin or end_t
     for a_, b_, nm in chord_spans(t_sl, body_end):
         bs, up = CHORDS[nm]
-        note(PNO, bs + 12, a_, b_ - a_ + 0.5, 62, 0.42, -0.1, rv=0.4, bg=0.6, tail=4)
-        if b_ - a_ >= 2 * BT - 1e-3: note(PNO, up[1] if len(up) > 1 else up[0], a_ + 2 * BT, b_ - a_ - 2 * BT + 0.5, 50, 0.3, 0.1, rv=0.4, bg=0.6, tail=4)
-    pads(t_sl, body_end, SSTR, 52, 0.20, rv=0.5, bg=0.6, fi=2.0, octave=-1)
-    pads(t_sl, body_end, CHOIR, 44, 0.08, rv=0.5, bg=0.6, fi=3.0, which=[0, 2])
-    basses(t_sl, body_end, CELLO, 54, 0.22, 1, rv=0.5)
+        note(PNO, bs + 12, a_, b_ - a_ + 0.5, 62, 0.26, -0.1, rv=0.4, bg=0.6, tail=4)
+        if b_ - a_ >= 2 * BT - 1e-3: note(PNO, up[1] if len(up) > 1 else up[0], a_ + 2 * BT, b_ - a_ - 2 * BT + 0.5, 50, 0.19, 0.1, rv=0.4, bg=0.6, tail=4)
+    pads(t_sl, body_end, SSTR, 52, 0.13, rv=0.5, bg=0.6, fi=2.0, octave=-1)
+    pads(t_sl, body_end, CHOIR, 44, 0.05, rv=0.5, bg=0.6, fi=3.0, which=[0, 2])
+    basses(t_sl, body_end, CELLO, 54, 0.15, 1, rv=0.5)
     # the theme, in half-time (1 theme beat = 2 film beats), phrased to the step lines
     TH = [('recall', 's1', [('F5', 2), ('E5', 2)]), ('recall', 's2', [('A4', 4)]), ('recall', 's3', [('Bb4', 1), ('C5', 1), ('D5', 2)]),
           ('recall', 's4', [('G5', 2), ('F5', 2), ('E5', 2)]), ('end', 'l1', [('F5', 2), ('E5', 2), ('A4', 2)]),
@@ -998,17 +1000,17 @@ if B('recall'):
     for vt, nm, seq in TH:
         t = T(vt, nm)
         if t is None: continue
-        melody(t, seq, PNO, 64, 0.5, 0.1, rv=0.45, bg=0.7, legato=1.0, tail=4)
-        melody(t, seq, SSTR, 56, 0.20, -0.15, rv=0.5, bg=0.6, legato=1.1, oct=-1)
+        melody(t, seq, PNO, 64, 0.32, 0.1, rv=0.45, bg=0.7, legato=1.0, tail=4)
+        melody(t, seq, SSTR, 56, 0.13, -0.15, rv=0.5, bg=0.6, legato=1.1, oct=-1)
         # each step line lands with a soft bell
         MUS.add(t, bell(mtof(CHORDS[chord_at(t)][1][0] + 24), 3.0, 1.0), 0.022, 0.35, rv=0.5, bg=0.7)
     if ok(fin):     # 先别急: D major with a ninth. The longest, quietest tail; silence by the end
         L = end_t - fin
         env = [(0, 1), (L * 0.35, 0.75), (L - 0.4, 0.0)]
         for j, k in enumerate(ms('D2', 'A2', 'D3', 'F#3', 'A3', 'E4', 'F#4', 'A4')):
-            note(PNO, k, fin + 0.03 * j, L, 58 - j, 0.30, -0.4 + 0.1 * j, rv=0.4, bg=0.9, tail=2, env=env)
-            note(SSTR, k + 12, fin + 0.3, L, 48, 0.12, 0.4 - 0.1 * j, rv=0.5, bg=0.9, tail=2, env=[(0, 0), (2.0, 1), (L * 0.6, 0.5), (L - 0.4, 0.0)])
-        note(PNO, m('F#5'), fin + 2 * BT, L - 2 * BT, 56, 0.4, 0.15, rv=0.4, bg=1.0, tail=2, env=[(0, 1), (L - 2 * BT - 0.6, 0)])
+            note(PNO, k, fin + 0.03 * j, L, 58 - j, 0.19, -0.4 + 0.1 * j, rv=0.4, bg=0.9, tail=2, env=env)
+            note(SSTR, k + 12, fin + 0.3, L, 48, 0.08, 0.4 - 0.1 * j, rv=0.5, bg=0.9, tail=2, env=[(0, 0), (2.0, 1), (L * 0.6, 0.5), (L - 0.4, 0.0)])
+        note(PNO, m('F#5'), fin + 2 * BT, L - 2 * BT, 56, 0.25, 0.15, rv=0.4, bg=1.0, tail=2, env=[(0, 1), (L - 2 * BT - 0.6, 0)])
         note(CEL, m('F#6'), fin + 2 * BT, 2.0, 50, 0.14, 0.2, rv=0.4, bg=1.0)
         MUS.add(fin, bell(mtof(m('D6')), 6.0, 2.0) * local_env(n_of(6.0), [(0, 1), (5.5, 0)]), 0.025, -0.2, rv=0.5, bg=0.9)
 

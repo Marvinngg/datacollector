@@ -130,6 +130,7 @@
     const B = [bufg(0, 1), bufg(1, 1), bufg(2, 1)];
     for (const b of B) b.n = 0;
     const yScroll = Sl * 900;
+    const lum = ease.inOut(prog(lt, a.fast - 1.5, a.fast + 0.6)), gain = o.frozen ? 1 : 1 + 0.8 * fl + 1.0 * lum;
     for (let i = 0; i < I.N; i++) {
       const tb = I.tb[i]; if (lt < tb) continue;
       const v = I.v[i], s = I.s[i];
@@ -139,7 +140,7 @@
       let x = I.x0[i] + Math.sin(y * 0.0035 + I.ph[i]) * 10 * s;
       if (fan > 0 && i < N_BURST) { const neck = fan * Math.exp(-(H + 90 - y) / 650); x = lerp(x, W / 2 + (x - W / 2) * 0.06, neck); }
       for (const bd of bands) if (Math.abs(y - bd[0]) < bd[1]) x += bd[2];
-      let al = 0.5 * (0.45 + 0.55 * s);
+      let al = 0.5 * (0.45 + 0.55 * s) * gain;
       if (wk > 0) { const w = weather(x, y + yScroll, lt); al *= lerp(1, w * w * 1.7, wk); }
       if (part && part.q > 0) {
         const dx = (x - W / 2) / part.rx, dy = (y - part.y) / part.ry, e2 = dx * dx + dy * dy;
@@ -173,7 +174,7 @@
         const x = PX.rand(j, 22) * W, y = H + 100 - (tr % L_WRAP), st = Math.min(9, v * m * shutter * 0.22);
         const cx = (x - W / 2) / 430, core = 0.45 + 0.9 * Math.exp(-cx * cx);
         const w = wk > 0 ? lerp(1, weather(x, y + yScroll, lt), wk) : 1;
-        const al = (0.12 + 0.2 * PX.rand(j, 25)) * core * w * w * 1.5;
+        const al = (0.12 + 0.2 * PX.rand(j, 25)) * core * w * w * 1.5 * (1 + 2.2 * lum);
         for (let q = 0; q < SEG; q++, k++) { X[k] = x; Y[k] = y + q * st; A[k] = al * (1 - q / SEG); }
       }
       PX.points(X, Y, k, [0.62, 1, 0.95], { a: 1, A, glow: 0.35 });

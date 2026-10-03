@@ -47,7 +47,7 @@ async function openPage(browser, base) {
   await page.evaluate(async (chars) => {
     await E.ready;
     const faces = ['300 40px "Noto Sans SC"', '400 40px "Noto Sans SC"', '500 40px "Noto Sans SC"', '700 40px "Noto Sans SC"',
-      '400 40px "Noto Serif SC"', '600 40px "Noto Serif SC"', '300 40px "JetBrains Mono"', '400 40px "JetBrains Mono"', '700 40px "JetBrains Mono"',
+      '400 40px "Noto Serif SC"', '600 40px "Noto Serif SC"', '900 40px "Noto Serif SC"', '300 40px "JetBrains Mono"', '400 40px "JetBrains Mono"', '700 40px "JetBrains Mono"',
       '400 40px "LXGW WenKai"'];
     for (const f of faces) await document.fonts.load(f, chars);
     await document.fonts.ready;
