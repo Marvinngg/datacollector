@@ -39,7 +39,7 @@
   const TC = [], TCF = [];
   function tokPrep() {                       // -> this frame's clouds (PX.text is called once per token per frame at most)
     if (TC.length === TOKS.length) return TC;
-    const ok = document.fonts.status === 'loaded' && document.fonts.check(`400 ${TOK_SIZE}px ${F.mono}`, TOKS.join(''));
+    const ok = document.fonts.status === 'loaded';   // the renderer preloads every glyph before the first frame
     for (let i = 0; i < TOKS.length; i++) {
       TCF[i] = PX.text(TOKS[i], { size: TOK_SIZE, family: F.mono, weight: 400, x: 0, y: 0, step: TOK_STEP, jitter: 0.5, seed: 3 + i });
       if (ok) TC[i] = TCF[i];
@@ -75,7 +75,7 @@
 
   // instances: each one token travelling upward in its lane
   let INST = null;
-  const N_BURST = 1500, N_FLOOD = 1900;
+  const N_BURST = 1500, N_FLOOD = 1550;
   function inst() {
     if (INST) return INST;
     const a = AT(), N = N_BURST + N_FLOOD, r = rng(5151);
@@ -148,8 +148,9 @@
       }
       if (!o.frozen && ((I.k[i] * 977 + bi * 0.618) % 1) < 0.06) al *= 1 + 2.2 * pul;
       const cl = CL[I.tok[i]];
-      const dens = Math.min(1, 0.26 + 0.62 * s * s);
-      const n = Math.max(6, Math.floor(cl.n * dens));
+      const dens = Math.min(1, 0.14 + 0.5 * s * s);              // fewer, brighter points on small (far) tokens
+      const n = Math.max(5, Math.floor(cl.n * dens));
+      al *= Math.min(1.6, (0.22 + 0.56 * s * s) / dens);
       const blur = Math.min(v * m * shutter * s, 10 + 22 * s);
       const g = I.grp[i];
       const b = bufg(g, B[g].n + n); B[g] = b;
@@ -165,13 +166,13 @@
     if (o.collect) return B;
     for (let g = 0; g < 3; g++) { const b = BUF[g]; if (b && b.n) PX.points(b.X, b.Y, b.n, GCOL[g], { a: 1, A: b.A, glow: 0 }); }
     // the luminous rain: motes too small to be glyphs, each a thin vertical streak of light (flood only)
-    const nF = Math.floor(30000 * ease.inOut(prog(lt, a.flood + 0.2, a.flood + 4.0)));
+    const nF = Math.floor(27000 * ease.inOut(prog(lt, a.flood + 0.2, a.flood + 4.0)));
     if (nF > 0) {
-      const SEG = 6, b = bufg(4, nF * SEG), X = b.X, Y = b.Y, A = b.A;
+      const SEG = 4, b = bufg(4, nF * SEG), X = b.X, Y = b.Y, A = b.A;
       let k = 0;
       for (let j = 0; j < nF; j++) {
         const v = 1100 + 2800 * PX.rand(j, 21), tr = Sl * v + PX.rand(j, 23) * L_WRAP;
-        const x = PX.rand(j, 22) * W, y = H + 100 - (tr % L_WRAP), st = Math.min(9, v * m * shutter * 0.22);
+        const x = PX.rand(j, 22) * W, y = H + 100 - (tr % L_WRAP), st = Math.min(11, v * m * shutter * 0.27);
         const cx = (x - W / 2) / 430, core = 0.45 + 0.9 * Math.exp(-cx * cx);
         const w = wk > 0 ? lerp(1, weather(x, y + yScroll, lt), wk) : 1;
         const al = (0.12 + 0.2 * PX.rand(j, 25)) * core * w * w * 1.5 * (1 + 2.2 * lum);
@@ -196,6 +197,14 @@
         for (let q = 0; q < 4; q++) { acc[ks[q]] += c[0] * w[q]; acc[ks[q] + 1] += c[1] * w[q]; acc[ks[q] + 2] += c[2] * w[q]; }
       }
     }
+    // the rain stops dead too: each streak collapses to one bright mote
+    { const lt = AT().dur - 1e-3, Sl = S(lt), c = [0.62, 1, 0.95];
+      for (let j = 0; j < 30000; j++) {
+        const v = 1100 + 2800 * PX.rand(j, 21), tr = Sl * v + PX.rand(j, 23) * L_WRAP;
+        const x = PX.rand(j, 22) * W, y = H + 100 - (tr % L_WRAP); if (!(x >= 0 && y >= 0 && x < W - 1 && y < H - 1)) continue;
+        const k = ((y | 0) * W + (x | 0)) * 3, a = 0.25 + 0.4 * PX.rand(j, 25);
+        acc[k] += c[0] * a; acc[k + 1] += c[1] * a; acc[k + 2] += c[2] * a;
+      } }
     const mkImg = (f) => {
       const cv = Object.assign(document.createElement('canvas'), { width: W, height: H }), g = cv.getContext('2d');
       const img = g.createImageData(W, H), d = img.data;
@@ -203,7 +212,7 @@
       g.putImageData(img, 0, 0); return cv;
     };
     const tm = (v, e) => 255 * (1 - Math.exp(-v * e));
-    const cyan = mkImg((r, g, b) => [tm(r, 1.6), tm(g, 1.6), tm(b, 1.6)]);
+    const cyan = mkImg((r, g, b) => [tm(r, 3.2), tm(g, 3.2), tm(b, 3.2)]);
     const grey = mkImg((r, g, b) => { const l = tm((r + g + b) / 3, 1.5); return [l * 0.92, l * 0.95, l]; });
     const out = { cyan, grey };
     if (TC.length === TOKS.length) FROZ = out;          // only cache once the real glyphs are in
@@ -240,7 +249,7 @@
         rows.forEach((r, i) => {
           const kk = clamp(fk * 1.3 - i * 0.3), e = ease.outExpo(kk), y = 930 + i * 128;
           if (kk <= 0) return;
-          ctx.save(); ctx.translate(W / 2, y); const sc = lerp(1.25, 1, e); ctx.scale(sc, sc);
+          ctx.save(); ctx.translate(W / 2 + optX(r, size, F.serif, 900), y); const sc = lerp(1.25, 1, e); ctx.scale(sc, sc);
           text(r, 0, 0, { size, family: F.serif, weight: 900, color: '#021012', align: 'center', alpha: clamp(kk * 3), spacing: 6 });
           if (kk < 0.4) text(r, 0, 0, { size, family: F.serif, weight: 900, color: '#ffffff', align: 'center', alpha: (1 - kk / 0.4) * 0.9, spacing: 6 });
           ctx.restore();
@@ -274,6 +283,8 @@
     }
     PX.points(X, Y, s.n, [0.86, 1, 0.98], { a: 1.6, A, glow: 0.2 });
   }
+  // a row ending in full-width punctuation is centred on its characters, not on the comma's empty half
+  const optX = (row, size, fam = F.serif, wt = 600) => /[，、。？]$/.test(row) ? measure('，', { size, family: fam, weight: wt }) * 0.45 : 0;
   function splitAt(str, p) {
     const i = str.indexOf(p); return i < 0 ? [str] : [str.slice(0, i + 1), str.slice(i + 1)];
   }
@@ -381,7 +392,7 @@
       x += kw[i] + gap;
     });
     const rows = splitAt(V.lines.decide, '，'), td = tDec + beat.BEAT;
-    rows.forEach((r, i) => KIT.type(r, W / 2, 1500 + i * 92, { size: 60, family: F.serif, weight: 600, mode: 'rise', k: prog(lt, td + i * 0.9, td + i * 0.9 + 1.0), color: WARM, spacing: 3 }));
+    rows.forEach((r, i) => KIT.type(r, W / 2 + optX(r, 60), 1500 + i * 92, { size: 60, family: F.serif, weight: 600, mode: 'rise', k: prog(lt, td + i * 0.9, td + i * 0.9 + 1.0), color: WARM, spacing: 3 }));
   }
   function keycap(cx, cy, w, h, label, a, press) {
     const c = K.ctx; c.save(); c.globalAlpha *= a;
@@ -459,7 +470,7 @@
       // leaning back away from the rope: the top of the glyph is pulled outward
       for (let i = 0; i < fig.n; i++) { fb.X[i] = fx + fig.X[i] - fig.Y[i] * lean * side; fb.Y[i] = ROPE.figY + fig.Y[i]; }
       const c = [lerp(col[0], 1, warm * 0.9), lerp(col[1], 0.8, warm * 0.9), lerp(col[2], 0.55, warm * 0.9)];
-      PX.points(fb.X, fb.Y, fig.n, c, { a: (0.36 + 0.3 * warm) * rk * (1 - 0.35 * mach * (1 - warm)), glow: 0.4 + 0.4 * warm });
+      PX.points(fb.X, fb.Y, fig.n, c, { a: (t ? 0.75 : 0.6) * (1 + 0.5 * warm) * rk, glow: 0.4 + 0.4 * warm });
     });
     // the machine: cyan micro-ticks on the rope, a scan pulse running to the knot after each jump
     if (mach > 0) {
@@ -474,6 +485,9 @@
       }
       PX.points(tb.X, tb.Y, m3, COL.cyan, { a: 0.55 * mach * rk, A: tb.A, glow: 0.5 });
     }
+    // two near-black motes at opposite corners: the flush then refreshes the whole quarter-res glow canvas, so its
+    // border never samples stale light left over from b17's flood (a faint rectangle around the rope otherwise)
+    PX.dot(3, 3, [0, 0, 0.001], 0.001, 1); PX.dot(W - 4, H - 4, [0, 0, 0.001], 0.001, 1);
     PX.flush({ exposure: 1.5, glow: 1.0, glowR: 4 });
     // machine overlay in canvas: hairline from the knot to the ruler, crosshair brackets, readouts
     if (mach > 0) {
@@ -506,6 +520,6 @@
     KIT.type(V.lines.rope, W / 2, 620, { size: 58, family: F.serif, weight: 600, mode: 'rise', k: prog(lt, tRope + 0.6, tRope + 1.8), color: C.ink, alpha: rk * (1 - 0.55 * ropeOut), spacing: 3 });
     const rows = splitAt(V.lines.who, '，');
     const whoRows = rows.length > 1 ? [rows[0], rows.slice(1).join('')] : rows;
-    whoRows.forEach((r, i) => KIT.type(r, W / 2, 1360 + i * 96, { size: 64, family: F.serif, weight: 600, mode: 'rise', k: prog(lt, tWho + 0.3 + i * 1.3, tWho + 1.5 + i * 1.3), color: WARM, alpha: rk, spacing: 3 }));
+    whoRows.forEach((r, i) => KIT.type(r, W / 2 + optX(r, 64), 1360 + i * 96, { size: 64, family: F.serif, weight: 600, mode: 'rise', k: prog(lt, tWho + 0.3 + i * 1.3, tWho + 1.5 + i * 1.3), color: WARM, alpha: rk, spacing: 3 }));
   }
 })();

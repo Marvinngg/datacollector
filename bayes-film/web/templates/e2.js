@@ -106,9 +106,9 @@
     let fx = tx - ex, fy = ty - ey, fz = tz - ez; const fl = Math.hypot(fx, fy, fz); fx /= fl; fy /= fl; fz /= fl;
     let rx = -fz, ry = 0, rz = fx; const rl = Math.hypot(rx, rz); rx /= rl; rz /= rl;      // right = fwd × up(0,1,0)
     const ux = ry * fz - rz * fy, uy = rz * fx - rx * fz, uz = rx * fy - ry * fx;           // up = right × fwd
-    const cam = { ex, ey, ez, fx, fy, fz, rx, ry, rz, ux, uy, uz, f: FOC * (1 + ZOOM * kR + ZOOM * 0.04 * ss(T_PULL1, 39, ct)), cx: lerp(W / 2, 330, kR), cy: lerp(H / 2, 560, kR), dist, zf: dist, kc: 0, kR };
+    const cam = { ex, ey, ez, fx, fy, fz, rx, ry, rz, ux, uy, uz, f: FOC * (1 + ZOOM * kR + ZOOM * 0.04 * ss(T_PULL1, 39, ct)), cx: lerp(W / 2, 330, kR), cy: lerp(H / 2, 480, kR), dist, zf: dist, kc: 0, kR };
     if (withFocus) {
-      cam.kc = 6 * ss(T_FORM0, 5, ct) + 16 * ss(6, 9.5, ct) + 18 * kR;
+      cam.kc = 6 * ss(T_FORM0, 5, ct) + 16 * ss(6, 9.5, ct) + 8 * kR;
       const g = giant(), zG = (g.G[0] - ex) * fx + (g.G[1] - ey) * fy + (g.G[2] - ez) * fz;
       cam.zf = lerp(dist, zG - g.R * 0.75, ease.inOut(prog(ct, 26.4, 29.0)));     // rack focus to the giant's face
     }
@@ -148,7 +148,15 @@
     [[16.1, 18.4, 1], [19.8, 23.4, 0.85], [25.2, 40, 0.6]],
   ];
   const TRAVEL = 1.5, SM = 5200;
-  const emit = (s, t) => { let e = 0; for (const [a, b, k] of SWIN[s]) if (t > a && t < b) e += k * win(t, a, b, 0.5, 0.5); return e; };
+  const emit = (s, t) => {
+    const ws = SWIN[s]; let e = 0;
+    for (let i = 0; i < ws.length; i++) {
+      const w = ws[i], a = w[0], b = w[1]; if (t <= a || t >= b) continue;
+      let x = (t - a) * 2; if (x > 1) x = 1; let y = (b - t) * 2; if (y > 1) y = 1; const m = x < y ? x : y;
+      e += w[2] * m * m * (3 - 2 * m);
+    }
+    return e;
+  };
   const SB = { X: new Float32Array(SM * 3), Y: new Float32Array(SM * 3), Z: new Float32Array(SM * 3), A: new Float32Array(SM * 3), C: new Float32Array(SM * 9),
     O: { X: new Float32Array(SM * 3), Y: new Float32Array(SM * 3), A: new Float32Array(SM * 3) } };
 
@@ -158,21 +166,21 @@
   };
 
   // ---------------------------------------------------------------- the unlisted world
-  const GN = 110000;
+  const GN = 90000;
   let GI = null;
   function giant() {
     if (GI) return GI;
-    const cam = camAt(31, false), zG = cam.dist + 50 * (1 + ZOOM), Xs = 650, Ys = 1065;
+    const cam = camAt(31, false), zG = cam.dist + 50 * (1 + ZOOM), Xs = 650, Ys = 985;
     const xc = (Xs - cam.cx) * zG / cam.f, yc = (cam.cy - Ys) * zG / cam.f;
     const G = [cam.ex + cam.fx * zG + cam.rx * xc + cam.ux * yc, cam.ey + cam.fy * zG + cam.ry * xc + cam.uy * yc, cam.ez + cam.fz * zG + cam.rz * xc + cam.uz * yc];
     const Rpx = 385, R = Rpx * zG / cam.f;
-    const sp = PX.sphere(GN, 77, true), X = new Float32Array(GN), Y = new Float32Array(GN), Z = new Float32Array(GN), TXg = new Float32Array(GN), TA = new Float32Array(GN);
+    const sp = PX.sphere(GN, 77, true), X = new Float32Array(GN), Y = new Float32Array(GN), Z = new Float32Array(GN), TXg = new Float32Array(GN), TA = new Float32Array(GN), SC = new Float32Array(GN);
     for (let i = 0; i < GN; i++) {
       let x = sp.X[i], y = sp.Y[i], z = sp.Z[i];
-      TXg[i] = clamp(0.2 + 2.8 * (noise3(x * 1.3 + 4, y * 1.3, z * 1.3) - 0.33), 0.1, 2.0);
+      TXg[i] = clamp(0.2 + 2.8 * (noise3(x * 2.4 + 4, y * 2.4, z * 2.4) - 0.33), 0.1, 2.0);
       if (i % 7 === 0) { const s = Math.cbrt(PX.rand(i, 13)) * 0.96; x *= s; y *= s; z *= s; }
       X[i] = x; Y[i] = y; Z[i] = z;
-      TA[i] = 23.4 + 3.4 * Math.pow(PX.rand(i, 14), 0.8);                    // when this grain comes out of the dark
+      TA[i] = 23.1 + 3.4 * Math.pow(PX.rand(i, 14), 0.8); SC[i] = 0.55 * PX.rand(i, 15);                    // when this grain comes out of the dark
     }
     // the names, as glyph particles lying on the sphere's face: each glyph point is where the ct-31 camera's ray
     // through the intended screen spot hits the sphere (local frame = that camera's right / up / back)
@@ -199,7 +207,7 @@
       }
       words.push({ n, U, V, W: Wl, S0 });
     });
-    return (GI = { G, R, Rpx, X, Y, Z, TX: TXg, TA, e1, e2, e3, words,
+    return (GI = { G, R, Rpx, X, Y, Z, TX: TXg, TA, SC, e1, e2, e3, words,
       B: { X: new Float32Array(GN), Y: new Float32Array(GN), Z: new Float32Array(GN), A: new Float32Array(GN), O: { X: new Float32Array(GN), Y: new Float32Array(GN), A: new Float32Array(GN) } } });
   }
 
@@ -248,7 +256,7 @@
 
     PX.begin();
     // dust
-    const kD = ss(3.4, 7, ct) * endDim;
+    const kD = ss(3.4, 7, ct) * (1 - ss(28.5, 31, ct));
     if (kD > 0) {
       const d = dust();
       for (let i = 0; i < DN; i++) d.B[i] = d.A[i] * 0.5 * kD;
@@ -310,7 +318,7 @@
         if (e <= 0.01) continue;
         const v = 1 - u, bx = v * v * P0[0] + 2 * u * v * P1[0] + u * u * P2[0], by = v * v * P0[1] + 2 * u * v * P1[1] + u * u * P2[1], bz = v * v * P0[2] + 2 * u * v * P1[2] + u * u * P2[2];
         const fil = i % 4, r1 = PX.rand(i, 41 + si * 3), r2 = PX.rand(i, 42 + si * 3), r3 = PX.rand(i, 43 + si * 3);
-        const env = Math.pow(Math.sin(Math.PI * u), 0.7);
+        const sp = Math.sin(Math.PI * u), env = Math.sqrt(sp) * Math.sqrt(Math.sqrt(sp));
         let cs, sn;
         if (fil === 0) {                                   // loose sparks around the braid
           const rr = (0.04 + 0.3 * env) * Math.sqrt(r1), an = r2 * TAU + u * 4;
@@ -326,24 +334,39 @@
         ns++;
       }
     }
-    if (ns) { project(ns, SB.X, SB.Y, SB.Z, SB.A, cam, SB.O, 2, 11); PX.points(SB.O.X, SB.O.Y, ns, null, { a: 0.17, A: SB.O.A, C: SB.C, glow: 0.7 }); }
+    if (ns) { project(ns, SB.X, SB.Y, SB.Z, SB.A, cam, SB.O, 2, 11); PX.points(SB.O.X, SB.O.Y, ns, null, { a: 0.22, A: SB.O.A, C: SB.C, glow: 0.7 }); }
 
     // the unlisted world
     if (ct > 23.3) {
       const g = giant(), GB = g.B, kCold = ss(27.6, 30.6, ct);
       const th = 0.022 * (ct - 31), cT = Math.cos(th), sT = Math.sin(th), [e1, e2, e3] = [g.e1, g.e2, g.e3];
       const gA = (22 + 18 * kCold) * endDim;
+      // spin folded into the basis: world = G + sc * (x * A + y * e2 + z * Bv)
+      const Ax = cT * e1[0] - sT * e3[0], Ay = cT * e1[1] - sT * e3[1], Az = cT * e1[2] - sT * e3[2];
+      const Bx = sT * e1[0] + cT * e3[0], By = sT * e1[1] + cT * e3[1], Bz = sT * e1[2] + cT * e3[2];
+      const G0 = g.G[0], G1 = g.G[1], G2 = g.G[2], TA = g.TA, SCt = g.SC, TXg = g.TX, GXa = g.X, GYa = g.Y, GZa = g.Z, O = GB.O, OXo = O.X, OYo = O.Y, OAo = O.A;
+      // transform + project in one pass (same model as project(): energy per area x (zf/z)^2 depth cue, defocus scatter)
+      const { ex, ey, ez, fx, fy, fz, rx, ry, rz, ux, uy, uz, f, cx, cy, zf } = cam, kc = cam.kc * 0.6, D2 = (D0 * f / FOC) ** 2;
+      // pre-multiply the basis into camera space
+      const Gx = G0 - ex, Gy = G1 - ey, Gz = G2 - ez;
+      const gR = Gx * rx + Gy * ry + Gz * rz, gU = Gx * ux + Gy * uy + Gz * uz, gF = Gx * fx + Gy * fy + Gz * fz;
+      const aR = Ax * rx + Ay * ry + Az * rz, aU = Ax * ux + Ay * uy + Az * uz, aF = Ax * fx + Ay * fy + Az * fz;
+      const eR = e2[0] * rx + e2[1] * ry + e2[2] * rz, eU = e2[0] * ux + e2[1] * uy + e2[2] * uz, eF = e2[0] * fx + e2[1] * fy + e2[2] * fz;
+      const bR = Bx * rx + By * ry + Bz * rz, bU = Bx * ux + By * uy + Bz * uz, bF = Bx * fx + By * fy + Bz * fz;
       for (let i = 0; i < GN; i++) {
-        const k = ss(g.TA[i], g.TA[i] + 2.4, ct);
-        if (k <= 0) { GB.A[i] = 0; continue; }
-        const sc = g.R * (1 + (1 - k) * 0.55 * PX.rand(i, 15));
-        const lx = g.X[i] * cT + g.Z[i] * sT, ly = g.Y[i], lz = -g.X[i] * sT + g.Z[i] * cT;
-        GB.X[i] = g.G[0] + sc * (lx * e1[0] + ly * e2[0] + lz * e3[0]);
-        GB.Y[i] = g.G[1] + sc * (lx * e1[1] + ly * e2[1] + lz * e3[1]);
-        GB.Z[i] = g.G[2] + sc * (lx * e1[2] + ly * e2[2] + lz * e3[2]);
-        GB.A[i] = gA * k * k * g.TX[i];
+        let k = (ct - TA[i]) * (1 / 2.4);
+        if (k <= 0) { OAo[i] = 0; continue; }
+        if (k > 1) k = 1; else k = k * k * (3 - 2 * k);
+        const sc = g.R * (1 + (1 - k) * SCt[i]), x = GXa[i] * sc, y = GYa[i] * sc, z = GZa[i] * sc;
+        const zc = gF + x * aF + y * eF + z * bF; if (zc < 0.6) { OAo[i] = 0; continue; }
+        const iz = 1 / zc;
+        let X = cx + f * (gR + x * aR + y * eR + z * bR) * iz, Y = cy - f * (gU + x * aU + y * eU + z * bU) * iz;
+        let rel = zf * iz; rel *= rel; if (rel > 3) rel = 3; else if (rel < 0.18) rel = 0.18;
+        let a = gA * k * k * TXg[i] * D2 * iz * iz * rel;
+        const coc = kc * (zc > zf ? zc - zf : zf - zc) * iz, q = (i * 7 + 29) & (DOFN - 1);
+        X += coc * DOFX[q]; Y += coc * DOFY[q]; a /= 1 + coc * 0.035;
+        OXo[i] = X; OYo[i] = Y; OAo[i] = a;
       }
-      project(GN, GB.X, GB.Y, GB.Z, GB.A, cam, GB.O, 2, 29, 0.6);
       const cold = [0.55, 0.66, 0.86], warm = [0.80, 0.74, 1.0];
       PX.points(GB.O.X, GB.O.Y, GN, [lerp(cold[0], warm[0], kCold), lerp(cold[1], warm[1], kCold), lerp(cold[2], warm[2], kCold)], { a: 1, A: GB.O.A, glow: 0.5 });
       // its names condense out of its own surface
@@ -360,7 +383,7 @@
           GB.A[m] = k * endDim * (0.8 + 0.4 * PX.rand(i, 85)); m++;
         }
         project(m, GB.X, GB.Y, GB.Z, GB.A, cam, GB.O, 0, 47, 0);
-        PX.points(GB.O.X, GB.O.Y, m, [0.93, 0.89, 1.0], { a: 55, A: GB.O.A, glow: 0.45 });
+        PX.points(GB.O.X, GB.O.Y, m, [0.93, 0.89, 1.0], { a: 40, A: GB.O.A, glow: 0.35 });
       });
     }
     PX.flush({ exposure: lerp(1.4, 1.5, ss(3.2, 6, ct)), glow: lerp(1, 0.95, ss(3.2, 6, ct)) });
@@ -385,8 +408,8 @@
     // b08
     if (ct >= 18) {
       L.serif(L8.claim, W / 2, 380, { size: 56, weight: 600, color: C.ink, glow: 8, reveal: prog(ct, 18.2, 19.6), alpha: 1 - ss(23.0, 23.8, ct), spacing: 3, highlight: ['列出的世界'], hiColor: '#d9d2ff' });
-      L.serif(L8.real, W / 2, 1560, { size: 56, weight: 600, color: C.ink, glow: 8, reveal: prog(ct, 30.0, 31.6), alpha: 1 - 0.3 * ss(34.5, 35.5, ct), spacing: 3 });
-      L.serif(L8.humble, W / 2, 1660, { size: 56, weight: 600, color: C.ink, glow: 8, reveal: prog(ct, 34.5, 36.2), spacing: 3, highlight: ['「我可能漏了什么」'], hiColor: '#d4c8ff' });
+      L.serif(L8.real, W / 2, 1510, { size: 56, weight: 600, color: C.ink, glow: 8, reveal: prog(ct, 30.0, 31.6), alpha: 1 - 0.3 * ss(34.5, 35.5, ct), spacing: 3 });
+      L.serif(L8.humble, W / 2, 1610, { size: 56, weight: 600, color: C.ink, glow: 8, reveal: prog(ct, 34.5, 36.2), spacing: 3, highlight: ['「我可能漏了什么」'], hiColor: '#d4c8ff' });
     }
   }
 

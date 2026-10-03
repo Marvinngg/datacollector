@@ -45,7 +45,8 @@
     FT[i] = (GR.rows - 1 - row) / GR.rows * 1.0 + PX.rand(i, 43) * 0.35;      // fall delay (bottom rows first)
   }
   // the lit 140 in pile order (a stable random order, so the later survivors are scattered through each pile)
-  const byRank = a => a.slice().sort((x, y) => PROJ.rank[x] - PROJ.rank[y]);
+  // pile order = departure order: bottom rows of the grid leave first (the field evaporates upward)
+  const byRank = a => a.slice().sort((x, y) => (GY[y] - GY[x]) + (PROJ.rank[x] - PROJ.rank[y]) * 60);
   const LIT = [];
   byRank(PROJ.succF).forEach((i, s) => LIT.push({ i, gold: 1, s, f: s / 50 }));
   byRank(PROJ.failF).forEach((i, s) => LIT.push({ i, gold: 0, s, f: s / 90 }));
@@ -82,7 +83,7 @@
     S.x1 = g('noise.nothing'); S.slide3 = S.x1 + 1.0;
     S.txt = g('noise.text'); S.ch = g('noise.chain');
     S.end = S.ch + d('noise.chain');
-    S.terms = [0, 1, 2, 3, 3.6].map(k => S.ch + k * B);
+    S.terms = [0, 1, 2, 2.5, 2.7].map(k => S.ch + k * B);
     SC = S; SCK = key; return S;
   }
   const LN = type => { const b = T.TL.beats.find(b => b.visual.type === type); return b ? b.visual.lines : {}; };
@@ -220,7 +221,7 @@
   }
   // card motion: hover from t hov, slam at imp; returns {s, rot, lift, sq}
   function cardMotion(t, hov, imp, o = {}) {
-    const hi = o.hi || 1.55;
+    const hi = o.hi || 1.38;
     if (t < imp) {
       const fall = prog(t, imp - (o.fall || 0.3), imp);
       const hover = 1 - 0.06 * ease.out(prog(t, hov, imp - 0.3)) + 0.012 * Math.sin((t - hov) * 3.2);
@@ -377,7 +378,7 @@
       countLine((L1.lit || [])[1] || '', s, W / 2, 1668, CSTEEL, labA);
     }
     // pile counters
-    const cntA = ease.out(prog(t, S.st0 + 0.6, S.st0 + 1.2)) * (1 - ease.inOut(prog(t, S.ch, S.ch + 0.8)));
+    const cntA = ease.out(prog(t, S.st0 + 1.0, S.st0 + 1.5)) * (1 - ease.inOut(prog(t, S.ch, S.ch + 0.8)));
     if (cntA > 0.003) {
       const pulse3 = t > S.sv3 ? Math.exp(-(t - S.sv3 - 0.5) * 3) * (t < S.sv3 + 0.5 ? (t - S.sv3) / 0.5 : 1) : 0;
       counter(nG, PILE.gx, CNT_Y, CGOLD, cntA, pulse3);
@@ -399,8 +400,8 @@
     // ×1 (b13): small, plain, a little comic
     timesOne(t, S, L3.times || '×1');
     // the text (b13)
-    if (t > S.txt - 0.1 && t < S.ch + 1) {
-      const out = ease.in(prog(t, S.ch - 0.1, S.ch + 0.5)), str = L3.text || '', cut = str.indexOf('，');
+    if (t > S.txt - 0.1 && t < S.ch + 0.1) {
+      const out = ease.in(prog(t, S.ch - 0.55, S.ch + 0.05)), str = L3.text || '', cut = str.indexOf('，');
       const rows = cut > 0 ? [str.slice(0, cut + 1), str.slice(cut + 1)] : [str];
       rows.forEach((r, k) => L.serif(r, W / 2, 1460 + k * 84, { size: 60, weight: 600, color: CINK, glow: 6, alpha: 1 - out, reveal: prog(t, S.txt + 0.1 + k * 1.0, S.txt + 1.2 + k * 1.0), highlight: k ? ['等于没乘'] : [], hiColor: CGOLD }));
     }
@@ -488,7 +489,7 @@
     const bob = (j, side) => Math.sin(t * Math.PI * 2 / (B * 2) + j * 0.9 + side) * 1.6;
     // a figure that is losing its particles lets them fall; one that is being born gathers them from the ×5
     const drawFig = (fx, j, side, presence, col, born, aMul) => {
-      const nn = fig.n, f = pbuf('fig' + side + j, nn), lean = 0.13, back = j % 2, sc = back ? 0.84 : 1, yo = back ? -12 : 0;
+      const nn = fig.n, f = pbuf('fig' + side + j, nn), lean = 0.09, back = j % 2, sc = back ? 0.84 : 1, yo = back ? -12 : 0;
       const shown = presence * nn;
       let k = 0;
       for (let q = 0; q < nn; q++) {
@@ -518,9 +519,9 @@
       if (born <= 0) continue;
       const keep = j <= 2 ? 1 : j === 3 ? 1 / 3 : 0, lose = ease.inOut(prog(t, S.x23 + 0.25, S.x23 + 0.6));
       const presence = born < 1 ? 1 : lerp(1, keep, lose);
-      drawFig(ROPE.gIn - 14 - j * 25, j, -1, presence, GOLD, born, 1);
+      drawFig(ROPE.gIn - 16 - j * 31, j, -1, presence, GOLD, born, 1);
     }
-    for (let j = 0; j < 9; j++) drawFig(ROPE.sIn + 14 + j * 25, j, 1, 1, LSTEEL, 1, 0.9);
+    for (let j = 0; j < 9; j++) drawFig(ROPE.sIn + 16 + j * 28, j, 1, 1, LSTEEL, 1, 0.9);
   }
 
   // ---------------------------------------------------------------- HUD: the odds and the odometer (top, then at the rope)
@@ -534,11 +535,11 @@
     // odds: 1 : 9 → 5 : 9 → 10 : 27 (swap half-way through each roll)
     const sets = [['1', '9'], ['5', '9'], ['10', '27']];
     const sw1 = S.roll1 + S.rollD * 0.45, sw2 = S.roll2 + S.rollD * 0.45;
-    const draw = (pair, al, k) => rich([{ s: pair[0], c: CGOLD }, { s: ':', c: CDIM }, { s: pair[1], c: CSTEEL }], ox, oy, { size: os, weight: 600, alpha: a * al, k, gap: os * 0.3 });
-    const f1 = clamp((t - sw1) / 0.35), f2 = clamp((t - sw2) / 0.35);
-    if (f1 < 1) draw(sets[0], 1 - f1, 1); else if (f2 < 1) { draw(sets[1], 1 - f2, f1 < 1 ? f1 : 1); } else draw(sets[2], 1, f2);
-    if (f1 > 0 && f1 < 1) draw(sets[1], f1, f1);
-    if (f2 > 0 && f2 < 1) draw(sets[2], f2, f2);
+    const draw = (pair, al, k, up) => rich([{ s: pair[0], c: CGOLD }, { s: ':', c: CDIM }, { s: pair[1], c: CSTEEL }], ox, oy - (up || 0) * os * 0.6, { size: os, weight: 600, alpha: a * al, k, gap: os * 0.3 });
+    const f1 = ease.inOut(clamp((t - sw1) / 0.4)), f2 = ease.inOut(clamp((t - sw2) / 0.4));
+    const cur = f2 > 0 ? 2 : f1 > 0 ? 1 : 0, f = cur === 2 ? f2 : cur === 1 ? f1 : 1;
+    if (cur > 0 && f < 1) draw(sets[cur - 1], 1 - f, 1, f);          // the old odds lift away
+    draw(sets[cur], cur ? f : 1, cur ? f : 1);                          // the new ones rise in
     // the odometer
     const roll = (pp.k1 > 0 && pp.k1 < 1) || (pp.k2 > 0 && pp.k2 < 1);
     const col = roll ? '#fff4dc' : '#f3e7cc';
@@ -599,7 +600,7 @@
       const fl = 0.55 + 0.45 * Math.sin(t * (5 + PX.rand(s, 151) * 4) + s * 2.1), lvl = s < NSU ? 1 : 0.6;
       for (let q = 0; q < 22; q++) { const an = q / 22 * TAU + t * 0.4; b.X[b.n] = x + Math.cos(an) * 9.5 + shx; b.Y[b.n] = y + Math.sin(an) * 9.5 + shy; b.A[b.n] = ap * fl * lvl; b.n++; }
     }
-    PX.points(b.X, b.Y, b.n, EMBER, { a: 0.42 * A, A: b.A, glow: 0.6 });
+    PX.points(b.X, b.Y, b.n, EMBER, { a: 0.7 * A, A: b.A, glow: 0.6 });
   }
   function ghostLines(t, S, A, label) {
     const ctx = K.ctx, y50 = levelY(NSU / 10), y60 = levelY(NSU * 1.5 / 10);
@@ -617,13 +618,13 @@
 
   // ---------------------------------------------------------------- the chain: "1:9  ×5  ×⅔  =  10:27"
   function chainLine(t, S, str, shx, shy) {
-    const terms = str.split(/\s{2,}/).filter(Boolean), size = 92, gap = 46, y = 1110;
+    const terms = str.split(/\s{2,}/).filter(Boolean), size = 96, gap = 44, y = 1452;
     const ws = terms.map(s => measureT(s, size, F.serif, 600)), tw = ws.reduce((a, b) => a + b, 0) + gap * (terms.length - 1);
     let x = W / 2 - tw / 2;
     const out = 1;
     terms.forEach((s, ti) => {
       const c = cloud(s, size, { weight: 600, step: 1.7 }), cx = x + ws[ti] / 2; x += ws[ti] + gap;
-      const t0 = S.terms[Math.min(ti, S.terms.length - 1)], last = ti === terms.length - 1, dur = last ? 1.3 : 0.75;
+      const t0 = S.terms[Math.min(ti, S.terms.length - 1)], last = ti === terms.length - 1, dur = last ? 1.2 : 0.7;
       const k = prog(t, t0, t0 + dur); if (k <= 0) return;
       const col = s.includes('⅔') ? LSTEEL : s.includes('×') ? GOLD : last ? [1, 0.88, 0.62] : s === '=' ? [0.75, 0.75, 0.78] : [0.95, 0.92, 0.86];
       const n = c.n, b = pbuf('ch' + ti, n);
@@ -639,9 +640,9 @@
       }
       const fl = Math.exp(-Math.max(0, t - t0 - dur * 0.8) * 3) * (k >= 0.8 ? 1 : 0);
       // the light sweep along the whole line once it is complete
-      const swp = (t - (S.terms[4] + 1.5)) / 1.0, sx0 = W / 2 - tw / 2 + swp * (tw + 200) - 100;
+      const swp = (t - (S.terms[4] + 1.05)) / 0.9, sx0 = W / 2 - tw / 2 + swp * (tw + 200) - 100;
       const sweep = swp > 0 && swp < 1 ? Math.exp(-Math.pow((cx - sx0) / 120, 2)) : 0;
-      PX.points(b.X, b.Y, n, mixc(tc2, col, [1, 1, 1], Math.min(1, fl * 0.5 + sweep * 0.6)), { a: (0.5 + fl * 0.4 + sweep * 0.5) * out, A: b.A, glow: 0.55 });
+      PX.points(b.X, b.Y, n, mixc(tc2, col, [1, 1, 1], Math.min(1, fl * 0.5 + sweep * 0.6)), { a: (0.95 + fl * 0.6 + sweep * 0.8) * out, A: b.A, glow: 0.7 });
     });
   }
 
@@ -677,8 +678,8 @@
     c.push({ t: S.sv3, type: 'ticks', dur: S.sv3d, n: NGU + NSU, p0: 0.5, p1: 0.5, group: 'same' });
     c.push({ t: S.x1, type: 'thud' });
     c.push({ t: S.slide3, type: 'whoosh', dur: 1.0 });
-    S.terms.forEach((tt, i) => c.push({ t: tt, type: i === 4 ? 'gather' : 'chip', ...(i === 4 ? { dur: 1.3 } : {}) }));
-    c.push({ t: S.terms[4] + 1.5, type: 'resolve' });
+    S.terms.forEach((tt, i) => c.push({ t: tt, type: i === 4 ? 'gather' : 'chip', ...(i === 4 ? { dur: 1.2 } : {}) }));
+    c.push({ t: S.terms[4] + 1.15, type: 'resolve' });
     return c;
   }
 

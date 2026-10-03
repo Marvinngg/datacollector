@@ -367,6 +367,12 @@
     ];
   }
 
+  // the result of chapter 3, waiting under 「算出概率」; it leaves to the right when the beam arrives
+  function introBead(S, T) {
+    if (T > S.lever + 1.6) return null;
+    const a = ease.out(prog(T, S.calc + 0.4, S.calc + 1.2)), go = ease.in(prog(T, S.lever - 0.2, S.lever + 1.4));
+    return { x: W / 2 + go * 640, y: TY + Math.sin(T * 1.6) * 4 * (1 - go), a: a * (1 - prog(go, 0.7, 1)), lab: 1 - prog(go, 0, 0.3) };
+  }
   // ---------------------------------------------------------------- shared drawing for the b14 → b15 chain
   function drawChain(ctx, V, lt, api, isB15) {
     const S = schedule(api), T = lt - api.chainStart;
@@ -408,8 +414,11 @@
       }
       PX.points(SX, SY, j, COL.gold, { a: 0.55, A: SA, glow: 0.6 });
     }
+    const ib = introBead(S, T);
+    if (ib) bead(ib.x, ib.y, 16, COL.gold, ib.a * 1.1);
     sentinels();
     PX.flush({ exposure: 1.5, glow: 1.0 });
+    if (ib) text('27%', ib.x, ib.y - 40, { size: 40, family: F.mono, weight: 700, color: C.gold, align: 'center', alpha: ib.a * ib.lab });
 
     // ---------- canvas overlays
     const axisLab = 1 - sk;
@@ -420,8 +429,8 @@
     const L14 = vis14.lines;
     if (!isB15) {
       const out = prog(T, S.lever + 4.5, S.lever + 5.3);
-      const rows = L14.calc.split(/(?<=，)/);
-      rows.forEach((r, i) => type(r, W / 2, 420 + i * 92, { size: 66, mode: 'rise', k: prog(T, S.calc + 0.15 + i * 0.5, S.calc + 1.3 + i * 0.5), out, color: i ? C.ink : C.dim }));
+      const rows = L14.calc.split(/(?<=，)/), up = ease.inOut(prog(T, S.lever - 0.4, S.lever + 0.7));
+      rows.forEach((r, i) => type(r, W / 2, lerp(860, 420, up) + i * 92, { size: 66, mode: 'rise', k: prog(T, S.calc + 0.15 + i * 0.5, S.calc + 1.3 + i * 0.5), out, color: i ? C.ink : C.dim }));
     }
     // win / lose labels (they leave when the frame splits)
     const labOut = sk > 0 ? prog(T, S.split, S.split + 0.5) : 0;
@@ -550,7 +559,7 @@
         PX.points(SX, SY, n, col, { a: aCore * lerp(0.6, 1, wk), A: SA, glow: lerp(0.2, 0.4, wk) });
         if (wk <= 0) return;
         // strata: the wall's outer body, streaming up as we fall (with motion streaks)
-        const m = 26000, st = clamp(cam.vel * 0.035, 0, 90), reps = st > 4 ? 3 : 1; scratch(m * reps);
+        const m = 17000, st = clamp(cam.vel * 0.035, 0, 90), reps = st > 4 ? 2 : 1; scratch(m * reps);
         const span = H + 200; let j = 0;
         for (let i = 0; i < m; i++) {
           const dx = -Math.log(1 - PX.rand(i, seed + 3) * 0.97) * 42, par = 1;
@@ -559,7 +568,7 @@
           const A = (0.25 + 0.75 * Math.exp(-dx / 60)) * band * band * (0.4 + 0.6 * PX.rand(i, seed + 5)) / Math.sqrt(reps);
           for (let r = 0; r < reps; r++) { SX[j] = x + side * dx; SY[j] = y + r * st / 2; SA[j] = A; j++; }
         }
-        PX.points(SX, SY, j, col, { a: 0.5 * wk, A: SA, glow: 0.22 });
+        PX.points(SX, SY, j, col, { a: 0.62 * wk, A: SA, glow: 0.22 });
         // depth marks on the inner face (a ruler you fall past)
         const q = 30, step = 64; scratch(q * 40); j = 0;
         const off = ((cam.fall % step) + step) % step;
@@ -575,7 +584,7 @@
       if (axisY > -60) bead(x27, axisY, lerp(15, 24, cam.zk), COL.gold, 1.1);
       // ---------- falling dust in the canyon (streaks while fast)
       if (cam.fall > 0) {
-        const n = 1800, st = clamp(cam.vel * 0.06, 0, 140), reps = Math.max(1, Math.min(48, Math.ceil(st / 1.5))); scratch(n * reps);
+        const n = 1800, st = clamp(cam.vel * 0.06, 0, 140), reps = Math.max(1, Math.min(32, Math.ceil(st / 2))); scratch(n * reps);
         const span = H + 300; let j = 0;
         for (let i = 0; i < n; i++) {
           const d = 0.3 + 0.7 * PX.rand(i, 141), x = lerp(x25 + 10, x27 - 10, PX.rand(i, 142));

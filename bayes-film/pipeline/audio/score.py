@@ -1045,6 +1045,17 @@ def env_from(spans, kind):
             g[i0:i1] *= env_points(i1 - i0, [(x - i0 / SR, y) for x, y in pts], curve='cos')
     return g
 G = env_from(GATE, 'gate')[:, None]; HD = env_from(DUCK, 'duck')[:, None]
+if '--stems' in sys.argv:        # debug: loudness of each bus per step
+    import pyloudnorm as pyln
+    M_ = pyln.Meter(SR, block_size=0.4)
+    for b_ in BEATS:
+        for s_ in steps(b_):
+            i0, i1 = n_of(s_['t']), n_of(s_['t'] + s_['dur'])
+            vals = []
+            for y in (mus * HD, fxb * 0.85):
+                try: vals.append(M_.integrated_loudness(y[i0:i1]))
+                except Exception: vals.append(-99)
+            print(f"   stem {b_['id']} {s_['show']:9s} music {vals[0]:6.1f}  fx {vals[1]:6.1f}")
 mix = mus * 1.0 * HD + fxb * 0.85
 mix = filt(mix, 'hp', 28, order=2)
 mix = mix * G + post

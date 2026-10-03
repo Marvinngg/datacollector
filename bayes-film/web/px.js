@@ -128,7 +128,7 @@
     const pad = 2, x0 = Math.max(0, cx0 - pad), y0 = Math.max(0, cy0 - pad), x1 = Math.min(W - 1, cx1 + pad), y1 = Math.min(H - 1, cy1 + pad);
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1;
     if (dirtyGlow && (o.glow == null || o.glow > 0)) {
-      const r = o.glowR || 4, gx0 = Math.max(0, (x0 >> 2) - r * 2), gy0 = Math.max(0, (y0 >> 2) - r * 2), gx1 = Math.min(GW - 1, (x1 >> 2) + r * 2), gy1 = Math.min(GH - 1, (y1 >> 2) + r * 2);
+      const r = o.glowR || 4, pg = r * 3 + 3, gx0 = Math.max(0, (x0 >> 2) - pg), gy0 = Math.max(0, (y0 >> 2) - pg), gx1 = Math.min(GW - 1, (x1 >> 2) + pg), gy1 = Math.min(GH - 1, (y1 >> 2) + pg);   // pad past the blur's reach (2r)
       blurGlow(r, gx0, gy0, gx1, gy1);
       const gs = o.glow == null ? 1 : o.glow;
       for (let y = gy0; y <= gy1; y++) for (let x = gx0, k = (y * GW + gx0) * 3, j = y * GW + gx0; x <= gx1; x++, k += 3, j++) {
