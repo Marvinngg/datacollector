@@ -402,7 +402,7 @@
   const NS = 2600;                                                   // sparks from an unseen campfire below
   const WORD = { size: 250, y: 1112, cx: 540, top: 892, bot: 1142 };
   const STAMP = { x: 540, y: 680, w: 290, h: 158 };
-  const PHR = { size: 84, y: 452 };
+  const PHR = { size: 90, y: 456 };
   let M11 = null;
   function mat11(V, T0) {
     if (M11) return M11;
@@ -513,7 +513,7 @@
         const rx = bx - STAMP.x, g = Math.exp(-Math.pow((by - sy) / 120, 2)) * Math.sin(Math.PI * u);
         const clear = 175 + 150 * R(j, 75);                            // each passes at its own distance: no rim
         bx += (rx >= 0 ? 1 : -1) * Math.max(0, clear - Math.abs(rx)) * g;
-        x = bx; y = by; a = lerp(a, 0.95, smooth(u)) * (1 + 0.5 * Math.sin(Math.PI * u));
+        x = bx; y = by; a = lerp(a, 0.95, smooth(u)) * (1 + 1.3 * Math.sin(Math.PI * u));
       }
       // 3. hold (breathing), then fly on: upward and outward, the left wing left, the right wing right
       if (u >= 1) {

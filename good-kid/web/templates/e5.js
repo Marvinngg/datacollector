@@ -268,7 +268,7 @@
 
   // ================================================================================================ b17 fall
   // world (identity camera = the opening shot): cliff top at YT, the edge at XE, the floor HC below
-  const YT = 860, XE = 600, HC = 300, YF = YT + HC, YOU = 150, XL = XE + 95;   // XL: where 你 comes down
+  const YT = 860, XE = 600, HC = 300, YF = YT + HC, YOU = 150, XL = XE + 140;   // XL: where 你 comes down
   const FEET = 0.47;                                     // KIT.you: feet ≈ centre + 0.47 x size
   // the silhouette: a plateau rising gently to the left, a worn lip, a jagged face stepping back to the floor
   const FACE = [[XE, YT], [XE + 7, YT + 12], [XE - 3, YT + 30], [XE - 15, YT + 56], [XE - 9, YT + 88], [XE - 24, YT + 124],
@@ -410,10 +410,10 @@
     return { D: fallD(tauS) + vS * k * (1 - Math.exp(-d / k)), v: vS * Math.exp(-d / k) };
   }
   // camera (world point shown at screen (540, 960), scale s)
-  const S_OPEN = 1.08, CAM_FLOOR = { s: 0.7, wx: 660, wy: 1005 }, LAND_AT = { x: 560, y: 918 };
+  const S_OPEN = 1.36, CAM_FLOOR = { s: 0.72, wx: 705, wy: 1000 }, LAND_AT = { x: 556, y: 930 };
   function camAt(S, lt) {
     const pk = ease.inOut(prog(lt, S.tC, S.tS + 2.2));
-    let c = { s: lerp(1, S_OPEN, pk), wx: lerp(540, 575, pk), wy: lerp(960, 930, pk) };
+    let c = { s: lerp(1.24, S_OPEN, pk), wx: lerp(565, 580, pk), wy: lerp(950, 925, pk) };
     if (lt >= S.tL - 0.6) {                                   // landing shot (world-true), then the pull-back
       const yc = YF - FEET * YOU, s0 = S_OPEN;
       c = { s: s0, wx: XL - (LAND_AT.x - 540) / s0, wy: yc - (LAND_AT.y - 960) / s0 };
@@ -464,9 +464,9 @@
   }
   // the rush: depth layers moving up (screen space): far dust, thin streaks, and a few big soft ones close by
   const LAYERS = [
-    { n: 900, par: 0.22, a: 0.30, len: 0.03, seed: 31, size: 1 },
-    { n: 150, par: 0.7, a: 0.34, len: 0.05, seed: 41, size: 1 },
-    { n: 12, par: 2.2, a: 0.26, len: 0.07, seed: 51, size: 2 },
+    { n: 1100, par: 0.22, a: 0.42, len: 0.03, seed: 31, size: 1 },
+    { n: 140, par: 0.7, a: 0.34, len: 0.05, seed: 41, size: 1 },
+    { n: 12, par: 2.2, a: 0.2, len: 0.07, seed: 51, size: 2 },
   ];
   function rush(D, v, a, xHole) {
     if (a <= 0.003) return;
@@ -477,7 +477,7 @@
         const x = PX.rand(i, L.seed) * (W + 80) - 40, sp = 0.7 + 0.6 * PX.rand(i, L.seed + 1);
         const y = ((PX.rand(i, L.seed + 2) * span - D * L.par * sp) % span + span) % span - 700;
         if (y > H + 10 || y + len * sp < -10) continue;
-        const near = Math.abs(x - xHole) < 110 ? 0.4 : 1, A = (0.35 + 0.65 * PX.rand(i, L.seed + 3)) * near * Math.min(1, 3 / Math.sqrt(m));
+        const near = Math.abs(x - xHole) < 110 ? 0.4 : 1, A = (0.3 + 0.7 * PX.rand(i, L.seed + 3) ** 2) * near;
         for (let q = 0; q < m; q++) { SX[j] = x; SY[j] = y + q * len * sp / m; SA[j] = A * (q === 0 ? 1.4 : 1 - q / m * 0.75); j++; }
       }
       PX.points(SX, SY, j, mix(LAMP, [0.55, 0.62, 0.78], 0.45), { a: a * L.a, A: SA, glow: L.size > 1 ? 0.7 : 0.25, size: L.size });
@@ -499,7 +499,7 @@
       const R = lt > cT ? 1500 * (1 - Math.exp(-(lt - cT) / 2.0)) : 0;                         // light spread (world px)
       const reveal = ease.inOut(prog(lt, S.tF + 0.8, S.tF + 4.8));
       // ---------- darkness deepens during the fall
-      const dark = falling && !landShot ? 0.3 * ease.inOut(clamp(tau / 4)) : landShot ? 0.3 * (1 - ease.out(prog(lt, S.tL, S.tL + 2.5))) : 0;
+      const dark = falling && !landShot ? 0.22 * ease.inOut(clamp(tau / 4)) : landShot ? 0.3 * (1 - ease.out(prog(lt, S.tL, S.tL + 2.5))) : 0;
       veil(dark);
       // ---------- the cliff: lit from above (opening), an endless face (fall), the true cliff (landing, reveal)
       if (!landShot) {
@@ -524,7 +524,7 @@
           const y = YF + 10 + md * FLOOR_D, dist = Math.hypot(mx - XL, (y - YF) / FLOOR_SQ);
           const lit = clamp((R - dist) / 300); if (lit <= 0.01) continue;
           const pk = 0.65 + 0.55 * md, flash = Math.exp(-Math.max(0, R - dist) / 200);
-          ctx.save(); ctx.translate(mx, y); ctx.scale(ms * pk, ms * pk * FLOOR_SQ * 1.5); ctx.rotate(mr);
+          ctx.save(); ctx.translate(mx, y); ctx.scale(ms * pk, ms * pk * FLOOR_SQ * 2); ctx.rotate(mr);
           ctx.globalAlpha = lit * mb * (0.16 + 0.22 * flash) * (0.6 + 0.4 * md);
           ctx.fillStyle = warmS(1); ctx.fillText('人', 0, 18);
           if (mz > 0.45) { ctx.strokeStyle = warmS(0.35); ctx.lineWidth = 1.2 / (ms * pk); ctx.beginPath(); ctx.ellipse(0, 0, 50, 50, 0, 0, TAU); ctx.stroke(); }
@@ -579,7 +579,7 @@
         PX.points(SX, SY, n, LAMP, { a: 0.22 * va, A: SA, glow: 0.2 });
       }
       // ---------- 你
-      const yo = KIT.you(you.x, you.y, you.size, { t: lt, rot: you.rot, gray: you.gray, own: you.own, drift: you.drift, breathe: you.breathe, a: 1.35 });
+      const yo = KIT.you(you.x, you.y, you.size, { t: lt, rot: you.rot, gray: you.gray, own: you.own, drift: you.drift, breathe: you.breathe, a: 1.7 });
       if (you.stream > 0.02) {
         // its particles stream upward (the air of the fall)
         const n = yo.n, m = 3, len = 30 + 260 * you.stream; scratch(Math.ceil(n / 2) * m); let j = 0;
@@ -590,7 +590,7 @@
         PX.points(SX, SY, j, [0.62, 0.66, 0.74], { a: 0.2 * you.stream + 0.04, A: SA, glow: 0.2 });
       }
       PX.flush({ exposure: 1.45, glow: 0.95 });
-      if (falling && !landShot) vignette(0.9 * ease.inOut(clamp((tau - 0.5) / 4)));
+      if (falling && !landShot) vignette(0.75 * ease.inOut(clamp((tau - 0.5) / 4)));
       else if (landShot) vignette(0.9 * (1 - ease.out(prog(lt, S.stop, S.stop + 1.2))));
       // ---------- soft warm light pool on the floor (canvas, additive)
       if (lightK) {

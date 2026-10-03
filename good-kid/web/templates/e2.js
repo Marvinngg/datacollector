@@ -68,7 +68,7 @@
       const tN = at(api, 'name'), tP = at(api, 'praise'), tR = at(api, 'rule'), dur = api.dur;
       const words = V.lines.praise, TL_ = wordTimes(api);
       // ---- the term
-      const kT = prog(lt, tN + 0.25, tN + 2.3), up = ease.inOut(prog(lt, tP - 0.6, tP + 1.2));
+      const kT = prog(lt, tN + 0.25, tN + 2.3), up = ease.inOut(prog(lt, tP - 1.7, tP + 0.1));
       const ty = lerp(560, 330, up), ts = lerp(1, 0.62, up), ta = lerp(1, 0.62, up);
       ctx.save(); ctx.translate(W / 2, ty); ctx.scale(ts, ts);
       L.serif(V.lines.name, 0, 0, { size: 96, weight: 600, color: '#f2ecdf', glow: 5, reveal: kT, spacing: 22, alpha: ta });
@@ -223,7 +223,7 @@
       let st;
       const fl = floatState(lt, tG);
       const litMet = 0.82 + 0.05 * Math.sin(lt * 1.3);
-      const litGone = lerp(litMet, 0.3, smooth(prog(lt, tG + 0.6, tG + 4.4)));
+      const litGone = lerp(litMet, 0.36, smooth(prog(lt, tG + 0.6, tG + 4.4)));
       if (lt < tF) st = { ...fl, lit: lt < tG ? litMet : litGone };
       else {
         const s0 = floatState(tF, tG), k = ease.inOut(prog(lt, tF, tF + 2.1));
@@ -234,7 +234,7 @@
         st = {
           x: lerp(s0.x, tx, k), y: lerp(s0.y, ty, k) + bob, rot: lerp(s0.rot, 0, k) + 0.02 * Math.sin((lt - tF) * 1.2) * (1 - k),
           drift: lerp(s0.drift, 0, k), scale: lerp(1, sc, k),
-          lit: lerp(0.3, 0.36, k) + 0.5 * smooth(prog(lt, tF + 4.4, tF + 6.0)),
+          lit: 0.36 + 0.5 * smooth(prog(lt, tF + 4.4, tF + 6.0)),
         };
       }
 

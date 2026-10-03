@@ -37,7 +37,7 @@
   const FOC = 1000;
   // cu: how far the far end of the page curls up to face the camera (0..1); fade: soften the page's near rows
   const CAM0 = { th: 0, D: 1000, Cy: 380, Yc: 960, cx: 0, cu: 0, fade: 0 };          // flat: the sheet at 1:1, x 100..980, y 180..1340
-  const CAM1 = { th: 60 * DEG, D: 800, Cy: 940, Yc: 520, cx: 0, cu: 0, fade: 1 };    // the floor (b18 'up' .. b20)
+  const CAM1 = { th: 56 * DEG, D: 950, Cy: 900, Yc: 480, cx: 90, cu: 0, fade: 1 };   // the floor (b18 'up' .. b20)
   const CAM2 = { th: 52 * DEG, D: 1700, Cy: 1200, Yc: 840, cx: 0, cu: 0, fade: 0.4 }; // b21: risen and eased back, room above
   const camMix = (a, b, k) => { const o = {}; for (const key in a) o[key] = lerp(a[key], b[key], k); return cam(o); };
   const cam = o => (o.c = Math.cos(o.th), o.s = Math.sin(o.th), o);
@@ -54,7 +54,7 @@
     const iz = FOC / (z + cm.D);
     out.x = W / 2 + (u - SW / 2 - cm.cx) * iz; out.y = cm.Yc - (y - cm.Cy) * iz; out.s = iz; return out;
   }
-  const fadeAt = (cm, y) => 1 - cm.fade * 0.82 * ss(1250, 1720, y);
+  const fadeAt = (cm, y) => 1 - cm.fade * 0.85 * ss(1180, 1440, y);
 
   // ---------------------------------------------------------------- sheet layers (painted once, flat)
   function paintSheet(g, o) {                          // the same drawing as KIT.sheet (fill 1, grey), on any canvas
@@ -86,8 +86,8 @@
     // the imprint 你 leaves on the paper (same glyph, same place as the particle body lying there)
     const yc = youCloud(), print = mk(cw, ch), pg = print.getContext('2d');
     pg.font = `600 ${yc.fs}px ${F.serif}`; pg.textAlign = 'center'; pg.fillStyle = 'rgba(138,143,152,0.3)';
-    const bl = PAD + yc.baseV - yc.baseYoff + 0.38 * yc.fs;
-    pg.fillText('你', PAD + U0, bl); pg.fillStyle = 'rgba(138,143,152,0.1)'; pg.fillText('你', PAD + U0 + 1.5, bl + 1.5);
+    const bl = PAD + PRINT_V - yc.baseYoff + 0.38 * yc.fs;
+    pg.fillText('你', PAD + PRINT_U, bl); pg.fillStyle = 'rgba(138,143,152,0.12)'; pg.fillText('你', PAD + PRINT_U + 1.5, bl + 1.5);
     return (LAY = { fk, sheet, warm, head, print });
   }
   /* map rows v0..v1 of a flat layer onto the screen through the camera, in thin strips (each strip is an affine map;
@@ -152,7 +152,8 @@
   }
 
   // ================================================================ 你 as a 3D particle body
-  const U0 = SW / 2, PSIZE = 380;               // 你 lies centred across the page; glyph size in world units (= px when flat)
+  // 你 lies printed a little left of centre; it stands up beside its imprint (glyph size in world units = px when flat)
+  const PSIZE = 420, PRINT_U = 370, PRINT_V = 770, STAND_U = 610, STAND_V = 830;
   let YOU = null;
   function youCloud() {
     const fk = document.fonts.check(`600 40px ${F.serif}`, '你');
@@ -161,7 +162,6 @@
     let y0 = 1e9, y1 = -1e9; for (let i = 0; i < n; i++) { if (c.Y[i] < y0) y0 = c.Y[i]; if (c.Y[i] > y1) y1 = c.Y[i]; }
     const sc = PSIZE / S, GX = new Float32Array(n), UP = new Float32Array(n), hgt = (y1 - y0) * sc;
     for (let i = 0; i < n; i++) { GX[i] = c.X[i] * sc; UP[i] = (y1 - c.Y[i]) * sc; }
-    const baseV = 760;                            // the glyph's foot on the page
     // four small lights to kindle, each on a stroke: pick the particle nearest to a target spot
     const tgt = [[-0.30, 0.70], [0.16, 0.80], [0.04, 0.38], [0.30, 0.22]], EM = [];
     for (const [tx, ty] of tgt) {
@@ -171,7 +171,7 @@
     }
     const EW = new Float32Array(n * 4);
     for (let i = 0; i < n; i++) for (let e = 0; e < 4; e++) { const d2 = (GX[i] - EM[e][0]) ** 2 + (UP[i] - EM[e][1]) ** 2; EW[i * 4 + e] = Math.exp(-d2 / (2 * 26 * 26)); }
-    return (YOU = { fk, n, GX, UP, hgt, EM, EW, baseV, fs: S * sc, baseYoff: y1 * sc, X: new Float32Array(n), Y: new Float32Array(n), A: new Float32Array(n), Cc: new Float32Array(n * 3) });
+    return (YOU = { fk, n, GX, UP, hgt, EM, EW, fs: S * sc, baseYoff: y1 * sc, X: new Float32Array(n), Y: new Float32Array(n), A: new Float32Array(n), Cc: new Float32Array(n * 3) });
   }
 
   /* draw 你. st: u, v (foot on the page), phi (0 lying on the page .. 90deg upright), yaw, lift (extra height),
@@ -187,6 +187,7 @@
     const col = [0, 1, 2].map(k => lerp(base[k] * 0.55 * (1 - 0.7 * own) + LC.lamp[k] * lit * 0.9 + LC.warm[k] * own * 1.25, lum * (0.55 + lit * 0.9 + own), gray));
     const wr = LC.warm, emOn = em[0] + em[1] + em[2] + em[3] > 0.001;
     const q = {}; let s0 = 1;
+    if (st.occ > 0) occlude(cm, st, Y, cyaw, syaw);
     for (let i = 0; i < n; i++) {
       const r1 = R(i, 21), r2 = R(i, 22);
       const ph = phi + fl * (r1 - 0.5) * 0.5, up = Y.UP[i], gx = Y.GX[i];
@@ -207,6 +208,29 @@
     const ph = phi, mid = Y.hgt * 0.5, c = P(cm, st.u, st.v - mid * Math.cos(ph), mid * Math.sin(ph) + (st.lift || 0), {});
     const foot = P(cm, st.u, st.v, 0, {});
     return { x: c.x, y: c.y, s: c.s, fx: foot.x, fy: foot.y, X: OX, Y: OY, n, emPos: Y.EM.map(([ex, eu]) => P(cm, st.u + ex * cyaw, st.v - eu * Math.cos(ph) - ex * syaw, eu * Math.sin(ph) + (st.lift || 0), {})) };
+  }
+  /* 你 is a body: it hides the paper behind it. A soft dark silhouette of the glyph, mapped onto the glyph's plane
+     (an affine fit: foot, one unit across, one unit up), drawn before its light. */
+  let OCC = null;
+  function occSprite() {
+    const fk = document.fonts.check(`600 40px ${F.serif}`, '你');
+    if (OCC && OCC.fk === fk) return OCC;
+    const S = 420, c = mk(560, 600), g = c.getContext('2d');
+    g.filter = 'blur(5px)'; g.font = `600 ${S}px ${F.serif}`; g.textAlign = 'center'; g.fillStyle = '#05070b';
+    g.fillText('你', 280, 300 + S * 0.38); g.filter = 'none';
+    return (OCC = { fk, c, ox: 280, oy: 300 });
+  }
+  function occlude(cm, st, Y, cyaw, syaw) {
+    const o = occSprite(), sc = PSIZE / 420, ph = st.phi, lf = st.lift || 0;
+    const f = P(cm, st.u, st.v, lf, {}), ex = P(cm, st.u + 100 * cyaw, st.v - 100 * syaw, lf, {});
+    const ey = P(cm, st.u, st.v - 100 * Math.cos(ph), 100 * Math.sin(ph) + lf, {});
+    const axx = (ex.x - f.x) / 100 * sc, axy = (ex.y - f.y) / 100 * sc, ayx = (ey.x - f.x) / 100 * sc, ayy = (ey.y - f.y) / 100 * sc;
+    // sprite pixel (px, py) -> cloud (X = px - ox, Y = py - oy) -> (gx = X sc, up = (y1 - Y) sc)
+    const y1 = Y.baseYoff / sc;
+    const ctx = K.ctx; ctx.save();
+    ctx.globalAlpha *= 0.9 * st.occ;
+    ctx.transform(axx, axy, -ayx, -ayy, f.x - o.ox * axx + (y1 + o.oy) * ayx, f.y - o.ox * axy + (y1 + o.oy) * ayy);
+    ctx.drawImage(o.c, 0, 0); ctx.restore();
   }
   // a soft warm halo behind 你 (own light)
   function halo(x, y, r, a) {
@@ -277,11 +301,14 @@
     let phi = lerp(cm.th, 90 * DEG, kS);
     // looking: at the header (given), then down at the child (kid)
     phi -= 7 * DEG * ss(S.given + 0.4, S.given + 2.6, ct) + 5 * DEG * ss(S.kid + 1.2, S.kid + 3.6, ct);
-    const yaw = -0.2 * ss(S.kid + 1.2, S.kid + 3.8, ct);
+    const yaw = 0.26 * ss(S.kid + 1.2, S.kid + 3.8, ct);
     const fl = Math.sin(Math.PI * prog(ct, tUp + 0.1, tUp + 5.0)) * 0.55;
     const lift = 34 * Math.sin(Math.PI * prog(ct, tUp + 0.6, tUp + 6.2));
     const kRise = ss(tUp + 0.2, tUp + 3.2, ct);
-    return { cm, phi, yaw, fl, lift, kRise, kT };
+    // it steps off its own mark as it rises: the imprint stays where it lay
+    const kM = ease.inOut(prog(ct, tUp + 1.4, tUp + 6.0));
+    const u = lerp(PRINT_U, STAND_U, kM), v = lerp(PRINT_V, STAND_V, kM);
+    return { cm, phi, yaw, fl, lift, kRise, kT, u, v, occ: ss(tUp + 1.0, tUp + 4.0, ct) };
   }
   T.register('stand', {
     draw(ctx, V, lt, api) {
@@ -290,7 +317,7 @@
       drawSheet(cm, { a: 1, head: ss(S.given + 0.5, S.given + 2.0, ct), print: st.kRise });
       PX.begin();
       drawKid(cm, { k: ss(S.kid + 0.6, S.kid + 3.2, ct), phi: 104 * DEG, t: lt });
-      drawYou(cm, { u: U0, v: youCloud().baseV, phi: st.phi, yaw: st.yaw, lift: st.lift, flutter: st.fl, t: lt,
+      drawYou(cm, { u: st.u, v: st.v, phi: st.phi, occ: st.occ, yaw: st.yaw, lift: st.lift, flutter: st.fl, t: lt,
         gray: 1, a: lerp(0.62, 0.95, st.kRise), shim: 1 + st.fl });
       PX.flush({ exposure: 1.4 });
       cap(V.lines.not, ct, S.not, S.up + 0.2);
@@ -409,12 +436,12 @@
     const emK = em.map(e => e * (1 - 0.7 * kOwn));
     // 你 straightens up (end of b18 it was looking down at the child)
     const kUp = ss(S.try + 0.3, S.try + 3.2, ct);
-    const phi = lerp(78 * DEG, 90 * DEG, kUp), yaw = lerp(-0.2, 0, kUp);
+    const phi = lerp(78 * DEG, 90 * DEG, kUp), yaw = lerp(0.26, 0, kUp);
     // ---- the paper floor
     drawSheet(cm, { a: 1, head: 1, print: 1 });
     // warm light on the floor: a little from the first lights, all of it once the light is yours
     const pool = 0.25 * ownTry + ss(take + 3.0, take + 7.0, ct) * 1.0;
-    floorLight(cm, U0, yc.baseV, 230 + 260 * ss(take + 3.0, take + 7.5, ct), pool, 1);
+    floorLight(cm, STAND_U, STAND_V, 230 + 260 * ss(take + 3.0, take + 7.5, ct), pool, 1);
     // ---- the tries, by hand
     const dimL = lerp(1, 0.42, ss(take + 0.2, take + 2.2, ct));
     let tip = null;
@@ -441,7 +468,7 @@
     // ---- light
     PX.begin();
     drawKid(cm, { k: 1, phi: lerp(104 * DEG, 92 * DEG, ss(take + 4, take + 7, ct)), own: 0.55 * ss(take + 4.0, take + 7.0, ct), t: lt + 30 });
-    const Y = drawYou(cm, { u: U0, v: yc.baseV, phi, yaw, t: lt + 20, gray, own, a: 0.95, em: emK });
+    const Y = drawYou(cm, { u: STAND_U, v: STAND_V, occ: 1, phi, yaw, t: lt + 20, gray, own, a: 0.95, em: emK });
     // sparks from each finished line into its light
     tr.Ls.forEach((L, li) => {
       const k = prog(ct, tr.done[li] + 0.1, tr.kin[li]); if (k <= 0 || k >= 1) return;
@@ -514,7 +541,7 @@
       const kc = ease.inOut(prog(ct, 0.3, 8.0)), cm = camMix(CAM1, CAM2, kc);
       // the step: forward, off the near edge of the paper, onto the dark ground
       const tS = S.life + 1.9, kStep = ease.inOut(prog(ct, tS, tS + 1.7));
-      const v = lerp(yc.baseV, SH + 120, kStep), lift = 22 * Math.sin(Math.PI * kStep);
+      const v = lerp(STAND_V, SH + 120, kStep), u = lerp(STAND_U, STAND_U - 40, kStep), lift = 22 * Math.sin(Math.PI * kStep);
       const phi = 90 * DEG - 7 * DEG * Math.sin(Math.PI * kStep);
       const breath = 0.5 + 0.5 * Math.sin(ct * 1.25);
       const own = 1 + 0.06 * Math.sin(ct * 1.25 + 0.6);
@@ -522,11 +549,11 @@
       drawSheet(cm, { a: sheetA, head: 1, print: 1 });
       // the warm pool travels with 你; off the paper it falls on bare ground
       const offK = ss(tS + 0.9, tS + 1.8, ct);
-      floorLight(cm, U0, v, 490 + 30 * breath, 1, 1 - 0.5 * offK);
+      floorLight(cm, u, v, 490 + 30 * breath, 1, 1 - 0.5 * offK);
       // ground: a faint warm line where the paper ends and the ground begins, lit only near 你
       PX.begin();
       const kid = ss(1.2, 5.2, ct);
-      const Y = drawYou(cm, { u: U0, v, phi, lift, t: ct + 40, own, gray: 0, a: 0.95 });
+      const Y = drawYou(cm, { u, v, occ: 1, phi, lift, t: ct + 40, own, gray: 0, a: 0.95 });
       drawKid(cm, { k: 1, phi: 92 * DEG, own: 0.55, t: ct + 60, to: kid, dest: Y });
       // Have a try: warm particles flowing out of 你's light
       const T0 = S.try + 0.15, tc = tryCloud(), n = tc.n;

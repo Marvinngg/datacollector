@@ -352,14 +352,15 @@
       // --- the scorer's red ✓ beside you, and the cold lamp that switches on above you
       const ckK = prog(tau, tCheck, tCheck + 0.45);
       const ckSize = lerp(40, 26, mk_), ckFade = 1 - smooth(prog(lt, tMorph + dMorph + 0.3, tMorph + dMorph + 0.6));
-      if (ckK > 0) KIT.pen('check', CHECK_X, youY, ckSize, ease.out(ckK), { seed: 13, gray: 0.15 * fz });
+      if (ckK > 0 && ckFade > 0) { ctx.save(); ctx.globalAlpha *= ckFade; KIT.pen('check', CHECK_X, youY, ckSize, ease.out(ckK), { seed: 13, gray: 0.15 * fz }); ctx.restore(); }
       // lamp
       const lampK = smooth(prog(tau, tCheck + 0.15, tCheck + 0.9)) * (1 - smooth(prog(lt, tK + 1.2, tK + 3.4)) * 0.85);
       PX.begin(); fullFrame();
       if (lampK > 0) KIT.spot(NAME_X, youY + 34, { k: lampK * 0.85, w: 96, h: 470, px: true, t: tabs, dust: 1, tag: 3 });
       // you
       const youA = ease.out(prog(lt, tR + 0.76, tR + 1.4));
-      KIT.you(NAME_X, youY, lerp(70, 58, mk_), { lit: 0.3 + 0.7 * lampK, gray: 0.3 * fz, t: tabs, breathe: 0.45, a: youA * 1.7, tag: 1 });
+      const swell = 1 + 0.08 * smooth(prog(tau, tCheck + 0.3, tB + 0.9));   // you swell a little with it... and stop mid-swell
+      KIT.you(NAME_X, youY, lerp(70 * swell, 58, mk_), { lit: 0.3 + 0.7 * lampK, gray: 0.3 * fz, t: tabs, breathe: 0.45, a: youA * 1.7, tag: 1 });
       PX.flush({ exposure: 1.45, glow: 0.9 });
       // --- the held frame: a quiet dimming, nothing else moves
       if (fz > 0) { ctx.save(); ctx.globalAlpha *= 0.12 * fz * (1 - smooth(prog(lt, tB + 0.6, tB + 1.6))); ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H); ctx.restore(); }
@@ -637,7 +638,7 @@
       drawPen(smooth(prog(lt, tE + 1.2, tE + dPull + 0.4)) * (0.65 + 0.35 * on));
       // the balance
       ctx.save(); ctx.translate(SX, SYD); ctx.scale(SZ, SZ);
-      const th = theta(lt, tS), zs = zc * SZ, dk = prog(lt, tS + 0.1, tS + 2.0);
+      const th = theta(lt, tS), zs = zc * SZ, dk = prog(lt, tS + 0.05, tS + 1.6);
       const light = lerp(1, 0.75, 1 - on);
       const ends = drawBalance(th, zs, { dk, light });
       // the words: in their pans, then they trade pans (arcs crossing above the pillar)
