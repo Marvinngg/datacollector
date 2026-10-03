@@ -35,14 +35,14 @@
   const R1MAX = Math.max(...D1) + 10;
   // dust: everyone without the trait. Each settles into the sediment under its own grid column (bottom rows first).
   const DUSTI = [], SX = new Float32Array(N), SY = new Float32Array(N), FT = new Float32Array(N);
-  { const per = new Array(GR.cols).fill(0);
-    for (let row = GR.rows - 1; row >= 0; row--) for (let c = 0; c < GR.cols; c++) {
-      const i = row * GR.cols + c; if (PROJ.founder[i]) continue;
-      const k = per[c]++, [x] = camXY(GX[i], GY[i], CAM);
-      SX[i] = x + (PX.rand(i, 41) - 0.5) * 16; SY[i] = SED - k * 2.9 - PX.rand(i, 42) * 3;
-      FT[i] = (GR.rows - 1 - row) / GR.rows * 1.0 + PX.rand(i, 43) * 0.35;      // fall delay
-    }
-    for (let i = 0; i < N; i++) if (!PROJ.founder[i]) DUSTI.push(i);
+  // the sediment is a low dune: x near the bead's own column, height filled uniformly under a soft mound profile
+  for (let i = 0; i < N; i++) {
+    if (PROJ.founder[i]) continue; DUSTI.push(i);
+    const row = Math.floor(i / GR.cols), [x] = camXY(GX[i], GY[i], CAM);
+    SX[i] = x + (PX.rand(i, 41) - 0.5) * GR.pitch * CAM * 1.6;
+    const m = 1 - Math.pow((SX[i] - W / 2) / 470, 2), h = 26 + 70 * Math.max(0, m);
+    SY[i] = SED - Math.pow(PX.rand(i, 42), 1.6) * h;
+    FT[i] = (GR.rows - 1 - row) / GR.rows * 1.0 + PX.rand(i, 43) * 0.35;      // fall delay (bottom rows first)
   }
   // the lit 140 in pile order (a stable random order, so the later survivors are scattered through each pile)
   const byRank = a => a.slice().sort((x, y) => PROJ.rank[x] - PROJ.rank[y]);
@@ -68,8 +68,8 @@
     S.lift1 = g('evidence1.light') + 0.05;
     S.lab = g('evidence1.light') + 0.15;
     S.sv1 = g('evidence1.light') + 0.4; S.sv1d = Math.max(1.5, d('evidence1.light') - 1.6);
-    S.str = g('evidence1.stream'); S.st0 = S.str + 0.2; S.stSpan = 2.1; S.stTrav = 1.45;
-    S.hud0 = S.str + 1.7; S.hud1 = S.hud0 + 1.4; S.rope0 = S.str + 1.6;
+    S.str = g('evidence1.stream'); S.st0 = S.str + 0.15; S.stSpan = 1.8; S.stTrav = 1.35;
+    S.hud0 = S.str + 2.9; S.hud1 = S.hud0 + 1.3; S.rope0 = S.str + 3.1;
     S.r1 = g('evidence1.ratio'); S.eq1 = S.r1 + B; S.x5 = S.r1 + 2 * B; S.roll1 = S.x5 + 0.3; S.rollD = 1.6;
     S.note = g('evidence1.note');
     // b12
@@ -265,7 +265,7 @@
     }
 
     // ---- the lit 140: grid → stream → pile → filter / repack → chain
-    const pile = pbuf('pile', 200), trails = pbuf('trail', 140 * 40);
+    const pile = pbuf('pile', 200), trails = pbuf('trail', 140 * 80);
     let nG = 0, nS = 0;                                               // live counts in the piles
     const v2 = 300 / S.sv2d, v3 = 300 / S.sv3d;
     const chainPull = prog(t, S.terms[4] - 0.2, S.terms[4] + 1.2);       // survivors give their light to "10:27"
@@ -288,21 +288,24 @@
       if (t < ta) {
         // flight: lift out of the grid, swing to its side, pour down through a funnel into its slot
         const sd = gold ? -1 : 1, px = gold ? PILE.gx : PILE.sx;
-        const P1x = g0x + sd * (40 + PX.rand(i, 62) * 80), P1y = g0y - 120 - PX.rand(i, 63) * 120;
-        const P2x = px + (L.slot[0] - px) * 0.25 + sd * 30, P2y = PILE.base - 9 * PILE.p - 150;
+        const P1x = g0x + sd * (30 + PX.rand(i, 62) * 70), P1y = g0y - 170 - PX.rand(i, 63) * 150;
+        const P2x = px + (L.slot[0] - px) * 0.15 + sd * 20, P2y = 560 + PX.rand(i, 69) * 50;
         const bz = (u) => { const m = 1 - u; return [m * m * m * g0x + 3 * m * m * u * P1x + 3 * m * u * u * P2x + u * u * u * L.slot[0], m * m * m * g0y + 3 * m * m * u * P1y + 3 * m * u * u * P2y + u * u * u * L.slot[1]]; };
         const uu = (tt) => ease.inOut(clamp((tt - td) / S.stTrav));
         const u = uu(t), [x, y] = bz(u);
-        push(pile, x + shx, y + shy, 1.6, lerp(9 * CAM / BR, 1, u) * 1.05, lc);
-        for (let m = 1; m <= 18; m++) {
-          const tt = t - m * 0.022; if (tt < td) break;
-          const [qx, qy] = bz(uu(tt)), fade = (1 - m / 19);
-          push(trails, qx + shx + (PX.rand(i * 19 + m, 64) - 0.5) * 3, qy + shy + (PX.rand(i * 19 + m, 65) - 0.5) * 3, 0.55 * fade * fade, 1, lc);
+        push(pile, x + shx, y + shy, gold ? 2.4 : 1.9, lerp(9 * CAM / BR, 1, u) * 1.05, mixc(tc, lc, [1, 1, 1], 0.35));
+        // a comet tail along the path it has flown
+        let px0 = x, py0 = y;
+        for (let m = 1; m <= 36; m++) {
+          const tt = t - m * 0.016; if (tt < td) break;
+          const [qx, qy] = bz(uu(tt)), fade = Math.pow(1 - m / 37, 1.6);
+          for (let h = 0; h < 2; h++) { const f = h * 0.5; push(trails, lerp(qx, px0, f) + shx + (PX.rand(i * 97 + m * 2 + h, 64) - 0.5) * 2.4, lerp(qy, py0, f) + shy + (PX.rand(i * 97 + m * 2 + h, 65) - 0.5) * 2.4, 0.75 * fade, 1, lc); }
+          px0 = qx; py0 = qy;
         }
         continue;
       }
       // in the pile
-      let [x, y] = L.slot, a = 1.35 + 1.8 * Math.exp(-(t - ta) * 7), r = 1, col = lc;
+      let [x, y] = L.slot, a = (gold ? 2.0 : 1.6) + 2.0 * Math.exp(-(t - ta) * 7), r = 1, col = lc;
       const arrived = 1;
       // row pulse at "= 5 : 9": rows light one after another
       const row = Math.floor(L.s / 10), rp = t - (S.eq1 + 0.1 + row * 0.09);

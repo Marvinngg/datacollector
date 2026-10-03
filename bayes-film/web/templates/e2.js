@@ -23,7 +23,7 @@
   const FLY = 2.6, SPREAD = 1.6;                   // bead flight time, spread of departure times within a world (s)
   const WD = [                                      // the three listed worlds
     { col: PX.COL.gold, grid: PX.COL.gold, css: '#ffd58a', N: 22000, R: 1.0, c: [0.0, 2.4, 0.15], tilt: 0.38, spin: 0.21, wave: 3.25, a: 0.30, seed: 21, lab: -1 },
-    { col: [0.52, 0.61, 0.76], grid: PX.COL.steel, css: '#aebcd4', N: 36000, R: 1.45, c: [-2.05, -1.5, -0.35], tilt: -0.3, spin: -0.16, wave: 3.85, a: 0.26, seed: 22, lab: 1 },
+    { col: [0.52, 0.61, 0.76], grid: PX.COL.steel, css: '#aebcd4', N: 36000, R: 1.45, c: [-2.05, -1.5, -0.35], tilt: -0.3, spin: -0.16, wave: 3.85, a: 0.34, seed: 22, lab: 1 },
     { col: PX.COL.violet, grid: PX.COL.steel, css: '#b9a8ff', N: 28000, R: 1.2, c: [2.05, -1.35, 0.45], tilt: 0.55, spin: 0.19, wave: 4.45, a: 0.29, seed: 23, lab: 1 },
   ];
   const BEADS_OF = [PROJ.succ, PROJ.fail.slice(0, 600), PROJ.fail.slice(600)];
@@ -66,9 +66,11 @@
         else if (j % 13 === 1) { const s = 1.06 + 0.45 * PX.rand(g, 6) ** 2; x *= s; y *= s; z *= s; TX[g] = 0.35 * (1.6 - s); }   // a thin atmosphere
         UX[g] = x; UY[g] = y; UZ[g] = z;
         // where the particle sits inside its bead (same sunflower look as KIT.beads), and the bead's brightness share
-        const rr = Math.sqrt((q + 0.5) / m), an = q * ga + b * 1.7;
-        OX[g] = Math.cos(an) * rr * 9; OY[g] = Math.sin(an) * rr * 9;
-        AG[g] = 1.1 * 48 / m * (1 - 0.55 * rr * rr);
+        // the first 48 grains of a bead sit exactly where KIT.beads draws its 48 points (so the opening frame is b06's
+        // last frame); the rest wait unlit at random spots inside the bead and light up as it flies
+        const kb = Math.min(48, m), boost = PROJ.ok[b] ? 1.3 : 0.72;
+        if (q < kb) { const rr = Math.sqrt((q + 0.5) / 64), an = q * ga; OX[g] = Math.cos(an) * rr * 9; OY[g] = Math.sin(an) * rr * 9; AG[g] = 1.1 * boost * (48 / kb) * (1 - 0.55 * rr * rr); }
+        else { const rr = 0.85 * Math.sqrt(PX.rand(g, 7)), an = PX.rand(g, 8) * TAU; OX[g] = Math.cos(an) * rr * 9; OY[g] = Math.sin(an) * rr * 9; AG[g] = 0; }
         BID[g] = b;
       }
       // bead departures: a wave out from the centre of the grid, roughened by the bead's own random rank
@@ -157,10 +159,10 @@
   let GI = null;
   function giant() {
     if (GI) return GI;
-    const cam = camAt(31, false), zG = cam.dist + 50 * (1 + ZOOM), Xs = 640, Ys = 1040;
+    const cam = camAt(31, false), zG = cam.dist + 50 * (1 + ZOOM), Xs = 650, Ys = 1065;
     const xc = (Xs - cam.cx) * zG / cam.f, yc = (cam.cy - Ys) * zG / cam.f;
     const G = [cam.ex + cam.fx * zG + cam.rx * xc + cam.ux * yc, cam.ey + cam.fy * zG + cam.ry * xc + cam.uy * yc, cam.ez + cam.fz * zG + cam.rz * xc + cam.uz * yc];
-    const Rpx = 340, R = Rpx * zG / cam.f;
+    const Rpx = 385, R = Rpx * zG / cam.f;
     const sp = PX.sphere(GN, 77, true), X = new Float32Array(GN), Y = new Float32Array(GN), Z = new Float32Array(GN), TXg = new Float32Array(GN), TA = new Float32Array(GN);
     for (let i = 0; i < GN; i++) {
       let x = sp.X[i], y = sp.Y[i], z = sp.Z[i];
@@ -280,7 +282,7 @@
         if (useC) { const q = j * 3; B.C[q] = lerp(w.grid[0], w.col[0], mix); B.C[q + 1] = lerp(w.grid[1], w.col[1], mix); B.C[q + 2] = lerp(w.grid[2], w.col[2], mix); }
       }
       project(n, WXb, WYb, WZb, A0b, cam, B, 3, o);
-      PX.points(B.X, B.Y, n, w.col, { a: 1, A: B.A, C: useC ? B.C : null, glow: 0.45 });
+      PX.points(B.X, B.Y, n, w.col, { a: 1, A: B.A, C: useC ? B.C : null, glow: lerp(0.3, 0.45, ss(3.2, 6, ct)) });
     }
 
     // confidence streams: braided ribbons of light along curved 3D paths; a particle exists only if it left the source
@@ -304,24 +306,24 @@
         const u = fract(PX.rand(i, 40 + si * 3) + ct / TRAVEL), te = ct - u * TRAVEL, e = emit(si, te);
         if (e <= 0.01) continue;
         const v = 1 - u, bx = v * v * P0[0] + 2 * u * v * P1[0] + u * u * P2[0], by = v * v * P0[1] + 2 * u * v * P1[1] + u * u * P2[1], bz = v * v * P0[2] + 2 * u * v * P1[2] + u * u * P2[2];
-        const fil = i % 6, r1 = PX.rand(i, 41 + si * 3), r2 = PX.rand(i, 42 + si * 3), r3 = PX.rand(i, 43 + si * 3);
+        const fil = i % 4, r1 = PX.rand(i, 41 + si * 3), r2 = PX.rand(i, 42 + si * 3), r3 = PX.rand(i, 43 + si * 3);
         const env = Math.pow(Math.sin(Math.PI * u), 0.7);
         let cs, sn;
         if (fil === 0) {                                   // loose sparks around the braid
           const rr = (0.04 + 0.3 * env) * Math.sqrt(r1), an = r2 * TAU + u * 4;
           cs = Math.cos(an) * rr; sn = Math.sin(an) * rr;
-        } else {                                           // five tight strands twisting around each other
-          const rr = 0.025 + 0.13 * env, an = fil * TAU / 5 + u * 10 - ct * 2.2;
-          cs = Math.cos(an) * rr + (r1 - 0.5) * 0.03; sn = Math.sin(an) * rr + (r3 - 0.5) * 0.03;
+        } else {                                           // three tight strands twisting around each other
+          const rr = (0.02 + 0.12 * env) * (0.85 + 0.3 * Math.sin(fil * 2.1 + u * 5)), an = fil * TAU / 3 + u * 8 - ct * 2.2;
+          cs = Math.cos(an) * rr + (r1 - 0.5) * 0.022; sn = Math.sin(an) * rr + (r3 - 0.5) * 0.022;
         }
         SB.X[ns] = bx + cs * n1x + sn * n2x; SB.Y[ns] = by + cs * n1y + sn * n2y; SB.Z[ns] = bz + cs * n1z + sn * n2z;
         SB.A[ns] = e * (fil === 0 ? 0.7 : 1) * ss(0, 0.06, u) * (1 - ss(0.88, 1, u)) * endDim * (0.5 + r2);
         const q = ns * 3, uu = ss(0.1, 0.9, u);
-        SB.C[q] = lerp(ca[0], cb[0], uu) * 0.85 + 0.15; SB.C[q + 1] = lerp(ca[1], cb[1], uu) * 0.85 + 0.15; SB.C[q + 2] = lerp(ca[2], cb[2], uu) * 0.85 + 0.15;
+        SB.C[q] = lerp(ca[0], cb[0], uu); SB.C[q + 1] = lerp(ca[1], cb[1], uu); SB.C[q + 2] = lerp(ca[2], cb[2], uu);
         ns++;
       }
     }
-    if (ns) { project(ns, SB.X, SB.Y, SB.Z, SB.A, cam, SB.O, 2, 11); PX.points(SB.O.X, SB.O.Y, ns, null, { a: 0.2, A: SB.O.A, C: SB.C, glow: 0.6 }); }
+    if (ns) { project(ns, SB.X, SB.Y, SB.Z, SB.A, cam, SB.O, 2, 11); PX.points(SB.O.X, SB.O.Y, ns, null, { a: 0.17, A: SB.O.A, C: SB.C, glow: 0.7 }); }
 
     // the unlisted world
     if (ct > 23.3) {
@@ -358,7 +360,7 @@
         PX.points(GB.O.X, GB.O.Y, m, [0.93, 0.89, 1.0], { a: 55, A: GB.O.A, glow: 0.45 });
       });
     }
-    PX.flush({ exposure: 1.5, glow: 0.95 });
+    PX.flush({ exposure: lerp(1.4, 1.5, ss(3.2, 6, ct)), glow: lerp(1, 0.95, ss(3.2, 6, ct)) });
 
     // ---- type
     const kR = cam.kR;

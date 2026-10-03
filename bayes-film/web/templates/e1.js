@@ -33,7 +33,7 @@
     S.F0 = S.fall + 1.5; S.F1 = S.count - 0.1;                 // first / last bead completes (rain)
     S.scan0 = S.sweep + 0.35; S.scan1 = S.one - 0.5;           // scanline top → bottom
     S.mem0 = S.membrane + 0.7; S.mem1 = S.result - 0.75;       // membrane top → bottom
-    S.cam0 = S.end - 2.1; S.cam1 = S.end - 0.45;               // camera back to the standard grid
+    S.cam0 = S.end - 1.65; S.cam1 = S.end - 0.45;               // camera back to the standard grid
     return S;
   }
   function camera(t, S) { const k = ease.inOut(prog(t, S.cam0, S.cam1)); return { s: lerp(S0, 1, k), cy: lerp(CY0, GCY, k) }; }

@@ -511,31 +511,31 @@
       // ---------- zoom dust: log-periodic, so the dive never ends (expands from the focus as the scale grows)
       const logS = Math.log(s / ZS0), zDustA = 1 - prog(lt, cam.tZ + 5.0, cam.tZ + 6.5);
       if (zDustA > 0) {
-        const n = 9000; scratch(n);
+        const n = 16000; scratch(n);
         const fx = cam.x26, fy = axisY;
         for (let i = 0; i < n; i++) {
           const an = PX.rand(i, 101) * TAU, cyc = (PX.rand(i, 102) + logS * 0.42) % 1, r = 24 * Math.exp(cyc * 3.9);
           SX[i] = fx + Math.cos(an) * r; SY[i] = fy + Math.sin(an) * r * 1.25;
           SA[i] = Math.sin(Math.PI * cyc) ** 2 * (0.3 + 0.7 * PX.rand(i, 103));
         }
-        PX.points(SX, SY, n, COL.cool, { a: 0.4 * zDustA * clamp(cam.zk * 5 + 0.15), A: SA, glow: 0.3 });
+        PX.points(SX, SY, n, COL.cool, { a: 0.55 * zDustA * clamp(cam.zk * 5 + 0.15), A: SA, glow: 0.3 });
       }
       // ---------- graduations on the axis (particles), subdividing as the scale grows
       if (axisY > 150) {
         const vmin = 26 - (cam.x26 + 30) / s, vmax = 26 + (W - cam.x26 + 30) / s;
-        let j = 0; scratch(60000);
+        let j = 0; scratch(120000);
         for (let li = 0; li < LEVELS.length; li++) {
           const d = LEVELS[li], p = d * s; if (p < 3) continue;
-          const al = clamp((p - 3) / 30), imp = clamp(Math.log2(p / 6) / 6.5), h = 6 + 330 * imp ** 1.6;
+          const al = clamp((p - 3) / 30), imp = clamp(Math.log2(p / 6) / 6.5), h = 6 + 620 * imp ** 1.5;
           const k0 = Math.ceil(Math.max(0, vmin) / d), k1 = Math.floor(Math.min(100, vmax) / d);
-          for (let k = k0; k <= k1 && j < 59000; k++) {
+          for (let k = k0; k <= k1 && j < 119000; k++) {
             const v = k * d; if (li > 0 && isMult(v, LEVELS[li - 1])) continue;
-            const x = X(v), m = Math.max(4, Math.round(h / 1.6)), mb = Math.max(3, m >> 2);
-            for (let q = 0; q < m && j < 59000; q++) { const u = q / m; SX[j] = x + (PX.rand(j, 111) - 0.5) * 1.2; SY[j] = axisY - 2 - q * 1.6; SA[j] = al * (1 - u) ** 1.5 * (0.6 + 0.4 * imp); j++; }
-            for (let q = 0; q < mb && j < 59000; q++) { SX[j] = x + (PX.rand(j, 111) - 0.5) * 1.2; SY[j] = axisY + 3 + q * 1.6; SA[j] = al * 0.45 * (1 - q / mb); j++; }
+            const x = X(v), m = Math.max(4, Math.round(h / 1.6)), mb = Math.max(3, m >> 1);
+            for (let q = 0; q < m && j < 119000; q++) { const u = q / m; SX[j] = x + (PX.rand(j, 111) - 0.5) * 1.2; SY[j] = axisY - 2 - q * 1.6; SA[j] = al * (1 - u) ** 1.5 * (0.6 + 0.4 * imp); j++; }
+            for (let q = 0; q < mb && j < 119000; q++) { SX[j] = x + (PX.rand(j, 111) - 0.5) * 1.2; SY[j] = axisY + 3 + q * 1.6; SA[j] = al * 0.3 * (1 - q / mb) ** 2; j++; }
           }
         }
-        PX.points(SX, SY, j, mix(COL.white, COL.cool, 0.3), { a: 0.55, A: SA, glow: 0.3 });
+        PX.points(SX, SY, j, mix(COL.white, COL.cool, 0.3), { a: 1.1 * (1 - wk * 0.5), A: SA, glow: 0.35 });
         // the axis itself
         const xa = Math.max(-10, X(0)), xb = Math.min(W + 10, X(100)), n = Math.min(6000, Math.ceil((xb - xa) / 0.8)); scratch(n);
         for (let i = 0; i < n; i++) { SX[i] = lerp(xa, xb, (i + PX.rand(i, 112)) / n); SY[i] = axisY + (PX.rand(i, 113) - 0.5) * 1.4; SA[i] = 1; }
@@ -546,20 +546,20 @@
       const wall = (x, side, col, seed, aCore) => {
         // core line
         const n = 3000; scratch(n);
-        for (let i = 0; i < n; i++) { SX[i] = x + (PX.rand(i, seed) - 0.5) * lerp(2.2, 5, cam.zk); SY[i] = lerp(wallTop, wallBot, (i + PX.rand(i, seed + 1)) / n); SA[i] = 0.7 + 0.3 * PX.rand(i, seed + 2); }
-        PX.points(SX, SY, n, col, { a: aCore, A: SA, glow: 0.45 });
+        for (let i = 0; i < n; i++) { SX[i] = x + (PX.rand(i, seed) - 0.5) * lerp(1.6, 4, wk); SY[i] = lerp(wallTop, wallBot, (i + PX.rand(i, seed + 1)) / n); SA[i] = 0.7 + 0.3 * PX.rand(i, seed + 2); }
+        PX.points(SX, SY, n, col, { a: aCore * lerp(0.6, 1, wk), A: SA, glow: lerp(0.2, 0.4, wk) });
         if (wk <= 0) return;
         // strata: the wall's outer body, streaming up as we fall (with motion streaks)
         const m = 26000, st = clamp(cam.vel * 0.035, 0, 90), reps = st > 4 ? 3 : 1; scratch(m * reps);
         const span = H + 200; let j = 0;
         for (let i = 0; i < m; i++) {
-          const dx = -Math.log(1 - PX.rand(i, seed + 3) * 0.995) * 70, par = 0.7 + 0.3 * Math.exp(-dx / 120);
+          const dx = -Math.log(1 - PX.rand(i, seed + 3) * 0.97) * 42, par = 1;
           const yb = PX.rand(i, seed + 4) * span, y = ((yb - cam.fall * par) % span + span) % span - 100;
-          const band = 0.55 + 0.45 * Math.sin((yb * 0.045) + Math.floor(dx / 18) * 1.7);
+          const band = 0.5 + 0.5 * Math.sin(yb * 0.031 + Math.sin(yb * 0.0071 + seed) * 2.6) * Math.cos(yb * 0.0113 + dx * 0.004);
           const A = (0.25 + 0.75 * Math.exp(-dx / 60)) * band * band * (0.4 + 0.6 * PX.rand(i, seed + 5)) / Math.sqrt(reps);
           for (let r = 0; r < reps; r++) { SX[j] = x + side * dx; SY[j] = y + r * st / 2; SA[j] = A; j++; }
         }
-        PX.points(SX, SY, j, col, { a: 0.42 * wk, A: SA, glow: 0.4 });
+        PX.points(SX, SY, j, col, { a: 0.5 * wk, A: SA, glow: 0.22 });
         // depth marks on the inner face (a ruler you fall past)
         const q = 30, step = 64; scratch(q * 40); j = 0;
         const off = ((cam.fall % step) + step) % step;
@@ -575,12 +575,12 @@
       if (axisY > -60) bead(x27, axisY, lerp(15, 24, cam.zk), COL.gold, 1.1);
       // ---------- falling dust in the canyon (streaks while fast)
       if (cam.fall > 0) {
-        const n = 4500, st = clamp(cam.vel * 0.05, 0, 120), reps = st > 3 ? 6 : 1; scratch(n * reps);
+        const n = 1800, st = clamp(cam.vel * 0.06, 0, 140), reps = Math.max(1, Math.min(48, Math.ceil(st / 1.5))); scratch(n * reps);
         const span = H + 300; let j = 0;
         for (let i = 0; i < n; i++) {
           const d = 0.3 + 0.7 * PX.rand(i, 141), x = lerp(x25 + 10, x27 - 10, PX.rand(i, 142));
           const y = ((PX.rand(i, 143) * span - cam.fall * d * 1.3) % span + span) % span - 150;
-          for (let r = 0; r < reps; r++) { SX[j] = x; SY[j] = y + r * st * d / reps; SA[j] = d * d / Math.sqrt(reps); j++; }
+          for (let r = 0; r < reps; r++) { SX[j] = x; SY[j] = y + r * st * d / reps; SA[j] = d * d * (r === 0 ? 1.4 : 0.9) * (1 - r / reps * 0.6) / Math.pow(reps, 0.35); j++; }
         }
         PX.points(SX, SY, j, COL.cool, { a: 0.7 * wk, A: SA, glow: 0.3 });
       }
@@ -616,7 +616,7 @@
         const vmin = 26 - (cam.x26 + 60) / s, vmax = 26 + (W - cam.x26 + 60) / s;
         for (let li = 0; li < LEVELS.length; li++) {
           const d = LEVELS[li], p = d * s; if (p < 110 || d > 5) continue;
-          const al = clamp((p - 110) / 70) * (1 - endA * 0.0);
+          const al = clamp((p - 110) / 70) * prog(axisY, 560, 760);
           for (let k = Math.ceil(vmin / d); k <= Math.floor(vmax / d); k++) {
             const v = k * d; if (li > 0 && isMult(v, LEVELS[li - 1]) && LEVELS[li - 1] * s >= 110 && LEVELS[li - 1] <= 5) continue;
             if (Math.abs(v - 25) < 1e-6 || Math.abs(v - 27) < 1e-6) continue;

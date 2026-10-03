@@ -107,46 +107,50 @@
   const GREY = [0.62, 0.64, 0.66];
   const L_WRAP = H + 260;
 
+  // weather: slow bright "rivers" in the stream that drift upward with it (0.25..1)
+  const weather = (x, yw, t) => 0.62 + 0.22 * Math.sin(x * 0.0062 + 1.6 * Math.sin(yw * 0.0021 + t * 0.3)) + 0.16 * Math.sin(yw * 0.0047 - x * 0.0023);
+
   /** Splat the stream as it is at b17-local time lt. o:
-   *   frozen  true: no motion blur, no dust field (b18)
-   *   drainY  tokens above this y are drained to grey (b18), the rest stay cyan
-   *   fieldA  overall intensity multiplier
-   *   part    {y, rx, ry, q}: tokens part around an ellipse (for the four jobs)  */
+   *   frozen   true: no motion blur, no dust, no flicker (b18)
+   *   collect  true: fill BUF[0..2] and return instead of splatting (for the frozen-frame cache)
+   *   part     {y, rx, ry, q}: tokens part around an ellipse (for the four jobs)  */
   function stream(lt, o = {}) {
     const CL = tokPrep();
     const a = AT(), I = inst(), Sl = S(lt), m = mult(lt);
     const fl = ease.inOut(prog(lt, a.flood, a.flood + 4.0));
     const fan = 1 - ease.inOut(prog(lt, a.burst + 1.5, a.burst + 5.5));
-    const shutter = o.frozen ? 0 : 1 / 110;
-    const fieldA = o.fieldA == null ? 1 : o.fieldA, drainY = o.drainY == null ? -1e9 : o.drainY;
+    const shutter = o.frozen ? 0 : 1 / 100;
+    const wk = (o.frozen ? 0 : 1) * (0.25 + 0.75 * fl) * (1 - 0.6 * ease.inOut(prog(lt, a.fast, a.fast + 1.5)));   // weather strength
     const part = o.part;
     // beat flashes: a few random tokens flare on every beat
     const absT = lt + (o.t0 || 0), bi = Math.floor(absT / beat.BEAT), pul = o.frozen ? 0 : beat.pulse(absT, 7);
     // glitch bands (flood only): rows of the stream jump sideways for a frame
-    const fr = Math.floor(lt * 30), gr = rng(fr * 977 + 3), gl = o.frozen ? 0 : fl * (0.4 + 0.6 * pul);
-    const bands = []; if (gl > 0.05) for (let q = 0; q < 4; q++) if (gr() < gl * 0.8) bands.push([gr() * H, 6 + gr() * 40, (gr() - 0.5) * 180]);
-    const B = [bufg(0, 1), bufg(1, 1), bufg(2, 1), bufg(3, 1)];
+    const fr = Math.floor(lt * 30), gr = rng(fr * 977 + 3), gl = o.frozen ? 0 : fl * (0.35 + 0.65 * pul);
+    const bands = []; if (gl > 0.05) for (let q = 0; q < 5; q++) if (gr() < gl * 0.7) bands.push([gr() * H, 4 + gr() * 34, (gr() - 0.5) * 160]);
+    const B = [bufg(0, 1), bufg(1, 1), bufg(2, 1)];
     for (const b of B) b.n = 0;
+    const yScroll = Sl * 900;
     for (let i = 0; i < I.N; i++) {
       const tb = I.tb[i]; if (lt < tb) continue;
       const v = I.v[i], s = I.s[i];
       const travel = (Sl - S(tb)) * v;
-      let y = H + 90 - (travel % L_WRAP);
+      const y = H + 90 - (travel % L_WRAP);
       if (y < -120 || y > H + 100) continue;
       let x = I.x0[i] + Math.sin(y * 0.0035 + I.ph[i]) * 10 * s;
-      if (fan > 0) { const neck = fan * Math.exp(-(H + 90 - y) / 650) * (i < N_BURST ? 1 : 0); x = lerp(x, W / 2 + (x - W / 2) * 0.06, neck); }
+      if (fan > 0 && i < N_BURST) { const neck = fan * Math.exp(-(H + 90 - y) / 650); x = lerp(x, W / 2 + (x - W / 2) * 0.06, neck); }
       for (const bd of bands) if (Math.abs(y - bd[0]) < bd[1]) x += bd[2];
-      let al = 0.5 * (0.45 + 0.55 * s) * fieldA;
+      let al = 0.5 * (0.45 + 0.55 * s);
+      if (wk > 0) { const w = weather(x, y + yScroll, lt); al *= lerp(1, w * w * 1.7, wk); }
       if (part && part.q > 0) {
         const dx = (x - W / 2) / part.rx, dy = (y - part.y) / part.ry, e2 = dx * dx + dy * dy;
-        if (e2 < 1.6) { const k = part.q * (1.6 - e2) / 1.6; x += Math.sign(dx || 1) * k * 220; al *= 1 - 0.75 * k; }
+        if (e2 < 1.8) { const k = part.q * ease.inOut((1.8 - e2) / 1.8); x += Math.sign(dx || 1) * k * 160; al *= 1 - 0.8 * k; }
       }
       if (!o.frozen && ((I.k[i] * 977 + bi * 0.618) % 1) < 0.06) al *= 1 + 2.2 * pul;
       const cl = CL[I.tok[i]];
       const dens = Math.min(1, 0.26 + 0.62 * s * s);
       const n = Math.max(6, Math.floor(cl.n * dens));
-      const blur = v * m * shutter * s;
-      const g = y < drainY ? 3 : I.grp[i];
+      const blur = Math.min(v * m * shutter * s, 10 + 22 * s);
+      const g = I.grp[i];
       const b = bufg(g, B[g].n + n); B[g] = b;
       const X = b.X, Y = b.Y, A = b.A, sk = (i * 13) & 1023;
       let j0 = b.n;
@@ -157,19 +161,52 @@
       }
       b.n = j0;
     }
-    for (let g = 0; g < 4; g++) { const b = BUF[g]; if (b && b.n) PX.points(b.X, b.Y, b.n, g === 3 ? GREY : GCOL[g], { a: 1, A: b.A, glow: 0 }); }
-    // the luminous dust: a field of motes too small to be glyphs (flood only)
-    const nF = o.frozen ? 0 : Math.floor(150000 * ease.inOut(prog(lt, a.flood + 0.3, a.flood + 4.2)));
+    if (o.collect) return B;
+    for (let g = 0; g < 3; g++) { const b = BUF[g]; if (b && b.n) PX.points(b.X, b.Y, b.n, GCOL[g], { a: 1, A: b.A, glow: 0 }); }
+    // the luminous rain: motes too small to be glyphs, each a thin vertical streak of light (flood only)
+    const nF = Math.floor(30000 * ease.inOut(prog(lt, a.flood + 0.2, a.flood + 4.0)));
     if (nF > 0) {
-      const b = bufg(4, nF), X = b.X, Y = b.Y, A = b.A;
+      const SEG = 6, b = bufg(4, nF * SEG), X = b.X, Y = b.Y, A = b.A;
+      let k = 0;
       for (let j = 0; j < nF; j++) {
-        const v = 900 + 2600 * PX.rand(j, 21), tr = Sl * v + PX.rand(j, 23) * L_WRAP;
-        X[j] = PX.rand(j, 22) * W;
-        Y[j] = H + 100 - (tr % L_WRAP) + (PX.rand(j, 24) - 0.5) * v * m * shutter * 0.6;
-        A[j] = 0.10 + 0.14 * PX.rand(j, 25);
+        const v = 1100 + 2800 * PX.rand(j, 21), tr = Sl * v + PX.rand(j, 23) * L_WRAP;
+        const x = PX.rand(j, 22) * W, y = H + 100 - (tr % L_WRAP), st = Math.min(9, v * m * shutter * 0.22);
+        const cx = (x - W / 2) / 430, core = 0.45 + 0.9 * Math.exp(-cx * cx);
+        const w = wk > 0 ? lerp(1, weather(x, y + yScroll, lt), wk) : 1;
+        const al = (0.12 + 0.2 * PX.rand(j, 25)) * core * w * w * 1.5;
+        for (let q = 0; q < SEG; q++, k++) { X[k] = x; Y[k] = y + q * st; A[k] = al * (1 - q / SEG); }
       }
-      PX.points(X, Y, nF, COL.cyan, { a: fieldA, A, glow: 0.7 });
+      PX.points(X, Y, k, [0.62, 1, 0.95], { a: 1, A, glow: 0.35 });
     }
+  }
+
+  // b18: the frozen stream, cached as two images (still cyan / drained grey): it never moves again
+  let FROZ = null;
+  function frozen() {
+    if (FROZ) return FROZ;
+    const B = stream(AT().dur - 1e-3, { frozen: true, collect: true });
+    const acc = new Float32Array(W * H * 3);
+    for (let g = 0; g < 3; g++) {
+      const b = B[g], c = GCOL[g];
+      for (let i = 0; i < b.n; i++) {
+        const x = b.X[i], y = b.Y[i]; if (!(x >= 0 && y >= 0 && x < W - 1 && y < H - 1)) continue;
+        const xi = x | 0, yi = y | 0, fx = x - xi, fy = y - yi, a = b.A[i];
+        const w = [(1 - fx) * (1 - fy) * a, fx * (1 - fy) * a, (1 - fx) * fy * a, fx * fy * a], ks = [(yi * W + xi) * 3, (yi * W + xi + 1) * 3, ((yi + 1) * W + xi) * 3, ((yi + 1) * W + xi + 1) * 3];
+        for (let q = 0; q < 4; q++) { acc[ks[q]] += c[0] * w[q]; acc[ks[q] + 1] += c[1] * w[q]; acc[ks[q] + 2] += c[2] * w[q]; }
+      }
+    }
+    const mkImg = (f) => {
+      const cv = Object.assign(document.createElement('canvas'), { width: W, height: H }), g = cv.getContext('2d');
+      const img = g.createImageData(W, H), d = img.data;
+      for (let p = 0, k = 0; p < W * H; p++, k += 3) { const [r, gg, bb] = f(acc[k], acc[k + 1], acc[k + 2]); d[p * 4] = r; d[p * 4 + 1] = gg; d[p * 4 + 2] = bb; d[p * 4 + 3] = 255; }
+      g.putImageData(img, 0, 0); return cv;
+    };
+    const tm = (v, e) => 255 * (1 - Math.exp(-v * e));
+    const cyan = mkImg((r, g, b) => [tm(r, 1.6), tm(g, 1.6), tm(b, 1.6)]);
+    const grey = mkImg((r, g, b) => { const l = tm((r + g + b) / 3, 1.5); return [l * 0.92, l * 0.95, l]; });
+    const out = { cyan, grey };
+    if (TC.length === TOKS.length) FROZ = out;          // only cache once the real glyphs are in
+    return out;
   }
 
   // ================================================================ b17 ai
@@ -187,20 +224,14 @@
         if (q > (part ? part.q : 0)) part = { y: 960, rx: 520, ry: 150, q };
       }
       PX.begin();
-      // the eruption's source: a hot neck of light at the bottom centre, beating
-      const neckA = (1 - ease.inOut(prog(lt, 3, 7))) * clamp(lt / 0.4);
-      if (neckA > 0) {
-        const d = PX.disc(5000, W / 2, H + 40, 260), b = bufg(5, d.n), pu = beat.pulse(lt + api.beat.start, 5);
-        for (let i = 0; i < d.n; i++) { b.X[i] = d.X[i] + Math.sin(lt * 9 + i) * 3; b.Y[i] = d.Y[i] - PX.rand(i, 41) * 200 * (0.5 + pu); b.A[i] = 0.25 * (1 - PX.rand(i, 41)); }
-        PX.points(b.X, b.Y, d.n, COL.cyan, { a: neckA * (0.8 + 0.6 * pu), A: b.A, glow: 1 });
-      }
       stream(lt, { part, t0: api.beat.start });
       for (let k = 0; k < jobs.length; k++) {
         const t0 = tJ(k), d = lt - t0; if (d < -0.05 || d > JD + 0.4) continue;
         jobWord(jobs[k], d, JD, k);
       }
       const jobHit = Math.max(...jobs.map((_, k) => { const d = lt - tJ(k); return d >= 0 ? Math.exp(-d * 5) : 0; }));
-      PX.flush({ exposure: lerp(1.35, 2.3, fl) * (1 + 0.25 * jobHit), glow: lerp(0.9, 1.5, fl), glowR: 5 });
+      const pul = beat.pulse(lt + api.beat.start, 6) * fl;
+      PX.flush({ exposure: lerp(1.4, 3.0, fl) * (1 + 0.25 * jobHit + 0.15 * pul), glow: lerp(0.8, 1.2, fl), glowR: 5 });
       // 'fast': the line lands as a black cut-out in the light
       const fk = prog(lt, tFast, tFast + 0.45);
       if (fk > 0) {
@@ -230,7 +261,7 @@
   });
   // a job word: condenses upward out of the stream, holds, then is swept away upward
   function jobWord(str, d, JD, k) {
-    const s = PX.text(str, { size: 190, family: F.sans, weight: 700, x: W / 2, y: 1030, step: 2.1, spacing: 14, seed: 11 + k });
+    const s = PX.text(str, { size: 190, family: F.sans, weight: 700, x: W / 2, y: 1030, step: 1.7, spacing: 14, seed: 11 + k });
     const b = bufg(6, s.n), X = b.X, Y = b.Y, A = b.A;
     for (let i = 0; i < s.n; i++) {
       const r1 = PX.rand(i, 51), r2 = PX.rand(i, 52);
@@ -240,7 +271,7 @@
       Y[i] = s.Y[i] + (1 - e) * (260 + r2 * 520) - up;
       A[i] = e * (1 - clamp(ex / 0.35));
     }
-    PX.points(X, Y, s.n, [0.86, 1, 0.98], { a: 0.62, A, glow: 0.5 });
+    PX.points(X, Y, s.n, [0.86, 1, 0.98], { a: 1.6, A, glow: 0.2 });
   }
   function splitAt(str, p) {
     const i = str.indexOf(p); return i < 0 ? [str] : [str.slice(0, i + 1), str.slice(i + 1)];
@@ -260,9 +291,12 @@
         : lt < tRope ? lerp(0.75, 0.34, ease.out(prog(lt, tFz + 1.3, tDec))) * (1 - 0.35 * prog(lt, tDec, tRope))
         : lerp(0.22, 0, ease.inOut(prog(lt, tRope, tRope + 0.9)));
       const ropeK = ease.inOut(prog(lt, tRope - 0.1, tRope + 0.8));
-      PX.begin();
-      if (fieldA > 0.003) stream(A_.dur - 1e-3, { frozen: true, drainY, fieldA, t0: 0 });
-      PX.flush({ exposure: lerp(1.6, 1.25, prog(lt, tFz, tFz + 0.6)), glow: 0.7, glowR: 4 });
+      if (fieldA > 0.003) {
+        const fz = frozen(), c = ctx; c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha *= fieldA;
+        if (drainY < H) { c.save(); c.beginPath(); c.rect(0, Math.max(0, drainY), W, H); c.clip(); c.drawImage(fz.cyan, 0, 0); c.restore(); }
+        if (drainY > 0) { c.save(); c.beginPath(); c.rect(0, 0, W, Math.min(H, drainY)); c.clip(); c.drawImage(fz.grey, 0, 0); c.restore(); }
+        c.restore();
+      }
       // a soft dark well in the middle (space for the human)
       const well = ease.inOut(prog(lt, tFz + 0.6, tFz + 2.2)) * (1 - ropeK);
       if (well > 0) {

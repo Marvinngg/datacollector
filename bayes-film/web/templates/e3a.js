@@ -6,16 +6,18 @@
  *                   form as two stacked fractions; the two P(D) slide together and annihilate; the terms regroup into
  *                   旧赔率 × 似然比 and the × stays, huge.
  *
- * THE ROPE (shared by the film; other chapters copy ROPE / drawRope / drawTeam / knotX from here):
+ * THE ROPE (shared by the film; other chapters copy ROPE / ropeY / ropeInto / figCloud / slot / figInto / knotX from here):
  *   a horizontal rope of light across the whole frame (x -40..1120) at y = 1000, sagging 9 px at the centre;
- *   ~12k gold-white particles [1, .9, .72] in two twisted strands (twist 0.11 rad/px, strand radius 2.4 px, front strand
+ *   ~12k gold-white particles [1, .9, .72] in two twisted strands (twist 0.11 rad/px, front strand
  *   brighter); the rope's material slides with the knot (so a moving knot visibly drags the rope);
- *   the knot: a 1.4k-particle white-hot disc (r 11) + a short ribbon hanging 34 px, swaying; soft light r 90.
- *   knot x = 540 + (steel share - 0.5) * 2 * 180  (1:9 -> 684, 5:9 -> 591, 10:27 -> 638); a faint dashed centre mark at 540.
- *   teams: the glyph 人 (F.serif 900, 110 px, sampled every 1.5 px) as particle clouds; gold [1,.81,.48] on the left
- *   (成功), steel-blue [.5,.58,.72] on the right (失败); feet 52 px below the rope; they lean away from the knot
- *   (0.2 rad) and heave every 2 beats; steel crowd = columns of 3 depth rows (x step 54, back rows +16 px x, -20 px y,
- *   scale -10 %, brightness -28 % per row). */
+ *   strand radius 3 px; rope drawn with PX.points a 0.5, glow 0.18 (a low halo so it reads as a thin wire of light).
+ *   the knot: a 1.4k-particle white-hot disc (r 11) + a short gold ribbon hanging 34 px, swaying; L.light r 70.
+ *   knot x = 540 + (steel share - 0.5) * 2 * 150  (1:9 -> 660, 5:9 -> 583, 10:27 -> 609); a faint dashed centre mark at 540.
+ *   teams: the glyph 人 (F.serif 900, 110 px, sampled every 1.6 px) as particle clouds (a 0.38, glow 0.3); gold
+ *   [1,.81,.48] on the left (成功; slot 1 x 205, slot 2 x 128, brightness 1.35), steel-blue [.5,.58,.72] on the right
+ *   (失败); feet 52 px below the rope; they lean away from the knot (0.2 rad ± 0.05, heaving every 2 beats);
+ *   steel crowd = 6 columns x 3 depth rows (column x = 975 - (5-c)*46, back rows -12 px x, -30 px y, scale -8 %,
+ *   brightness .85/.42/.24); 9 figures fill the three outer columns, 18 fill all six. */
 (function () {
   const { W, H, ctx, F, clamp, lerp, prog, ease, rng } = K;
   const { C, beat } = KIT;
@@ -461,12 +463,13 @@
       if (lt > tF + 0.9 && lt < tHit) {
         const [xl, xr] = pdPos(lt, tC, tHit), ch = prog(lt, tF + 0.9, tF + 1.8) * (0.35 + 0.65 * prog(lt, tF + 2.5, tHit));
         [xl, xr].forEach((x, side) => {
-          const n = 2200, out = PX.buf(n, 80 + side);
+          const n = 2200, out = PX.buf(n, 80 + side), chS = ch * (side ? prog(lt, tF + 1.6, tF + 2.4) : 1);
+          if (chS <= 0) return;
           for (let q = 0; q < n; q++) {
             const sp = 0.6 + PX.rand(q, 81) * 1.4, an = PX.rand(q, 82) * TAU + lt * sp * (side ? -1 : 1), rr = 50 + 80 * Math.pow(PX.rand(q, 83), 1.5);
             out.X[q] = x + Math.cos(an) * rr * 1.25; out.Y[q] = FR.dy - 14 + Math.sin(an) * rr * 0.55; out.A[q] = 0.3 + 0.7 * PX.rand(q, 84);
           }
-          PX.points(out.X, out.Y, n, [1, 0.97, 0.9], { a: 0.32 * ch, A: out.A, glow: 0.6 });
+          PX.points(out.X, out.Y, n, [1, 0.97, 0.9], { a: 0.32 * chS, A: out.A, glow: 0.6 });
         });
       }
       // ---------------- annihilation: shockwave + sparks
@@ -593,7 +596,7 @@
     const lx2 = LX2 - 40 * spread, rx2 = RX2 + 30 * spread;
     const dimO = 1 - 0.45 * big;
     const appear = (t0, d = 0.5) => ease.out(prog(lt, t0, t0 + d));
-    const aNL = appear(tF + 0.45), aDL = appear(tF + 0.75 + 0.2), aNR = appear(tF + 1.5), aDR = appear(tF + 1.7), aDiv = appear(tF + 2.25);
+    const aNL = appear(tF + 0.6, 0.4), aDL = appear(tF + 0.75, 0.4), aNR = appear(tF + 1.35, 0.4), aDR = appear(tF + 1.5, 0.4), aDiv = appear(tF + 2.1, 0.4);
     const rise = (k) => (1 - k) * 24;
     // arcs for the regroup (terms cross over)
     const arc = (x0, y0, x1, y1, k, h) => [lerp(x0, x1, k), lerp(y0, y1, k) - Math.sin(k * Math.PI) * h];
