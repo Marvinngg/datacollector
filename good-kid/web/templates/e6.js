@@ -535,7 +535,7 @@
     const pool = 0.25 * ownTry + ss(take + 6.0, take + 8.3, ct) * 1.0;
     floorLight(cm, STAND_U, STAND_V, 230 + 260 * ss(take + 6.0, take + 8.4, ct), pool, 1);
     // ---- the tries, by hand
-    const dimL = lerp(1, 0.14, ss(take + 0.1, take + 1.3, ct));
+    const dimL = lerp(1, 0.06, ss(take + 0.1, take + 1.3, ct));
     let tip = null;
     { const tp = drawHand(HEAD, ct, S.try + 0.35, dimL * 1.0, null); if (tp.on) tip = tp; }
     tr.Ls.forEach((L, li) => {
@@ -584,6 +584,7 @@
     const sub = (t, o) => out.push({ ...o, t: t + c0 });             // chain time -> this beat's local time
     if (S.t1 != null) {
       const tr = triesState(0, S, V);
+      sub(S.try + 0.35, { type: 'type', dur: +HEAD.dur.toFixed(2) });
       tr.Ls.forEach((L, i) => { sub(tr.t0[i], { type: 'type', dur: +L.dur.toFixed(2) }); sub(tr.kin[i], { type: 'glow' }); if (L.strike >= 0) sub(tr.t0[i] + L.tt[L.strike] + CPS + 0.12, { type: 'pen' }); });
       sub(S.fine + 0.3, { type: 'hush' });
     }
@@ -624,21 +625,23 @@
       const phi = 90 * DEG - 7 * DEG * Math.sin(Math.PI * kStep);
       const breath = 0.5 + 0.5 * Math.sin(ct * 1.25);
       const own = 1 + 0.06 * Math.sin(ct * 1.25 + 0.6);
-      const sheetA = lerp(1, 0.55, ss(tS + 0.8, tS + 5, ct));
+      // 'years': the picture recedes a little while the sentence holds the frame
+      const rec = ss(S.years + 0.3, S.years + 1.8, ct) * (1 - ss(S.try - 1.0, S.try + 0.6, ct));
+      const sheetA = lerp(1, 0.55, ss(tS + 0.8, tS + 5, ct)) * (1 - 0.45 * rec);
       drawSheet(cm, { a: sheetA, head: 1, print: 1 });
       // the warm pool travels with 你; off the paper it falls on bare ground
       const offK = ss(tS + 0.9, tS + 1.8, ct);
-      floorLight(cm, u, v, 490 + 30 * breath, 1, 1 - 0.5 * offK);
+      floorLight(cm, u, v, 490 + 30 * breath, 1 - 0.4 * rec, 1 - 0.5 * offK);
       // ground: a faint warm line where the paper ends and the ground begins, lit only near 你
       PX.begin();
       const kid = ss(1.2, 5.2, ct);
-      const Y = drawYou(cm, { u, v, occ: 1.2, phi, lift, t: ct + 40, own, gray: 0, a: 1.5 });
+      const Y = drawYou(cm, { u, v, occ: 1.2, phi, lift, t: ct + 40, own, gray: 0, a: 1.5 * (1 - 0.35 * rec) });
       drawKid(cm, { k: 1, phi: 92 * DEG, own: 0.55, t: ct + 60, to: kid, dest: Y });
       // Have a try: warm particles flowing out of 你's light
       const T0 = S.try + 0.15, tc = tryCloud(), n = tc.n;
       if (ct > T0) {
         for (let i = 0; i < n; i++) {
-          const d = T0 + tc.D[i] * 2.3, k = clamp((ct - d) / 1.9);
+          const d = T0 + tc.D[i] * 1.7, k = clamp((ct - d) / 1.6);
           if (k <= 0) { tc.A[i] = 0; continue; }
           const j = (i * 7) % Y.n, sx = Y.X[j], sy = Y.Y[j], tx = tc.c.X[i], ty = tc.c.Y[i];
           const e = ease.inOut(k), u = 1 - e;
@@ -649,11 +652,15 @@
         }
         PX.points(tc.X, tc.Y, n, LC.warm, { a: 0.34, A: tc.A, glow: 0.22 });
       }
+      /* 'years': a typographic moment of its own — a quiet line, then 好孩子 set large in the grey of the good life,
+         gathering from dust and dissolving upward before "Have a try" */
+      const yrs = noDot(V.lines.years), yc2 = yrs.indexOf('好孩子'), yOut = prog(ct, S.try - 1.2, S.try - 0.05);
+      KIT.ptext(yrs.slice(0, yc2), 150, 560, { size: 50, weight: 400, align: 'left', color: LC.ink, a: 0.42, crisp: 0.9, k: prog(ct, S.years + 0.5, S.years + 2.5), out: yOut, t: ct, seed: 4, tag: 3, drift: 0.4 });
+      KIT.ptext(yrs.slice(yc2), 142, 706, { size: 116, weight: 500, align: 'left', spacing: 10, color: [0.66, 0.68, 0.72], a: 0.36, crisp: 0.75, k: prog(ct, S.years + 1.8, S.years + 4.0), out: yOut, t: ct, seed: 6, tag: 4, drift: 0.4 });
+      // 'life': beneath "Have a try", gathering out of 你's light
+      KIT.ptext(noDot(V.lines.life), 540, 858, { size: 48, weight: 400, color: LC.ink, a: 0.4, crisp: 0.95, k: prog(ct, S.life + 0.2, S.life + 2.4), from: [Y.x, Y.y], t: ct, seed: 8, tag: 5, drift: 0.3 });
       PX.flush({ exposure: 1.4 });
-      halo(Y.x, Y.y, 300 * Y.s / 0.6, 0.9 + 0.12 * breath);
-      // the voice
-      cap(V.lines.years, ct, S.years + 0.4, S.try - 0.1, { y: 760 });
-      cap(V.lines.life, ct, S.life + 0.2, null, { y: 858, size: 50 });
+      halo(Y.x, Y.y, 300 * Y.s / 0.6, (0.9 + 0.12 * breath) * (1 - 0.4 * rec));
     },
     cues(V, api) {
       const S = steps(api);

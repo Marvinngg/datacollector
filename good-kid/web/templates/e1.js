@@ -575,7 +575,7 @@
   const TITLE_Y = [868, 984], TITLE_SIZE = 72;
   function voiceParticles(ct, S, l6, fx, fy, far) {
     // 社会不发奖状。 — gathers in the empty dark where the 奖状 holder stood
-    KIT.ptext(l6.none, NONE_AT.x, NONE_AT.y, { size: 44, weight: 500, color: [0.74, 0.77, 0.84], a: 0.42, crisp: 0.55, t: ct, seed: 5, tag: 1,
+    KIT.ptext(l6.none, NONE_AT.x, NONE_AT.y, { size: 46, weight: 500, color: [0.78, 0.8, 0.86], a: 0.5, crisp: 0.85, t: ct, seed: 5, tag: 1,
       k: prog(ct, S.none + 0.1, S.none + 1.9), out: prog(ct, S.title - 0.9, S.title + 0.2) });
     // the title condenses out of the light the lamps left behind: motes along the three old beams drift in and gather
     const tk = prog(ct, S.title - 0.6, S.title + 3.0), tout = prog(ct, S.lamp - 0.2, S.lamp + 1.0);
@@ -593,18 +593,36 @@
           b.Y[i] = lerp(sy, T_.Y[i], kk) + Math.sin(r1 * 40) * sw - lift * (40 + 90 * r2);
           b.A[i] = (clamp(tk * 5) * (0.5 + 0.5 * r3)) * (1 - 0.55 * smooth(prog(tk, 0.75, 1))) * (1 - lift);
         }
-        PX.points(b.X, b.Y, n, LAMP, { a: 0.22, A: b.A, glow: 0.5 });
+        PX.points(b.X, b.Y, n, LAMP, { a: 0.32, A: b.A, glow: 0.5 });
       });
     }
     // the last lamp, carried away: its faint beam no longer reaches you — it lights the words instead
     const L1 = holderState(S, S.lamp)[1], lxs = 540 + (L1.h.x + L1.dx - YOU.x) * 0.57, lys = 1196 + (L1.h.y + L1.dy - YOU.y) * 0.57;
     const ka = prog(ct, S.lamp + 0.5, S.lamp + 2.6), ko = prog(ct, S.held2 - 0.5, S.held2 + 0.6);
-    KIT.ptext(l6.lamp[0], lxs, lys + 300, { size: 44, weight: 400, color: LAMP, a: 0.4, crisp: 0.7, t: ct, seed: 7, tag: 2, from: [fx, fy], k: ka, out: ko });
-    KIT.ptext(l6.lamp[1], lxs, lys + 372, { size: 44, weight: 400, color: LAMP, a: 0.4, crisp: 0.7, t: ct, seed: 8, tag: 3, from: [fx, fy], k: prog(ct, S.lamp + 1.2, S.lamp + 3.2), out: ko });
-    const gone = prog(ct, S.end - 0.8, S.end - 0.3);
-    KIT.ptext(l6.held, lxs, lys + 110, { size: 40, weight: 500, color: LAMP, a: 0.42, crisp: 0.75, t: ct, seed: 9, tag: 4, from: [fx, fy], k: prog(ct, S.held2 + 0.3, S.held2 + 2.0), out: gone });
+    beamText(l6.lamp[0], lxs, lys + 300, 44, ka, ko, fx, fy, ct, 7);
+    beamText(l6.lamp[1], lxs, lys + 372, 44, prog(ct, S.lamp + 1.2, S.lamp + 3.2), ko, fx, fy, ct, 8);
+    beamText(l6.held, lxs, lys + 112, 40, prog(ct, S.held2 + 0.3, S.held2 + 2.0), prog(ct, S.end - 0.8, S.end - 0.3), fx, fy, ct, 9);
+  }
+  /* words that pour out of a lamp along its light: each particle travels its own ray from the lamp to its place;
+     a crisp core fades in once they have arrived (drawn after the flush, see voiceCrisp) */
+  const BEAMTXT = [];
+  function beamText(str, x, y, size, k, out, lx, ly, ct, seed) {
+    if (k <= 0 || out >= 1) return;
+    const T_ = PX.text(str, { size, family: F.serif, weight: 400, x, y: y + size * 0.36, step: Math.max(1.25, size / 34), seed });
+    const n = T_.n, b = PX.buf(n, 380 + seed);
+    for (let i = 0; i < n; i++) {
+      const r1 = PX.rand(i, 111 + seed), r2 = PX.rand(i, 112 + seed);
+      const sk = smooth(clamp(k * 1.6 - r1 * 0.6)), ko = ease.in(clamp(out * 1.5 - r2 * 0.5));
+      b.X[i] = lerp(lx, T_.X[i], sk) + Math.sin(ct * 0.7 + i) * 0.5 + Math.cos(r2 * 30) * ko * 40;
+      b.Y[i] = lerp(ly + 4, T_.Y[i], sk) - ko * (30 + 50 * r1);
+      b.A[i] = clamp(sk * 6) * (1 - 0.5 * smooth(prog(k, 0.8, 1))) * (1 - ko);
+    }
+    PX.points(b.X, b.Y, n, LAMP, { a: 0.36, A: b.A, glow: 0.45 });
+    BEAMTXT.push({ str, x, y, size, a: clamp((k - 0.8) / 0.2) * (1 - clamp(out * 1.6)) });
   }
   function voiceCrisp(ct, S, l6) {
+    for (const b of BEAMTXT) if (b.a > 0) text(b.str, b.x, b.y + b.size * 0.36, { size: b.size, family: F.serif, weight: 400, color: '#dfe6f6', align: 'center', alpha: b.a * 0.72 });
+    BEAMTXT.length = 0;
     // the far lamp's own soft beam (it lights the words, not you)
     const far = holderState(S, ct)[1];
     const bA = ease.inOut(prog(ct, S.lamp, S.lamp + 1.2)) * far.lampOn;

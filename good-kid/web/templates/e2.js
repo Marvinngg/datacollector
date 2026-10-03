@@ -78,7 +78,7 @@
     text('燃料 · 认可', x, y1 + 44, { size: 20, family: F.sans, weight: 400, color: C.dim, align: 'center', spacing: 3, alpha: a });
   }
 
-  function ruleSentence(V, lt, tR, lit) {
+  function ruleSentence(V, lt, tR, o_ink) {
     const k1 = prog(lt, tR + 0.2, tR + 2.3), k2 = prog(lt, tR + 1.5, tR + 3.8);
     if (k1 <= 0) return;
     const YP = youPts(), y1 = 560, y2 = 662, S1 = 50, S2 = 50, SH = 64;
@@ -86,7 +86,7 @@
     const segs = hiAt < 0 ? [[l2, S2, false]] : [[l2.slice(0, hiAt), S2, false], [hi, SH, true], [l2.slice(hiAt + hi.length), S2, false]].filter(g => g[0]);
     const ws = segs.map(([t, sz, h]) => measure(t, { size: sz, family: F.serif, weight: h ? 600 : 500 }));
     let x = W / 2 - ws.reduce((a, b) => a + b, 0) / 2;
-    PX.begin();
+    if (!o_ink) {
     const c1 = tcloud(V.lines.rule[0], S1, W / 2, y1, { seed: 81 });
     gatherCloud(c1, i => { const j = (i * 13) % YP.n; return [YOU.x + YP.X[j], YOU.y + YP.Y[j]]; }, k1, { tag: 460, color: mixRGB(INK, LAMP, 0.5), a: 0.5, arc: 90, t: lt, plume: true, stagger: 1.2 });
     segs.forEach(([t, sz, h], gi) => {
@@ -95,7 +95,8 @@
       else gatherCloud(c, i => { const j = (i * 17 + gi * 501) % YP.n; return [YOU.x + YP.X[j], YOU.y + YP.Y[j]]; }, k2, { tag: 461 + gi, color: mixRGB(INK, LAMP, 0.5), a: 0.5, arc: 90, t: lt, plume: true, stagger: 1.2 });
       x += ws[gi];
     });
-    PX.flush({ exposure: 1.45, glow: 0.9 });
+    }
+    if (!o_ink) return;
     // once gathered, the line is also there in ink, so it reads cleanly
     const a1 = clamp((k1 - 0.85) / 0.15) * 0.85, a2 = clamp((k2 - 0.85) / 0.15) * 0.85;
     if (a1 > 0) text(V.lines.rule[0], W / 2, y1, { size: S1, family: F.serif, weight: 500, color: '#e6e9f0', align: 'center', alpha: a1 });
@@ -165,13 +166,14 @@
           PX.points(e.X, e.Y, m, GOLD, { a: 0.6, A: e.A, glow: 0.8 });
         }
       });
+      ruleSentence(V, lt, tR, false);                       // its particles share the frame's light pass
       PX.flush({ exposure: 1.45, glow: 1.0 });
 
       // ---- the gauge beside 你
       gauge(800, 870, 1110, fill, ease.out(prog(lt, tP - 0.3, tP + 0.9)), lt, lands);
       // ---- the sentence: 你的自我价值 rises out of 你's own (borrowed) light; 别人的评价 condenses out of the dark above,
       //      where the praise came from, in the praise's gold
-      ruleSentence(V, lt, tR, lit);
+      ruleSentence(V, lt, tR, true);
     },
     cues(V, api) {
       const out = [{ t: at(api, 'name') + 0.25, type: 'title' }];
@@ -374,14 +376,13 @@
       KIT.you(st.x, st.y, YOU.size, { lit: st.lit, t: lt, rot: st.rot, drift: st.drift, scale: st.scale, breathe: 0.4 + 0.9 * wk, a: youA(st.lit) * Math.pow(st.scale, 1.5) });
       // somebody's lamp over the lit path (cone + its dust)
       if (fOn > 0 && litK > 0) { const zp = ZPOOL; KIT.spot(sx_(PATH.lit(zp), zp), sy_(zp), { k: litK * 0.6, w: 120, h: 580, px: true, t: lt, dust: 0.6, tag: 3 }); }
-      PX.flush({ exposure: 1.45, glow: 1.0 });
-
-      // ---- the sentences live in the picture: engraved under the 标准 line; weightless with 你; lying on the ground of the fork
-      PX.begin();
+      // the sentences, in the same light pass
       metSentence(V, lt, tM, tG, er);
       goneSentence(V, lt, tG, tF);
       fearSentence(V, lt, tF);
-      PX.flush({ exposure: 1.45, glow: 0.8 });
+      PX.flush({ exposure: 1.45, glow: 1.0 });
+
+      // ---- the sentences live in the picture: engraved under the 标准 line; weightless with 你; lying on the ground of the fork
       metSentenceInk(V, lt, tM, er);
       goneSentenceInk(V, lt, tG, tF);
       fearSentenceInk(V, lt, tF);
@@ -613,7 +614,7 @@
       const hiMask = [...l].map(() => false); let h = l.indexOf('个性'); while (h >= 0) { hiMask[h] = hiMask[h + 1] = true; h = l.indexOf('个性', h + 1); }
       let x = RM.x + (li === 0 ? 0 : 0), y = RM.y0 + li * RM.gap + (li === 0 ? 0 : 14);
       [...l].forEach((c, ci) => {
-        const w = measure(c, o), t0 = tE + 1.1 + idx * 0.12 + li * 0.35, p = prog(lt, t0, t0 + 0.28);
+        const w = measure(c, o), t0 = tE + 1.0 + idx * 0.1 + li * 0.3, p = prog(lt, t0, t0 + 0.28);
         if (p > 0) {
           ctx.save(); ctx.beginPath(); ctx.rect(x - 4, y - RM.size, (w + 8) * ease.out(p), RM.size * 1.4); ctx.clip();
           text(c, x, y + (PX.rand(idx, 520) - 0.5) * 4, { ...o, color: hiMask[ci] ? C.warm : '#ece7dc', alpha: 0.4 + 0.55 * p, glow: hiMask[ci] ? 8 : 0 });
