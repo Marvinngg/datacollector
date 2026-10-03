@@ -437,8 +437,8 @@
     const tw = u => { let s = 0; for (const t of tJ) { const d = lt - t; if (d > 0 && d < 1.2) s += 7 * Math.exp(-d * 5) * Math.sin(d * 46) * Math.sin(Math.PI * u); } return s; };
     // warm light on the teams first (canvas, under the particles)
     if (warm > 0) {
-      L.light(ROPE.figL, ROPE.figY - 50, 260, 'rgba(255,190,120,0.30)', warm * rk);
-      L.light(ROPE.figR, ROPE.figY - 50, 260, 'rgba(255,190,120,0.30)', warm * rk);
+      L.light(ROPE.figL, ROPE.figY - 50, 260, 'rgba(255,190,120,0.22)', warm * rk);
+      L.light(ROPE.figR, ROPE.figY - 50, 260, 'rgba(255,190,120,0.22)', warm * rk);
     }
     PX.begin();
     // rope: three twisted strands of gold-white light; the twist slides with the knot (rope running through hands)
@@ -457,12 +457,12 @@
         if (end > 0) { b2.X[m2] = b.X[i]; b2.Y[m2] = b.Y[i]; b2.A[m2] = b.A[i] * end * end * warm; m2++; }
       }
     }
-    PX.points(b.X, b.Y, n, [1, 0.93, 0.8], { a: 0.42 * rk, A: b.A, glow: 0.35 });
-    if (m2) PX.points(b2.X, b2.Y, m2, [1, 0.72, 0.42], { a: 0.55 * rk, A: b2.A, glow: 0.6 });
+    PX.points(b.X, b.Y, n, [1, 0.93, 0.8], { a: 0.42 * rk, A: b.A, glow: 0.2 });
+    if (m2) PX.points(b2.X, b2.Y, m2, [1, 0.72, 0.42], { a: 0.3 * rk, A: b2.A, glow: 0.35 });
     // the knot
     const kd = PX.disc(1400, 0, 0, 15), kb = bufg(9, kd.n), ky = ropeY(kf) + tw(kf);
     for (let i = 0; i < kd.n; i++) { kb.X[i] = kx + kd.X[i]; kb.Y[i] = ky + kd.Y[i]; kb.A[i] = 1 - Math.hypot(kd.X[i], kd.Y[i]) / 17; }
-    PX.points(kb.X, kb.Y, kd.n, [1, 0.97, 0.9], { a: 0.75 * rk, A: kb.A, glow: 0.9 });
+    PX.points(kb.X, kb.Y, kd.n, [1, 0.97, 0.9], { a: 0.4 * rk, A: kb.A, glow: 0.6 });
     // the two teams: 人 as particle clouds, leaning back; gold left, steel right; lit warm by the human at 'who'
     const fig = PX.text('人', { size: 120, family: F.serif, weight: 900, x: 0, y: 0, step: 1.7, seed: 77 });
     [[ROPE.figL, -1, COL.gold], [ROPE.figR, 1, COL.cool]].forEach(([fx, side, col], t) => {
@@ -470,7 +470,7 @@
       // leaning back away from the rope: the top of the glyph is pulled outward
       for (let i = 0; i < fig.n; i++) { fb.X[i] = fx + fig.X[i] - fig.Y[i] * lean * side; fb.Y[i] = ROPE.figY + fig.Y[i]; }
       const c = [lerp(col[0], 1, warm * 0.9), lerp(col[1], 0.8, warm * 0.9), lerp(col[2], 0.55, warm * 0.9)];
-      PX.points(fb.X, fb.Y, fig.n, c, { a: (t ? 0.75 : 0.6) * (1 + 0.5 * warm) * rk, glow: 0.4 + 0.4 * warm });
+      PX.points(fb.X, fb.Y, fig.n, c, { a: (t ? 0.75 : 0.6) * (1 + 0.12 * warm) * rk, glow: 0.4 });
     });
     // the machine: cyan micro-ticks on the rope, a scan pulse running to the knot after each jump
     if (mach > 0) {
@@ -517,7 +517,7 @@
     }
     // text: the machine's line above, the human's line below
     const ropeOut = ease.inOut(prog(lt, tWho, tWho + 0.8));
-    KIT.type(V.lines.rope, W / 2, 620, { size: 58, family: F.serif, weight: 600, mode: 'rise', k: prog(lt, tRope + 0.6, tRope + 1.8), color: C.ink, alpha: rk * (1 - 0.55 * ropeOut), spacing: 3 });
+    KIT.type(V.lines.rope, W / 2, 620, { size: 54, family: F.serif, weight: 600, mode: 'rise', k: prog(lt, tRope + 0.6, tRope + 1.8), color: C.ink, alpha: rk * (1 - 0.55 * ropeOut), spacing: 3 });
     const rows = splitAt(V.lines.who, '，');
     const whoRows = rows.length > 1 ? [rows[0], rows.slice(1).join('')] : rows;
     whoRows.forEach((r, i) => KIT.type(r, W / 2 + optX(r, 64), 1360 + i * 96, { size: 64, family: F.serif, weight: 600, mode: 'rise', k: prog(lt, tWho + 0.3 + i * 1.3, tWho + 1.5 + i * 1.3), color: WARM, alpha: rk, spacing: 3 }));
