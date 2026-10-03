@@ -467,8 +467,6 @@
     }
     PX.points(SPX, SPY, m, LC.warm, { a: 1.1 * Math.sin(Math.PI * Math.min(1, k * 1.15)) + 0.2, A: SPA, glow: 0.9, size: 2 });
   }
-  // the lamps' light drawn down into 你
-  const NL = 2400, LX = new Float32Array(NL), LY = new Float32Array(NL), LA = new Float32Array(NL), LCc = new Float32Array(NL * 3);
   const LAMPS = [{ x: 350, y: 1050 }, { x: 610, y: 1085 }, { x: 870, y: 1050 }], LAMP_H = 800;
 
   // 做得不好，世界也没有塌。 — the slots on the paper where the fallen characters come to lie (hand, in reading order)
@@ -479,6 +477,40 @@
     const chars = [...V.lines.fine], ws = chars.map(ch => K.measure(ch, { size: FINE_S, family: F.hand }) + 3), tw = ws.reduce((a, b) => a + b, 0);
     let u = 470 - tw / 2; SLOTS = chars.map((ch, i) => { const s = { ch, u }; u += ws[i]; return s; });
     return SLOTS;
+  }
+  // 每试一次，你就从别人手里，/ 拿回一点属于自己的灯。 — made of the lamps' dust
+  const TAKE_Y = [468, 556], TAKE_S = 50;
+  let TW = null;
+  function takeCloud(lines) {
+    const fk = document.fonts.check(`500 40px ${F.serif}`, lines[0]);
+    if (TW && TW.fk === fk) return TW;
+    const cs = lines.map((l, li) => PX.text(noDot(l), { size: TAKE_S, family: F.serif, weight: 500, x: 600, y: TAKE_Y[li], step: 1.35, seed: 31 + li }));
+    const n = cs.reduce((a, c) => a + c.n, 0), TX = new Float32Array(n), TY = new Float32Array(n), D = new Float32Array(n);
+    let m = 0; cs.forEach((c, li) => { for (let i = 0; i < c.n; i++, m++) { TX[m] = c.X[i]; TY[m] = c.Y[i]; D[m] = clamp(0.5 * li + 0.45 * (c.X[i] - 250) / 700 + 0.15 * R(m, 76)) ; } });
+    return (TW = { fk, n, TX, TY, D, X: new Float32Array(n), Y: new Float32Array(n), A: new Float32Array(n), C: new Float32Array(n * 3) });
+  }
+  function lampWords(lines, ct, take, Y) {
+    const tw = takeCloud(lines), n = tw.n, warmK = ss(take + 2.6, take + 5.0, ct);
+    for (let i = 0; i < n; i++) {
+      const L = LAMPS[i % 3], v = R(i, 72), top = L.y - LAMP_H, half = lerp(22, 120, v);
+      const x0 = L.x + (R(i, 73) * 2 - 1) * half * 0.85, y0 = top + v * LAMP_H * 0.85 + ((ct * 14 * (0.4 + R(i, 77))) % 60);
+      const k1 = ease.inOut(clamp((ct - take - 0.25 - tw.D[i] * 1.1) / 1.1));
+      const k2 = clamp((ct - take - 5.5 - tw.D[i] * 1.2 - R(i, 78) * 0.3) / 1.3);
+      const sw = Math.sin(Math.PI * k1) * (R(i, 74) - 0.5) * 50;
+      let x = lerp(x0, tw.TX[i], k1) + sw + Math.sin(ct * (0.9 + R(i, 79)) + i) * 0.4, y = lerp(y0, tw.TY[i], k1);
+      if (k2 > 0) { const j = (i * 13) % Y.n, e = ease.in(k2) * 0.6 + ease.inOut(k2) * 0.4; x = lerp(x, Y.X[j], e) + Math.sin(k2 * Math.PI) * (R(i, 75) - 0.5) * 60; y = lerp(y, Y.Y[j], e); }
+      tw.X[i] = x; tw.Y[i] = y;
+      tw.A[i] = (k2 >= 1 ? 0 : (0.3 + 0.7 * k1) * (1 + 1.3 * Math.sin(Math.PI * k2))) * ss(take, take + 0.6, ct);
+      const w = Math.max(warmK * (0.6 + 0.4 * tw.D[i]), ss(0.1, 0.7, k2));
+      tw.C[i * 3] = lerp(LC.lamp[0], LC.warm[0], w); tw.C[i * 3 + 1] = lerp(LC.lamp[1], LC.warm[1], w); tw.C[i * 3 + 2] = lerp(LC.lamp[2], LC.warm[2], w);
+    }
+    PX.points(tw.X, tw.Y, n, null, { a: 0.5, A: tw.A, C: tw.C, glow: 0.35 });
+    // once gathered, the sentence also reads crisply, cold at first, warming
+    const ck = ss(take + 1.2, take + 2.0, ct) * (1 - ss(take + 5.3, take + 6.0, ct));
+    if (ck > 0.01) lines.forEach((l, li) => {
+      const w = warmK * (0.6 + 0.4 * li), col = [0, 1, 2].map(c => Math.round(255 * lerp(LC.lamp[c] * 0.95, LC.warm[c], w)));
+      K.text(noDot(l), 600, TAKE_Y[li], { size: TAKE_S, family: F.serif, weight: 500, align: 'center', color: `rgb(${col})`, alpha: ck * 0.75 });
+    });
   }
   function triesState(ct, S, V) {
     const Ls = layout(V), tk = ['t1', 't2', 't3', 't4'].map(n => S[n]);
@@ -491,7 +523,7 @@
     // the lights: each try kindles one; the lamp's light fills the rest
     const em = tr.kin.map(k => { const e = ss(k, k + 0.5, ct); return e * (1 + 0.9 * Math.exp(-Math.max(0, ct - k) * 2.2)) * (0.92 + 0.08 * Math.sin(ct * 1.7 + k)); });
     const ownTry = 0.11 * em.reduce((a, b) => a + Math.min(1, b), 0);
-    const kOwn = ss(take + 2.6, take + 6.0, ct);
+    const kOwn = ss(take + 5.9, take + 8.0, ct);
     const own = lerp(ownTry, 1, kOwn), gray = Math.max(0, 1 - own * 1.9);
     const emK = em.map(e => e * (1 - 0.7 * kOwn));
     // 你 straightens up (end of b18 it was looking down at the child)
@@ -500,8 +532,8 @@
     // ---- the paper floor
     drawSheet(cm, { a: 1, head: 1, print: 1 });
     // warm light on the floor: a little from the first lights, all of it once the light is yours
-    const pool = 0.25 * ownTry + ss(take + 3.0, take + 7.0, ct) * 1.0;
-    floorLight(cm, STAND_U, STAND_V, 230 + 260 * ss(take + 3.0, take + 7.5, ct), pool, 1);
+    const pool = 0.25 * ownTry + ss(take + 6.0, take + 8.3, ct) * 1.0;
+    floorLight(cm, STAND_U, STAND_V, 230 + 260 * ss(take + 6.0, take + 8.4, ct), pool, 1);
     // ---- the tries, by hand
     const dimL = lerp(1, 0.14, ss(take + 0.1, take + 1.3, ct));
     let tip = null;
@@ -527,11 +559,11 @@
       if (tp.on) tip = tp;
     });
     // ---- the lamps of the middle of the film, faint, for a moment
-    const lampK = ss(take + 0.2, take + 1.6, ct) * (1 - ss(take + 2.4, take + 4.6, ct));
+    const lampK = ss(take + 0.0, take + 1.0, ct) * (1 - ss(take + 4.6, take + 6.8, ct));
     if (lampK > 0.003) LAMPS.forEach((L, i) => KIT.spot(L.x, L.y, { k: lampK * 0.26, w: 120, h: LAMP_H }));
     // ---- light
     PX.begin();
-    drawKid(cm, { k: 1, phi: lerp(104 * DEG, 92 * DEG, ss(take + 4, take + 7, ct)), own: 0.55 * ss(take + 4.0, take + 7.0, ct), t: lt + 30 });
+    drawKid(cm, { k: 1, phi: lerp(104 * DEG, 92 * DEG, ss(take + 6, take + 8.3, ct)), own: 0.55 * ss(take + 6.2, take + 8.3, ct), t: lt + 30 });
     const Y = drawYou(cm, { u: STAND_U, v: STAND_V, occ: 1 + 0.2 * own, phi, yaw, t: lt + 20, gray, own, a: lerp(3.0, 1.5, own), em: emK });
     // sparks from each finished line into its light
     tr.Ls.forEach((L, li) => {
@@ -540,29 +572,11 @@
       spark(last.x + last.w * 0.5, last.y - HS * 0.35, e.x, e.y, k);
     });
     if (tip) PX.dot(tip.x, tip.y, LC.warm, 0.5, 0.8);
-    // the lamps' light, drawn down into 你 and turning warm
-    const kd0 = take + 1.4;
-    if (ct > kd0 && ct < take + 7) {
-      let m = 0;
-      for (let i = 0; i < NL; i++) {
-        const L = LAMPS[i % 3], d = kd0 + R(i, 71) * 2.2, k = clamp((ct - d) / 1.5); if (k <= 0 || k >= 1) continue;
-        const v = R(i, 72), top = L.y - LAMP_H, y0 = top + v * LAMP_H * 0.8, half = lerp(150 * 0.18, 150, v * 0.8);
-        const x0 = L.x + (R(i, 73) * 2 - 1) * half * 0.85, j = (i * 13) % Y.n, x1 = Y.X[j], y1 = Y.Y[j];
-        const e = ease.in(k) * 0.6 + ease.inOut(k) * 0.4;
-        LX[m] = lerp(x0, x1, e) + Math.sin(k * Math.PI) * (R(i, 74) - 0.5) * 40; LY[m] = lerp(y0, y1, e);
-        LA[m] = Math.sin(Math.PI * k) * (0.6 + 0.4 * R(i, 75));
-        const w = ss(0.35, 0.95, k);
-        LCc[m * 3] = lerp(LC.lamp[0], LC.warm[0], w); LCc[m * 3 + 1] = lerp(LC.lamp[1], LC.warm[1], w); LCc[m * 3 + 2] = lerp(LC.lamp[2], LC.warm[2], w);
-        m++;
-      }
-      PX.points(LX, LY, m, null, { a: 1.0, A: LA, C: LCc, glow: 0.6, size: 2 });
-    }
+    // the lamps' dust gathers into the sentence in their beams, warms, then streams down into 你
+    const takeL = api.beat.visual.lines && api.beat.visual.lines.take;
+    if (takeL && ct > take) lampWords(takeL, ct, take, Y);
     PX.flush({ exposure: 1.4 });
     halo(Y.x, Y.y, 260 * Y.s / 0.7, own * 0.9 + 0.25 * kOwn * (0.9 + 0.1 * Math.sin(ct * 1.3)));
-    // ---- the voice
-    cap(V.lines.try, ct, S.try, S.fine + 0.0);
-    cap(V.lines.fine, ct, S.fine + 0.9, take);
-    if (S.take != null && api.beat.visual.lines.take) cap(api.beat.visual.lines.take, ct, take + 0.3, api.chainEnd - api.chainStart + 1);
   }
   const chainDraw = (ctx, V, lt, api) => { const S = steps(api), ct = lt - api.chainStart; drawChain(ctx, V, ct, S, api, ct); };
   const chainCues = (V, api) => {
@@ -573,7 +587,7 @@
       tr.Ls.forEach((L, i) => { sub(tr.t0[i], { type: 'type', dur: +L.dur.toFixed(2) }); sub(tr.kin[i], { type: 'glow' }); if (L.strike >= 0) sub(tr.t0[i] + L.tt[L.strike] + CPS + 0.12, { type: 'pen' }); });
       sub(S.fine + 0.3, { type: 'hush' });
     }
-    if (S.take != null) { sub(S.take + 1.4, { type: 'whoosh', dur: 2.8 }); sub(S.take + 3.4, { type: 'swell', dur: 4.5 }); sub(S.take + 5.2, { type: 'glow' }); }
+    if (S.take != null) { sub(S.take + 0.25, { type: 'swell', dur: 2.5 }); sub(S.take + 5.5, { type: 'whoosh', dur: 2.4 }); sub(S.take + 7.2, { type: 'glow' }); }
     return out;
   };
   T.register('tries', { draw: chainDraw, cues: chainCues });

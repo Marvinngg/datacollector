@@ -291,17 +291,17 @@
 
   function trapTimes(api) {
     const tR = at(api, 'relief'), tC = at(api, 'climb'), tB = at(api, 'back'), tK = at(api, 'rank');
-    return { tR, tC, tB, tK, tMorph: tB + 0.75, dMorph: 2.0, tCheck: tC + 2.05 };
+    return { tR, tC, tB, tK, tMorph: tB + 0.75, dMorph: 2.0, tCheck: tC + 2.5, g0: tC + 0.2, g1: tC + 2.3 };
   }
   T.register('trap', {
     draw(ctx, V, lt, api) {
-      const T_ = trapTimes(api), { tR, tC, tB, tK, tMorph, dMorph, tCheck } = T_;
+      const T_ = trapTimes(api), { tR, tC, tB, tK, tMorph, dMorph, tCheck, g0, g1 } = T_;
       const frozen = lt >= tB, tau = frozen ? tB : lt;           // the motion clock stops at 'back'
       const tabs = tau + api.beat.start;
       const mk_ = smooth(prog(lt, tMorph, tMorph + dMorph));        // the board turns into the sheet
       const fz = ease.out(prog(lt, tB, tB + 0.25));
       // --- leaderboard state (from the frozen clock)
-      const p = 3 - 3 * ease.inOut(prog(tau, tC + 0.15, tC + 1.85));   // your slot, 3 -> 0
+      const p = 3 - 3 * ease.inOut(prog(tau, g0, g1));   // your slot, 3 -> 0
       const youY = lerp(LB_ROW0 + p * LB_PITCH, sRowY(0), mk_);
       const sc = NAMES.map((_, r) => lerp(S0[r], S1[r], smooth(prog(tau, tR + 1.0 + r * 0.45, tR + 3.4 + r * 0.45))));
       const slotOf = r => r + smooth(clamp((r + 1) - p));       // others slide down one place as you pass them
@@ -317,9 +317,8 @@
       const dk = ease.inOut(prog(lt, tR, tR + 1.2));
       ctx.strokeRect(BX, BY, BW, (bottom - BY) * dk);
       ctx.beginPath(); ctx.moveTo(BX, SHY); ctx.lineTo(BX + BW * dk, SHY); ctx.stroke();
-      // header label: 排名 -> 答题卡
-      text('排名', BX + 24, BY + 46, { size: 26, family: F.sans, weight: 500, color: C.dim, spacing: 4, alpha: 1 - smooth(prog(mk_, 0.2, 0.6)) });
-      text('答题卡', BX + 24, BY + 46, { size: 26, family: F.sans, weight: 500, color: C.dim, spacing: 4, alpha: smooth(prog(mk_, 0.45, 0.9)) });
+      // header label (the sheet's own header is printed below, once the board has given itself away)
+      text('排名', BX + 24, BY + 46, { size: 26, family: F.sans, weight: 500, color: C.dim, spacing: 4, alpha: 1 - smooth(prog(lt, tB + 0.5, tB + 0.9)) });
       // row separators (only the leaderboard has them)
       ctx.strokeStyle = INK(0.08 * (1 - mk_));
       for (let s = 1; s < 4; s++) { const y = LB_ROW0 + (s - 0.5) * LB_PITCH; ctx.beginPath(); ctx.moveTo(BX + 20, y); ctx.lineTo(BX + BW - 20, y); ctx.stroke(); }
@@ -380,7 +379,7 @@
       if (sheetIn > 0) {
         ctx.save(); ctx.globalAlpha *= sheetIn;
         const f = prog(lt, tMorph + dMorph + 0.1, tMorph + dMorph + 2.6);
-        KIT.sheet(BX, BY, BW, SH, { rows: SROWS, k: 1, fill: f, marks: f, title: '答题卡', color: C.line });
+        KIT.sheet(BX, BY, BW, SH, { rows: SROWS, k: 1, fill: f, marks: f, color: C.line });
         ctx.restore();
       }
       ctx.restore();
@@ -399,21 +398,47 @@
       PX.flush({ exposure: 1.45, glow: 0.9 });
       // --- the held frame: a quiet dimming, nothing else moves
       if (fz > 0) { ctx.save(); ctx.globalAlpha *= 0.12 * fz * (1 - smooth(prog(lt, tB + 0.6, tB + 1.6))); ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H); ctx.restore(); }
-      // --- rank: a fine grey line strikes the ranking through, slowly
-      const sk = ease.inOut(prog(lt, tK + 1.3, tK + 4.6));
+      // --- the sheet's header, printed: the board was the answer sheet all along
+      const hk = prog(lt, tB + 1.0, tB + 2.4), hDim = 1 - 0.45 * smooth(prog(lt, tK, tK + 1.2));
+      if (hk > 0) {
+        const chars = [...V.lines.back], n = chars.length, o = { size: 38, family: F.sans, weight: 500 };
+        let x = BX + 26;
+        chars.forEach((ch, i) => {
+          const a = smooth(clamp(hk * (n + 2) - i));
+          if (a > 0) text(ch, x, BY + 51, { ...o, color: C.ink, alpha: a * 0.92 * hDim });
+          x += measure(ch, o) + 3;
+        });
+        text('答题卡', BX + BW - 24, BY + 46, { size: 22, family: F.sans, weight: 500, color: C.dim, align: 'right', spacing: 4, alpha: smooth(prog(hk, 0.6, 1)) * 0.8 });
+      }
+      // --- the smug margin note: your own hand, scribbled under the board while the others' bars shrink
+      const nk = prog(lt, tR + 0.7, tR + 3.7), nOut = smooth(prog(lt, tB + 0.45, tB + 1.1));
+      if (nk > 0 && nOut < 1) handNote(splitRelief(V.lines.relief), 214, 1196, nk, { size: 50, gap: 80, indent: 70, rot: -0.04, alpha: 1 - nOut, gray: fz, under: '更稳', uk: prog(lt, tR + 3.5, tR + 4.1) });
+      // --- rank: a fine grey line strikes the ranking through, slowly, and writes the sentence as it goes
+      const sk = ease.inOut(prog(lt, tK + 0.3, tK + 3.3));
       if (sk > 0) {
-        const x0 = BX - 34, y0 = BY + SH + 30, x1 = BX + BW + 34, y1 = BY - 26;
-        ctx.save(); ctx.strokeStyle = C.gray; ctx.globalAlpha *= 0.85; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+        const x0 = BX - 40, y0 = 1160, x1 = BX + BW + 40, y1 = 744, N = 80;
+        const P = u => { const bow = Math.sin(u * Math.PI) * 14; return [lerp(x0, x1, u) - bow * 0.45, lerp(y0, y1, u) - bow]; };
+        // the words ride just above the line, each one written as the line's tip passes it
+        const ang = Math.atan2(y1 - y0, x1 - x0), str = [...V.lines.rank], o = { size: 44, family: F.serif, weight: 500 };
+        const ws = str.map(ch => measure(ch, o) + 4), tw = ws.reduce((a, b) => a + b, 0), len = Math.hypot(x1 - x0, y1 - y0);
+        let acc = (len - tw) / 2;
+        ctx.save(); ctx.lineJoin = 'round';
+        str.forEach((ch, i) => {
+          const u = (acc + ws[i] / 2) / len, a = smooth(clamp((sk - u) / 0.05));
+          acc += ws[i];
+          if (a <= 0) return;
+          const [px, py] = P(u);
+          ctx.save(); ctx.translate(px + Math.sin(ang) * 20, py - Math.cos(ang) * 20); ctx.rotate(ang);
+          ctx.globalAlpha *= a; ctx.font = `500 44px ${F.serif}`; ctx.textAlign = 'center';
+          ctx.strokeStyle = C.bg; ctx.lineWidth = 9; ctx.strokeText(ch, 0, (1 - a) * 6);
+          ctx.fillStyle = 'rgba(204,208,216,0.95)'; ctx.fillText(ch, 0, (1 - a) * 6);
+          ctx.restore();
+        });
+        ctx.strokeStyle = C.gray; ctx.globalAlpha *= 0.9; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
         ctx.beginPath(); ctx.moveTo(x0, y0);
-        const N = 60;
-        for (let k = 1; k <= N * sk; k++) { const u = k / N, bow = Math.sin(u * Math.PI) * 18; ctx.lineTo(lerp(x0, x1, u) + bow * 0.5, lerp(y0, y1, u) + bow); }
+        for (let k = 1; k <= N * sk; k++) { const [px, py] = P(k / N); ctx.lineTo(px, py); }
         ctx.stroke(); ctx.restore();
       }
-      // --- captions
-      const cOut = prog(lt, tB + 0.5, tB + 1.0);
-      KIT.caption(splitRelief(V.lines.relief), prog(lt, tR + 0.7, tR + 3.6), { family: F.hand, out: cOut, y: 1470, color: INK(0.9) });
-      KIT.caption(V.lines.back, prog(lt, tB + 1.0, tB + 2.6), { out: prog(lt, tK - 0.45, tK), y: 1500 });
-      KIT.caption(V.lines.rank, prog(lt, tK + 0.1, tK + 1.9), { y: 1500 });
     },
     cues(V, api) {
       const T_ = trapTimes(api), out = [];
@@ -421,16 +446,50 @@
       for (let r = 2; r >= 0; r--) {
         // p crosses r + 0.5 (half way past the row)
         const target = 3 - (r + 0.5);   // 3*ease = target
-        for (let s = 0; s < 2; s += 0.01) { if (3 * ease.inOut(prog(T_.tC + s, T_.tC + 0.15, T_.tC + 1.85)) >= target) { out.push({ t: +(T_.tC + s).toFixed(3), type: 'tick', r }); break; } }
+        for (let s = 0; s < 3; s += 0.01) { if (3 * ease.inOut(prog(T_.tC + s, T_.g0, T_.g1)) >= target) { out.push({ t: +(T_.tC + s).toFixed(3), type: 'tick', r }); break; } }
       }
       out.push({ t: T_.tCheck, type: 'pen' });
       out.push({ t: T_.tCheck + 0.15, type: 'click' });
       out.push({ t: T_.tB, type: 'freeze' });
       out.push({ t: T_.tMorph + T_.dMorph + 0.1, type: 'ticks', dur: 2.5, n: 12, p0: 0.2, p1: 0.2 });
-      out.push({ t: T_.tK + 1.3, type: 'hush' });
+      out.push({ t: T_.tR + 0.7, type: 'pen', soft: true, dur: 3.0 });
+      out.push({ t: T_.tB + 1.0, type: 'type', dur: 1.4 });
+      out.push({ t: T_.tK + 0.3, type: 'hush' });
       return out;
     },
   });
+  // your handwriting: characters arrive one by one, each a little off its line, a little turned
+  function handNote(lines, x, y, k, o) {
+    const size = o.size, N = lines.reduce((a, l) => a + [...l].length, 0), r = rng(31);
+    const cw = [255, 214, 165], gw = [168, 170, 176], col = cw.map((v, i) => Math.round(lerp(v, gw[i], o.gray || 0)));
+    const css = a => `rgba(${col},${a})`, fo = { size, family: F.hand };
+    ctx.save(); ctx.globalAlpha *= o.alpha; ctx.translate(x, y); ctx.rotate(o.rot);
+    let idx = 0, ux = null;
+    lines.forEach((l, li) => {
+      let cx = li * o.indent; const yy = li * o.gap;
+      const chars = [...l], ui = o.under ? l.indexOf(o.under) : -1;
+      chars.forEach((ch, ci) => {
+        const w = measure(ch, fo), jy = (r() - 0.5) * 5, jr = (r() - 0.5) * 0.07, p = clamp(k * (N + 3) - idx);
+        if (ci === ui) ux = [cx, yy];
+        if (ci === ui + [...o.under].length - 1 && ux) ux.push(cx + w);
+        if (p > 0) {
+          const e = ease.out(p);
+          ctx.save(); ctx.translate(cx + w / 2, yy + jy); ctx.rotate(jr); ctx.scale(lerp(0.9, 1, e), lerp(0.9, 1, e));
+          text(ch, 0, 0, { size, family: F.hand, color: css(0.9), align: 'center', alpha: e });
+          ctx.restore();
+        }
+        cx += w + 1; idx++;
+      });
+    });
+    // a quick, pleased underline under 更稳
+    if (ux && ux.length === 3 && o.uk > 0) {
+      const [a0, yy, a1] = ux, u = ease.out(o.uk);
+      ctx.strokeStyle = css(0.75); ctx.lineWidth = 2.4; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(a0 - 4, yy + 14);
+      ctx.quadraticCurveTo((a0 + a1) / 2, yy + 20, lerp(a0 - 4, a1 + 12, u), yy + 12 - 4 * u); ctx.stroke();
+    }
+    ctx.restore();
+  }
   function splitRelief(s) {
     const i = s.lastIndexOf('，');
     return i > 0 ? [s.slice(0, i + 1), s.slice(i + 1)] : [s];

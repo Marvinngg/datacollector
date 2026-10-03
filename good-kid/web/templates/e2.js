@@ -39,7 +39,8 @@
     for (let i = 0; i < n; i++) {
       const d = o.d ? o.d(i) : PX.rand(i, 400 + o.tag), kk = ease.inOut(clamp(k * (1 + st) - d * st));
       const [sx, sy] = src(i), sw = Math.sin(kk * Math.PI) * arc * (PX.rand(i, 401) - 0.5);
-      b.X[i] = lerp(sx, cl.X[i], kk) + sw + Math.sin(t * 1.1 + i) * 0.5; b.Y[i] = lerp(sy, cl.Y[i], kk) + Math.cos(t * 0.9 + i) * 0.5;
+      const kx = o.plume ? kk * kk * kk : kk, ky = o.plume ? 1 - Math.pow(1 - kk, 2) : kk;     // plume: rise first, spread late
+      b.X[i] = lerp(sx, cl.X[i], kx) + sw + Math.sin(t * 1.1 + i) * 0.5; b.Y[i] = lerp(sy, cl.Y[i], ky) + Math.cos(t * 0.9 + i) * 0.5;
       b.A[i] = clamp(kk * 6) * (0.3 + 0.7 * kk);
     }
     PX.points(b.X, b.Y, n, o.color, { a: o.a == null ? 0.5 : o.a, A: b.A, glow: o.glow == null ? 0.35 : o.glow });
@@ -87,11 +88,11 @@
     let x = W / 2 - ws.reduce((a, b) => a + b, 0) / 2;
     PX.begin();
     const c1 = tcloud(V.lines.rule[0], S1, W / 2, y1, { seed: 81 });
-    gatherCloud(c1, i => { const j = (i * 13) % YP.n; return [YOU.x + YP.X[j], YOU.y + YP.Y[j]]; }, k1, { tag: 460, color: mixRGB(INK, LAMP, 0.5), a: 0.5, arc: 60, t: lt });
+    gatherCloud(c1, i => { const j = (i * 13) % YP.n; return [YOU.x + YP.X[j], YOU.y + YP.Y[j]]; }, k1, { tag: 460, color: mixRGB(INK, LAMP, 0.5), a: 0.5, arc: 90, t: lt, plume: true, stagger: 1.2 });
     segs.forEach(([t, sz, h], gi) => {
       const c = tcloud(t, sz, x, y2, { align: 'left', seed: 82 + gi, weight: h ? 600 : 500 });
       if (h) gatherCloud(c, i => [160 + PX.rand(i, 470) * 760, 420 + PX.rand(i, 471) * 90], k2, { tag: 461 + gi, color: GOLD, a: 0.55, glow: 0.6, arc: 40, t: lt });
-      else gatherCloud(c, i => { const j = (i * 17 + gi * 501) % YP.n; return [YOU.x + YP.X[j], YOU.y + YP.Y[j]]; }, k2, { tag: 461 + gi, color: mixRGB(INK, LAMP, 0.5), a: 0.5, arc: 50, t: lt });
+      else gatherCloud(c, i => { const j = (i * 17 + gi * 501) % YP.n; return [YOU.x + YP.X[j], YOU.y + YP.Y[j]]; }, k2, { tag: 461 + gi, color: mixRGB(INK, LAMP, 0.5), a: 0.5, arc: 90, t: lt, plume: true, stagger: 1.2 });
       x += ws[gi];
     });
     PX.flush({ exposure: 1.45, glow: 0.9 });
