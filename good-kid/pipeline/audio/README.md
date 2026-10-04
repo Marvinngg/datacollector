@@ -2,7 +2,7 @@
 
 `python3 pipeline/audio/score.py [--plot] [--stems]` reads `build/timeline.json` and `build/cues.json` and writes
 `build/audio/mix.wav`: stereo, 48 kHz, −16 LUFS integrated, true peak ≤ −1.3 dBTP, length = timeline duration.
-A build takes about 4 minutes on 4 cores.
+A build takes about 3 minutes on 4 cores.
 
 - `--plot` writes `build/audio/score.png` (envelope + spectrogram).
 - `--stems` prints the loudness of the piano, music and fx buses per step.
@@ -38,10 +38,13 @@ Nothing in the score is written in seconds:
 - **Synthesised sounds:** room tone with an E-tuned phone hum, thumb swish, electrical click, pen nib, receipt printer
   (stepper whine gated in 16ths), crowd murmur and laughter, wind, a descending Shepard texture, detuned shimmer, warm
   "glow" tones, soft thumps.
-- **No drums.** The only pulse instruments are the scoring clock, the rules' metronome, the pendulum and the printer.
+- **No drums until the climax.** Before it, the only pulse instruments are the scoring clock, the rules' metronome,
+  the pendulum and the printer. From `kline` the drums enter for the first time: a synthesised kick, GM low toms,
+  congas, shaker, timpani, orchestral bass drum and crash. The climax also adds synth pluck arpeggios and bass, short
+  string notes, choir, French horns and brass.
 - **Reverb:** two convolution spaces, a 2.8 s hall and a 7.5 s "big" space. The reverb is computed per silence-delimited
   segment, so nothing rings into a silence.
-- **Key:** E minor, turning to E major at `take`.
+- **Key:** E minor, turning to E major at `take`; the climax and the end stay in E major.
 - **Theme, "the waiting child":** E4 – B4 – A4 – G4 – **F♯4** (held). It opens on a fifth, steps down and stops on
   the 2nd degree: a question waiting for a score.
 
@@ -67,9 +70,13 @@ Nothing in the score is written in seconds:
 | **e5** never | Three soft notes, **B4 → C5 → D♯5**, over Am9, F♯m7♭5 and B7. The leading tone is left unresolved. |
 | **e5** fall | `cliff`: a trembling low B with its flat ninth (C), a high F♯ harmonic and wind. At `step` a breath is held. At `fall` **the floor drops out**: a 7–8 s descending Shepard texture, wind and glints falling past. At `land` comes a single low **C1** and a bloom of strings + oohs (Cmaj9), with a tender line on top. In `floor` the theme is harmonised warmer (Cmaj7, Am7, **D**): the waiting F♯ is finally held, as the third of D. |
 | **e6** stand | `up` is a slow swell toward the light (C, D, G/B, Cadd9). `kid` brings the theme exactly as at 1 a.m., an octave up: the child who waits. |
-| **e6** tries | **The tries:** a light piano pulse (G, C, D, Em) with little imperfect figures, a hand still learning: late, early, uneven. t2 carries the crossed-out character, so it gets a **wrong note (A♯) left in**. t3 falters mid-phrase. Each kindling is a warm glow tone. `fine`: nothing happens, the pulse goes on. |
-| **e6** lamp | **E major:** `take` goes Cmaj7 → Dadd9 → **E (add9)**, ♭VI–♭VII–I. The G♯ arrives with a full strings swell and a glow. |
-| **e6** end | `years` **sings the theme in E major**: piano + violins (8va) + cellos (8vb) + oohs, over E, Amaj7, Bsus4, B. `try` is "Have a try", the answer: the F♯ no longer waits, it rises G♯, B → **E5**, plagal (A add9 → E). `life` is a long warm Eadd9 with the theme's head on a high celesta. It fades to digital silence at the end of the last step. |
+| **e6** tries | Six tries, matched to the template's kinds. The stall is a plain first step. The stocks go badly: the figure breaks off, nothing happens, the pulse goes on. The course wobbles. The city gets the crossed-out character, so a wrong note (A♯) is left in. The meeting word slips and falters. The last is uneven. |
+| **e6** lamp | **E major:** `take` goes Cmaj7 → Dadd9 → **E (add9)**. A riser in its last 2 beats leans into the hard cut. |
+| **e6** kline (**climax**) | `run`: **the drums enter for the first time**: a kick on the beat, low toms in 8ths, congas + shaker in 16ths, felt-piano octaves in 8ths, short strings, pluck bass, an arpeggio (E, C♯m7, A, B). The template's `ticks` race with the line. `dip`: **cut dead to one low C♯ hit**, silence for a beat (the reverb is cut too). `climb`: the build. Toms double into 16ths, a timpani roll grows, a rising string scale runs B3 → F♯5, and a riser lands on `found`. |
+| **e6** agents | `found`: one arpeggio, pad, piano and a lighter pulse. `spawn`: a second arpeggio (3 against 4), short strings and toms. Each `spawn` wave (n 8 → 544) is a rising cascade of tiny plucks fanning out across the stereo field, plus a glitter bed. `command`: **the choir enters**, a third high arpeggio and a heavier drive. The theme's first four notes are glimpsed (A, F♯m7, Bsus4, B). |
+| **e6** summit | `climb`: a dominant pedal on B, tremolo strings and choir swelling, a timpani roll and toms growing, a riser and reversed cymbal. **`peak`: the film's loudest, widest moment**, landing on the template's `peak` cue: bass drum, crash pair, timpani, low piano E, full divisi strings spread across the whole stereo field, horns, brass, choir and pad. **The theme is sung out at last** by violins, choir and horns: E5 B5 A5 G♯5 F♯5 – G♯5 B5. Its waiting F♯ now climbs on to E6 at the next downbeat. Half-time toms and kick underneath. |
+| **e6** journey | Release. `ride`: the steel guitar from e3's freedom, now yours, with the drums thinning to a shaker. A long sweeping violin phrase falls E6 → E5 over E, B/D♯, C♯m7, A, against a rising cello line, plus the template's wind. `free`: the guitar thins out and a calm dusk sea breathes under held strings (Aadd9 → E). |
+| **e6** end | Back to the intimate felt piano + quiet strings. `years`: G♯ B E. `try`: a breath on Aadd9 → Bsus4. **`love` ("找回你自己热爱的…") is the theme's last statement**: piano + violins + cellos, E4 B4 A4 G♯4 F♯4, over E, Amaj7, Bsus4, B. Under `you` the B chord is held softly, then the line rises G♯ B. **"那才是你。"** lands on the template's `resolve` cue (the final 你) with the warm last E-major chord: low E piano, strings, violin E5, oohs and a glow, plus the theme's head on a high celesta. It fades to digital silence at the end of the step. |
 
 ## Cues (`build/cues.json`)
 
@@ -95,13 +102,23 @@ are handled safely. The form and the cues share a registry (`seen`), so the same
 | `glow` | A warm amber tone on the current chord. `fuel`: the stacking praise chimes. `reunion`: behind the wall. `darkq`: barely a breath. |
 | `title` | `leave`: the deep title chord. `yourbill`: the heavy 试错权 chord. `end`: a high warm light. `darkq`: nothing (the theme is the title). Elsewhere a soft low note + bell. |
 | `freeze` | Hard stop to digital zero on music + fx + reverb until the step ends (in `trap`: until `rank`). |
-| `resolve` | A soft harp arpeggio of the current chord with a glow on top. |
+| `resolve` | A soft harp arpeggio of the current chord with a glow on top. In `end`'s last step its time sets the final chord ("那才是你。"). |
+| `beat` | A downbeat hit: kick + low tom (+ timpani in kline/summit) in the climax, a soft thump elsewhere. Scene-marker `beat`s (with `visual`) are ignored. |
+| `rise{dur}` | A riser landing at t+dur: air sweeping up, a rising tone, a reversed cymbal (full in the climax, half elsewhere). |
+| `drop` | The dip: a dead cut to digital silence for a beat (set up before composing). Inside it, one low hit on the post bus: piano octave, timpani, sub kick, bass drum. |
+| `spawn{dur,n}` | A cascade of up to 32 tiny plucks on the chord, rising and fanning out. Many more agents than notes adds a glitter bed. |
+| `pulse` | A pulse through the network: a soft sub kick and a short bright plucked chord. |
+| `peak` | In `summit`: sets the time of the composed peak (the sun breaking). Elsewhere a crash + timpani. |
+| `wind{dur}` | A gust of wind for dur. |
 
 ## Mix
 
 - **Buses:** felt piano, music, the reunion's low-passed "blur", fx (level set per chapter; the last step is barely
   audible), and a post bus that bypasses silences.
-- **Section trims by visual type:** the 1 a.m. beats sit 2.5–4 dB lower so the film can open in near silence.
+- **Section trims by visual type:** the 1 a.m. beats sit 2.5–4 dB lower so the film can open in near silence. `lamp`,
+  `leave` (the title chord) and `fall` (the landing) sit 1.5–2 dB lower, so the summit stays the clear peak: about
+  2 LU above any other moment in short-term loudness.
 - **Mastering:** a 30 Hz high-pass, then integrated normalisation to −16 LUFS and a 4× oversampled look-ahead limiter
-  at −1.3 dBTP.
+  at −1.3 dBTP. The report prints the limiter's maximum gain reduction (about 5 dB on the peak's downbeat, and more
+  than 2 dB in only about 1% of the film).
 - **Ending:** the last 2.5 s of the final step fade to digital zero, and the 0.5 s timeline tail is silent.

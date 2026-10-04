@@ -27,7 +27,8 @@ tl = Timeline(); D = tl.duration
 BPM = float(tl.d.get('bpm', 72)); BT = 60.0 / BPM; E8 = BT / 2; S16 = BT / 4
 NN = n_of(D) + n_of(4.0)            # working length (tails run past the end, cut at the end)
 NOUT = n_of(D)                      # output length = timeline duration
-CUES = sorted([c for c in tl.cues if isinstance(c.get('t'), (int, float))], key=lambda c: c['t'])
+CUES = sorted([c for c in tl.cues if isinstance(c.get('t'), (int, float))
+               and not (c.get('type') == 'beat' and 'visual' in c)], key=lambda c: c['t'])   # scene markers are not hits
 
 # ================================================================ timeline lookup (by visual type / step name)
 BEATS = tl.beats
@@ -495,13 +496,13 @@ def melody(t, seq, voice, unit=BT, **kw):
         if t is not None: t += d * unit
     return t
 
-def strings(keys, t, dur, vel=56, g=0.2, preset=SSTR, rv=0.45, bg=0.35, fi=1.2, fo=None, spread=0.6, cut=None, tail=3.0, bus=None):
+def strings(keys, t, dur, vel=56, g=0.2, preset=SSTR, rv=0.45, bg=0.35, fi=1.2, fo=None, spread=0.6, cut=None, cutf=0.12, tail=3.0, bus=None):
     if not ok(t) or dur <= 0: return
     env = [(0, 0), (fi, 1.0)] if fi else None
     if fo: env = (env or [(0, 1)]) + [(max(fi or 0, dur - fo), 1.0), (dur, 0.0)]
     for i, k in enumerate(keys):
         p = 0 if len(keys) == 1 else -spread + 2 * spread * i / (len(keys) - 1)
-        note(preset, k, t, dur, vel, g, p, rv=rv, bg=bg, tail=tail, env=env, cut=cut, bus=bus)
+        note(preset, k, t, dur, vel, g, p, rv=rv, bg=bg, tail=tail, env=env, cut=cut, cutf=cutf, bus=bus)
 
 def pads(t0, t1, preset, vel=50, g=0.3, rv=0.4, bg=0.3, octave=0, fi=0.6, fo=None, overlap=0.4, spread=0.6, which=None,
          bass=False, tail=3.0, cut=None, cutf=0.12, bus=None):
@@ -568,10 +569,10 @@ def sync(fn):
 def h_type(t, dur=1.0, **_):
     """soft key taps (a phone keyboard / a pencil), never busy"""
     dur = min(4.0, max(0.1, float(dur or 1.0))); rng = np.random.default_rng(int(t * 1000)); x = t
-    bus = POST if gated(t) else FX
+    bus = POST if gated(t) else FX; gk = 0.25 if gated(t) else 1.0
     while x < t + dur:
         bus.add(x, tick(rng.choice([2200, 2600, 3000]), 0.003, int(rng.integers(0, 6)), body=0.3),
-                0.022 * rng.uniform(0.6, 1.0), rng.uniform(-0.2, 0.2), rv=0.12)
+                0.022 * gk * rng.uniform(0.6, 1.0), rng.uniform(-0.2, 0.2), rv=0.12)
         x += rng.uniform(0.09, 0.18)
 
 @sync
@@ -863,9 +864,9 @@ def h_beat(t, **kw):
     if seen('beathit', t, 0.15): return
     bt = btype_at(t); root = CHORDS[chord_at(t + 0.02)][0]
     if bt in CLIMAX:
-        FX.add(t, kick(95, 40, 0.3, 1.0, 0.1), 0.45, 0, rv=0.15, bg=0.1)
-        drum(LTOM, t, 100, 0.55, -0.15, rv=0.3, bg=0.2, bus=FX)
-        if bt in ('kline', 'summit'): note(TIMP, root + 12, t, 1.0, 96, 0.5, 0.05, rv=0.3, bg=0.3, bus=FX)
+        FX.add(t, kick(95, 40, 0.3, 1.0, 0.1), 0.30, 0, rv=0.15, bg=0.1)
+        drum(LTOM, t, 96, 0.38, -0.15, rv=0.3, bg=0.2, bus=FX)
+        if bt in ('kline', 'summit'): note(TIMP, root + 12, t, 1.0, 92, 0.36, 0.05, rv=0.3, bg=0.3, bus=FX)
         return
     FX.add(t, thump(80, 44, 0.12, 0.6, 200), 0.3, 0, rv=0.15)
 
@@ -888,11 +889,11 @@ def h_drop(t, **_):
     if seen('drop', t, 0.3): return
     root = CHORDS[chord_at(t + 0.02)][0]
     bus = POST if gated(t) else FX
-    note(PNO, root - 12, t, 3.0, 110, 0.9, 0, rv=0.3, bg=0.6, bus=bus, tail=5)
-    note(PNO, root, t + 0.008, 3.0, 96, 0.5, 0, rv=0.3, bg=0.6, bus=bus, tail=5)
-    note(TIMP, root + 12, t, 2.0, 120, 0.8, 0, rv=0.3, bg=0.6, bus=bus)
-    bus.add(t, kick(70, 30, 0.6, 2.0, 0.15), 0.6, 0, rv=0.2, bg=0.5)
-    drum(BASSDRUM, t, 120, 0.5, 0, rv=0.3, bg=0.5, kit=KIT_ORCH, bus=bus)
+    note(PNO, root - 12, t, 3.0, 104, 0.40, 0, rv=0.3, bg=0.6, bus=bus, tail=5)
+    note(PNO, root, t + 0.008, 3.0, 90, 0.22, 0, rv=0.3, bg=0.6, bus=bus, tail=5, nominal=t)
+    note(TIMP, root + 12, t, 2.0, 112, 0.32, 0, rv=0.3, bg=0.6, bus=bus)
+    bus.add(t, kick(70, 30, 0.6, 2.0, 0.15), 0.26, 0, rv=0.2, bg=0.5)
+    drum(BASSDRUM, t, 112, 0.22, 0, rv=0.3, bg=0.5, kit=KIT_ORCH, bus=bus)
 
 @sync
 def h_spawn(t, dur=1.5, n=24, **_):
@@ -1494,10 +1495,12 @@ if B('tries'):
     basses(a, bl, CELLO, 48, 0.15, 1, rv=0.45)
     basses(a, bl, None, 38, 0.42, 0, piano=True, rv=0.4)
     pads(a, bl, SSTR, 46, 0.09, rv=0.5, bg=0.5, fi=2.0)
-    FIG = {'t1': [('D5', 0.5), ('E5', 0.5), ('G5', 1)],                                 # a small first step
-           't2': [('F#5', 0.5), ('A5', 0.5), ('A#5', 0.5), ('B5', 0.5), ('D6', 1)],         # a stranger's city: a wrong note, left in
-           't3': [('E5', 0.5), ('F#5', 0.5), (None, 1), ('D5', 0.5)],                       # an unready word: it falters
-           't4': [('C5', 0.5), ('E5', 0.5), ('A5', 0.5), ('G5', 0.5), ('B5', 1)]}           # something you will never be good at
+    FIG = {'t1': [('D5', 0.5), ('E5', 0.5), ('G5', 1)],                                 # a small stall: a first step
+           't2': [('B5', 0.5), ('A5', 0.5), ('F#5', 0.5), (None, 0.5), ('D5', 1)],          # stocks: it goes badly; nothing happens
+           't3': [('E5', 0.5), ('F#5', 0.75), ('E5', 0.25), ('G5', 1)],                     # a course you can't do: it wobbles
+           't4': [('F#5', 0.5), ('A5', 0.5), ('A#5', 0.5), ('B5', 0.5), ('D6', 1)],         # a stranger's city: a wrong note, left in
+           't5': [('E5', 0.5), ('F#5', 0.5), (None, 1), ('D5', 0.5)],                       # an unready word: it slips, falters
+           't6': [('B4', 0.5), ('D5', 0.75), ('G5', 0.25), ('F#5', 0.5), ('D5', 1)]}        # something you'll never be good at: uneven
     for nm, seq in FIG.items():
         t0 = T('tries', nm)
         if not ok(t0): continue
@@ -1517,12 +1520,13 @@ if B('tries'):
 # ---------------------------------------------------------------- e6 · b20 lamp: take back your own light; E major
 if B('lamp'):
     a, b = T('lamp'), E('lamp'); t_tk = T('lamp', 'take') or a
-    pads(a, b, PAD, 50, 0.10, rv=0.45, bg=0.5, fi=1.5)
+    pads(a, b, PAD, 50, 0.10, rv=0.45, bg=0.5, fi=1.5, cut=b if B('kline') else None, cutf=0.08)
     for a_, b_, nm in chord_spans(a, b):
         bs, up = CHORDS[nm]
         for j, k in enumerate(up + [up[-1] + 12]):
-            note(SSTR, k, a_, b_ - a_ + 0.5, 60, 0.10, -0.5 + 0.33 * j, rv=0.5, bg=0.6, env=[(0, 0.5 if a_ > a else 0.0), (0.8, 1.0)])
-        note(CELLO, bs + 12, a_, b_ - a_ + 0.5, 58, 0.18, 0, rv=0.45, bg=0.4)
+            note(SSTR, k, a_, b_ - a_ + 0.5, 60, 0.10, -0.5 + 0.33 * j, rv=0.5, bg=0.6, env=[(0, 0.5 if a_ > a else 0.0), (0.8, 1.0)],
+                 cut=b if B('kline') else None, cutf=0.08)
+        note(CELLO, bs + 12, a_, b_ - a_ + 0.5, 58, 0.18, 0, rv=0.45, bg=0.4, cut=b if B('kline') else None, cutf=0.08)
     t_E = next((x for x, _, nm in chord_spans(a, b) if nm.startswith('E')), None)
     if ok(t_E):                                 # the turn to E major: G# arrives, warm
         pchord(ms('E2', 'B2', 'E3', 'G#3', 'B3', 'F#4'), t_E, 5.0, 46, 0.5, rv=0.45, bg=0.6)
@@ -1531,39 +1535,238 @@ if B('lamp'):
         theme(t_E + 3 * BT, [('B4', 1), ('G#4', 1), ('B4', 1)], vel=36, g=0.45, rv=0.5, bg=0.5)
     pno(m('E5'), t_tk + BT, 2.0, 36, 0.42, 0.15); pno(m('F#5'), t_tk + 3 * BT, 2.0, 36, 0.42, 0.15)
 
-# ---------------------------------------------------------------- e6 · b21 end: the theme in E major, answered; the long last chord
+# ---------------------------------------------------------------- e6 · CLIMAX: the drums enter for the first time
+def drive(t0, t1, g=1.0, toms=True, hands=True, kickpat=(1, 0, 0, 0), cut=None, seed=0, cres=(1.0, 1.0)):
+    """the climax pulse on the 16th grid: kick, low toms in 8ths, congas + shaker (hand percussion)"""
+    if not ok(t0, t1): return
+    for k, t in grid(t0, t1, S16):
+        u = (t - t0) / max(1e-6, t1 - t0); cg = g * (cres[0] + (cres[1] - cres[0]) * u)
+        q = k % 4; b2 = (k // 4) % 2
+        if kickpat[q]: MUS.add(t, kick(105, 42, 0.22, 0.8, 0.15), 0.42 * cg * kickpat[q], 0, rv=0.08, cut=cut, cutf=0.02); ONSETS.append(t)
+        if toms and q == 2: drum(LTOM if b2 else LTOM2, t, 84 + 10 * b2, 0.34 * cg, -0.25 if b2 else 0.2, rv=0.25, bg=0.1, cut=cut)
+        if toms and q == 3 and h01(k, seed + 3) < 0.35: drum(MTOM, t, 70, 0.22 * cg, 0.3, rv=0.25, cut=cut)
+        if hands:
+            drum(SHAKER, t, 70 if q == 2 else 52, 0.13 * cg, 0.35, rv=0.15, cut=cut)
+            if q in (1, 3) or (q == 2 and b2):
+                drum(CONGA_HI if q == 3 else (CONGA_MUTE if q == 1 else CONGA_LO), t, 74 if q == 3 else 62, 0.17 * cg, -0.4, rv=0.2, cut=cut)
+
+def spicc(t0, t1, g=0.12, vel=78, octave=0, cell=(0, 1, 2, 1), cut=None, div=E8):
+    """strings: short repeated notes on the chord"""
+    if not ok(t0, t1): return
+    for k, t in grid(t0, t1, div):
+        tones = CHORDS[chord_at(t + 0.01)][1]; c = cell[k % len(cell)]
+        note(STR, tones[c % len(tones)] + 12 * (octave + c // len(tones)), t, div * 0.7, vel + (8 if k % 2 == 0 else 0), g,
+             -0.4 + 0.8 * ((k * 3) % 5) / 4, rv=0.3, bg=0.15, tail=0.6, cut=cut, cutf=0.02)
+
+def arp(t0, t1, g=0.05, div=S16, span=2, oct=1, bright=(5.0, 10.0), step=1, pan=0.0, detune=True, cut=None, seed=0):
+    """a synth arpeggio over the chord, up and down two octaves, its brightness opening"""
+    if not ok(t0, t1): return
+    for k, t in grid(t0, t1, div):
+        up = CHORDS[chord_at(t + 0.01)][1]; tones = [x + 12 * o for o in range(span) for x in up]
+        seq = list(range(len(tones))) + list(range(len(tones) - 2, 0, -1)); key = tones[seq[(k * step) % len(seq)]] + 12 * oct
+        u = (t - t0) / max(1e-6, t1 - t0); br = round(bright[0] + (bright[1] - bright[0]) * u, 0)
+        x = pluck(int(key), div * 1.6, br, 0.16, 30)
+        if detune: x = np.stack([x, np.roll(pluck(int(key), div * 1.6, br, 0.14, 30), 31)], 1)
+        a = g * (1.0 if k % 4 == 0 else 0.72)
+        MUS.add(t, x, a, pan + 0.35 * np.sin(k * 0.7 + seed), rv=0.3, bg=0.2, cut=cut, cutf=0.02); ONSETS.append(t)
+
+def bassline(t0, t1, g=0.3, cut=None, eighths=True):
+    if not ok(t0, t1): return
+    for k, t in grid(t0, t1, E8 if eighths else BT):
+        r = CHORDS[chord_at(t + 0.01)][0]
+        x = pluck(r + 12 + (12 if (eighths and k % 4 == 3) else 0), 0.35, 3.0, 0.16, 24)
+        MUS.add(t, x, g * (1.0 if k % 2 == 0 else 0.7), 0, rv=0.08, cut=cut, cutf=0.02); ONSETS.append(t)
+
+def tutti(t, L, keys, vel=80, g=0.12, preset=SSTR, fi=0.3, pan=0.8, cut=None, env=None):
+    for j, k in enumerate(keys):
+        note(preset, k, t, L, vel, g, -pan + 2 * pan * j / max(1, len(keys) - 1), rv=0.5, bg=0.6, tail=3,
+             env=env or [(0, 0.3), (fi, 1.0)], cut=cut)
+
+if B('lamp') and B('kline'):                    # the hard cut: the last two beats of 'take' lean into the downbeat
+    k0 = T('kline')
+    if not cue_in('rise', T('lamp'), k0 + 0.1): h_rise(k0 - 2 * BT, dur=2 * BT)
+
+if B('kline'):
+    a, b = T('kline'), E('kline'); t_dip = T_DROP; t_cl = T('kline', 'climb') or b
+    # run: the line races. A driving pulse, felt piano octaves in 8ths, strings, a pluck bass
+    drive(a, t_dip, 1.0, kickpat=(1, 0, 0, 0.0), cres=(0.85, 1.05))
+    bassline(a, t_dip, 0.30)
+    spicc(a, t_dip, 0.10, 76)
+    for k, t in grid(a, t_dip, E8):
+        r = CHORDS[chord_at(t + 0.01)][0] + 24
+        pno(r, t, E8 * 1.2, 52 if k % 2 == 0 else 44, 0.42, -0.1, rv=0.25, bg=0.1, human=0, mech=0.4)
+        if k % 2 == 0: pno(r + 12, t, E8 * 1.2, 46, 0.32, 0.1, rv=0.25, human=0, mech=0.2)
+    arp(a + 2 * BT, t_dip, 0.035, bright=(4, 9), seed=1)
+    pads(a, t_dip, SSTR, 66, 0.11, rv=0.45, bg=0.4, fi=0.6, octave=1)
+    pads(a, t_dip, CELLO, 70, 0.18, rv=0.4, bass=True, fi=0.2)
+    if not cue_in('beat', a - 0.1, a + 0.3): h_beat(a)
+    # the dip: one low hit (the cut itself is the silence set up above)
+    h_drop(t_dip)
+    # climb: the recovery builds. Toms 8ths -> 16ths, a rising string line, a riser into 'found'
+    s0 = t_dip + BT if t_dip + BT < t_cl else t_cl
+    if not cue_in('rise', t_dip, b): h_rise(s0, dur=b - s0)
+    drive(t_cl, b, 1.0, kickpat=(1, 0, 0.6, 0), cres=(0.8, 1.25), seed=3)
+    for k, t in grid(t_cl, b, S16):             # tom run doubling up toward the downbeat
+        u = (t - t_cl) / max(1e-6, b - t_cl)
+        if (k % 2 == 0) or u > 0.5: drum(LTOM if k % 3 else MTOM, t, int(70 + 40 * u), 0.22 + 0.2 * u, -0.3 + 0.6 * ((k % 4) / 3), rv=0.25, bg=0.15)
+    bassline(t_cl, b, 0.32)
+    line = ms('B3', 'C#4', 'D#4', 'E4', 'F#4', 'G#4', 'A4', 'B4', 'C#5', 'D#5', 'E5', 'F#5')
+    n16 = int(round((b - t_cl) / S16))
+    for i in range(len(line)):
+        t = t_cl + int(round(i * n16 / len(line))) * S16
+        note(STR, line[i], t, E8 * 1.5, 80 + 2 * i, 0.12, -0.3 + 0.05 * i, rv=0.35, bg=0.3, tail=1.0)
+        note(STR, line[i] - 12, t, E8 * 1.5, 76 + 2 * i, 0.10, 0.3 - 0.05 * i, rv=0.35, bg=0.3, tail=1.0)
+    for k, t in grid(t_cl, b, S16):             # a timpani roll, growing
+        u = (t - t_cl) / max(1e-6, b - t_cl)
+        if u > 0.35: note(TIMP, CHORDS[chord_at(t + 0.01)][0] + 12, t, S16 * 1.5, int(60 + 50 * u), 0.15 + 0.25 * u, 0, rv=0.3, bg=0.2, tail=0.8)
+
+if B('agents'):
+    a, b = T('agents'), E('agents')
+    t_sp, t_cm = T('agents', 'spawn') or a, T('agents', 'command') or b
+    if not cue_in('beat', a - 0.1, a + 0.3): h_beat(a)
+    # found: a stall's lamp grows. One arpeggio, a warm pad, the felt piano, a lighter pulse
+    arp(a, b, 0.045, bright=(3, 12), seed=2)
+    pads(a, b, PAD, 60, 0.14, rv=0.45, bg=0.5, fi=0.5)
+    for a_, b_, nm in chord_spans(a, t_sp):
+        bs, up = CHORDS[nm]; pchord([bs + 12] + up, a_, b_ - a_ + 0.3, 50, 0.45, rv=0.4, bg=0.4)
+    drive(a, t_sp, 0.75, toms=False, kickpat=(1, 0, 0, 0))
+    bassline(a, b, 0.26, eighths=False)
+    # spawn: layers multiply with the agents: a second arpeggio against it (3 against 4), strings, toms
+    arp(t_sp, b, 0.035, step=3, oct=2, bright=(8, 14), pan=0.2, seed=5)
+    spicc(t_sp, b, 0.10, 80, octave=1)
+    drive(t_sp, t_cm, 0.95, kickpat=(1, 0, 0, 0), seed=5)
+    pads(t_sp, b, SSTR, 66, 0.12, rv=0.45, bg=0.5, fi=1.0, octave=1)
+    basses(t_sp, b, CELLO, 72, 0.22, 1, rv=0.4)
+    if not cue_in('spawn', t_sp, t_cm):           # three spawn waves, each wider than the last
+        for i in range(3): h_spawn(t_sp + 2 * i * BT, dur=1.6 + 0.4 * i, n=8 * 3 ** (i + 1))
+    # command: one person, a thousand agents. The choir enters; a third, high arpeggio; the drive grows
+    arp(t_cm, b, 0.03, div=S16, step=5, oct=3, bright=(12, 16), pan=-0.2, seed=7)
+    drive(t_cm, b, 1.05, kickpat=(1, 0, 0.5, 0), cres=(1.0, 1.2), seed=7)
+    for a_, b_, nm in chord_spans(t_cm, b):
+        bs, up = CHORDS[nm]
+        for j, k in enumerate(up): note(CHOIR, k + 12, a_, b_ - a_ + 0.4, 70, 0.11, -0.5 + 0.5 * j, rv=0.5, bg=0.7, env=[(0, 0.3 if a_ > t_cm else 0.0), (0.7, 1.0)])
+        note(CHOIR, bs + 24, a_, b_ - a_ + 0.4, 66, 0.10, 0, rv=0.5, bg=0.6, env=[(0, 0.3 if a_ > t_cm else 0.0), (0.7, 1.0)])
+    theme(t_cm, [('E5', 1), ('B5', 1), ('A5', 1), ('G#5', 1)], vel=56, g=0.42, rv=0.4, bg=0.5)   # the theme, glimpsed
+
+if B('summit'):
+    a, b = T('summit'), E('summit'); t_pk = T('summit', 'peak') or a + 4 * BT
+    t_pk = PEAK_AT[0] if PEAK_AT else first('peak', a, b, t_pk)
+    t_pkg = snap(t_pk, BT)                       # the composed peak music stays on the grid; the hit is on the cue
+    if not cue_in('beat', a - 0.1, a + 0.3): h_beat(a)
+    # climb: a dominant pedal, tremolo strings and choir swelling, the timpani rolling, the arpeggios still racing
+    L = t_pk - a
+    for j, k in enumerate(ms('B2', 'F#3', 'B3', 'D#4', 'F#4', 'A4', 'B4')):
+        note(TREM, k, a, L + 0.05, 90, 0.10, -0.6 + 0.2 * j, rv=0.4, bg=0.4, env=[(0, 0.3), (L, 1.0)], cut=t_pk, cutf=0.05)
+    for j, k in enumerate(ms('B3', 'D#4', 'F#4', 'B4')):
+        note(CHOIR, k, a, L + 0.05, 80, 0.12, -0.4 + 0.27 * j, rv=0.5, bg=0.6, env=[(0, 0.2), (L, 1.0)], cut=t_pk, cutf=0.05)
+    arp(a, t_pk, 0.035, bright=(10, 16), seed=9); arp(a, t_pk, 0.03, step=3, oct=2, bright=(12, 16), seed=10)
+    bassline(a, t_pk, 0.32)
+    for k, t in grid(a, t_pk, S16):
+        u = (t - a) / max(1e-6, L)
+        note(TIMP, m('B2'), t, S16 * 1.5, int(56 + 60 * u), 0.14 + 0.35 * u, 0, rv=0.3, bg=0.2, tail=0.8)
+        if k % 2 == 0 or u > 0.5: drum(LTOM if k % 2 else LTOM2, t, int(64 + 50 * u), 0.15 + 0.25 * u, -0.3 + 0.6 * (k % 3) / 2, rv=0.25, bg=0.15)
+    if not cue_in('rise', a, t_pk + 0.1): h_rise(a, dur=L)
+    # PEAK: the sun breaks. Full orchestra + choir: the loudest, widest moment of the film
+    P = b - t_pk; Lp = P + 1.5
+    MUS.add(t_pk, kick(60, 28, 0.9, 3.0, 0.2), 0.24, 0, rv=0.2, bg=0.7)
+    drum(BASSDRUM, t_pk, 116, 0.30, 0, rv=0.3, bg=0.7, kit=KIT_ORCH)
+    drum(CRASH, t_pk, 104, 0.26, -0.5, rv=0.4, bg=0.7); drum(CRASH2, t_pk + 0.01, 100, 0.24, 0.5, rv=0.4, bg=0.7)
+    note(TIMP, m('E2'), t_pk, 2.0, 116, 0.45, 0, rv=0.3, bg=0.6)
+    note(TIMP, m('B1') + 12, t_pk + 0.01, 2.0, 104, 0.28, 0.1, rv=0.3, bg=0.6)
+    for k, v in (('E1', 100), ('E2', 92), ('B2', 80)): note(PNO, m(k), t_pk, 6.0, v, 0.32, 0, rv=0.3, bg=0.7, tail=6, bus=PNOB)
+    env_pk = [(0, 1.0), (P * 0.7, 0.85), (Lp, 0.6)]
+    for a_, b_, nm in chord_spans(t_pk, b):
+        bs, up = CHORDS[nm]; Lc = b_ - a_ + 0.6
+        tutti(a_, Lc, [bs + 12, bs + 19] + [k for k in up] + [k + 12 for k in up] + [up[-1] + 24], vel=96, g=0.11, fi=0.08, pan=0.95,
+              env=[(0, 0.5 if a_ > t_pk else 1.0), (0.1, 1.0)])
+        note(CBASS, bs + 12, a_, Lc, 100, 0.30, 0, rv=0.3, bg=0.4); note(CELLO, bs + 12, a_, Lc, 100, 0.30, -0.1, rv=0.4, bg=0.4)
+        for j, k in enumerate(up): note(HORN, k, a_, Lc, 92, 0.13, -0.3 + 0.3 * j, rv=0.5, bg=0.6, env=[(0, 0.6), (0.3, 1.0)])
+        note(BRASS, bs + 24, a_, Lc, 86, 0.08, 0.0, rv=0.5, bg=0.6, env=[(0, 0.6), (0.3, 1.0)])
+        for j, k in enumerate(up + [up[0] + 12]): note(CHOIR, k + 12, a_, Lc, 96, 0.13, -0.7 + 0.47 * j, rv=0.5, bg=0.8, env=[(0, 0.7), (0.3, 1.0)])
+        if a_ > t_pk: note(TIMP, bs + 12 if bs + 12 <= m('B2') else bs, a_, 1.5, 100, 0.5, 0, rv=0.3, bg=0.4)
+    pads(t_pk, b + BT, PAD, 76, 0.16, rv=0.4, bg=0.6, fi=0.1)
+    # the theme, sung out at last: violins + choir sopranos + horns an octave below, and it climbs on
+    TH = [('E5', 1), ('B5', 1), ('A5', 1), ('G#5', 1), ('F#5', 2), ('G#5', 1), ('B5', 1)]
+    melody(t_pkg, TH, lambda k, t, d: (note(VLN, k, t, d * 1.04, 104, 0.16, 0.15, rv=0.5, bg=0.7, tail=2.5, env=[(0, 0.6), (0.15, 1.0)]),
+                                      note(STR, k, t, d * 1.04, 98, 0.12, -0.15, rv=0.5, bg=0.7, tail=2.5),
+                                      note(CHOIR, k, t, d * 1.06, 92, 0.09, 0.0, rv=0.5, bg=0.8, tail=2.5),
+                                      note(HORN, k - 12, t, d * 1.04, 98, 0.15, -0.25, rv=0.5, bg=0.7, tail=2.5)))
+    for k, t in grid(t_pkg, b, BT):              # big, slow pulse under the peak: half-time toms + kick
+        if k % 2 == 0 and t > t_pk + 0.1:
+            MUS.add(t, kick(80, 36, 0.4, 1.2, 0.1), 0.20, 0, rv=0.15, bg=0.3); ONSETS.append(t)
+            drum(LTOM2, t, 96, 0.24, -0.3, rv=0.35, bg=0.3); drum(LTOM, t + E8, 86, 0.20, 0.3, rv=0.35, bg=0.3)
+    arp(t_pkg, b, 0.03, step=1, oct=2, bright=(14, 16), seed=11)
+    MUS.add(t_pk, glow_tone(mtof(m('E6')), 6.0, 0.2, 3.0), 0.05, 0.2, rv=0.5, bg=0.9)
+    MUS.add(t_pk, glow_tone(mtof(m('B5')), 6.0, 0.2, 3.0), 0.05, -0.2, rv=0.5, bg=0.9)
+    if not cue_in('rise', t_pk + BT, b): MUS.add(b - 2 * BT, revcym(round(2 * BT, 2), 21), 0.06, 0, rv=0.3, bg=0.3)
+
+if B('journey'):
+    a, b = T('journey'), E('journey'); t_fr = T('journey', 'free') or b
+    # ride: release at speed. The guitar from their freedom is yours now; a long sweeping string phrase; wind
+    if not cue_in('beat', a - 0.1, a + 0.3): h_beat(a)
+    guitar(a, t_fr, 0.30, 74)
+    guitar(t_fr, b, 0.22, 60, dens=(0.8, 0.2), seed=27)
+    drive(a, a + 4 * BT, 0.55, toms=False, kickpat=(1, 0, 0, 0), cres=(1.0, 0.4))
+    for k, t in grid(a, t_fr, S16): drum(SHAKER, t, 60 if k % 2 else 44, 0.08 * (1 - 0.6 * (t - a) / (t_fr - a)), 0.35, rv=0.2)
+    SWEEP = [('E6', 2), ('D#6', 1), ('B5', 1), ('C#6', 1), ('G#5', 1), ('A5', 1), ('F#5', 1), ('G#5', 2), ('E5', 2)]
+    melody(a, SWEEP, lambda k, t, d: (note(VLN, k, t, d * 1.05, 92, 0.14, 0.2, rv=0.5, bg=0.7, tail=3, env=[(0, 0.5), (0.2, 1.0)]),
+                                      note(SSTR, k - 12, t, d * 1.05, 80, 0.10, -0.2, rv=0.5, bg=0.7, tail=3)))
+    melody(a, [('E3', 2), ('F#3', 2), ('G#3', 2), ('A3', 2), ('C#4', 2), ('B3', 2)],
+           lambda k, t, d: note(CELLO, k, t, d * 1.05, 80, 0.22, -0.3, rv=0.45, bg=0.5, tail=3))
+    for a_, b_, nm in chord_spans(a, b):
+        bs, up = CHORDS[nm]; Lc = b_ - a_ + 0.6; u = (a_ - a) / (b - a)
+        tutti(a_, Lc, up + [up[-1] + 12], vel=int(84 - 24 * u), g=0.10, fi=0.4, pan=0.9)
+        note(CBASS, bs + 12, a_, Lc, int(84 - 24 * u), 0.22, 0, rv=0.35, bg=0.4)
+    pads(a, b, PAD, 60, 0.12, rv=0.45, bg=0.6, fi=0.2, fo=2.0)
+    note(OOHS, m('B4'), a, b - a + 1, 60, 0.07, 0.1, rv=0.5, bg=0.8, env=[(0, 1), (b - a, 0.5), (b - a + 1, 0)])
+    if not cue_in(('wind', 'whoosh'), a, t_fr): h_wind(a, dur=t_fr - a + 2 * BT)
+    # free: into a calm open dusk sea. The guitar thins; the sea breathes; the strings hold
+    L = b - t_fr + 2.0
+    sea = wind(L, 77, 180, 900, 0.25, q=0.5) * local_env(n_of(L), [(0, 0), (1.5, 1), (L - 1.5, 0.8), (L, 0)])[:, None]
+    MUS.add(t_fr, sea, 0.06, 0, rv=0.4, bg=0.4)
+    MUS.add(t_fr, glow_tone(mtof(m('G#5')), 6.0, 1.0, 2.5), 0.03, 0.3, rv=0.5, bg=0.9)
+
+# ---------------------------------------------------------------- e6 · b21 end: back to the felt piano; the theme's last statement; 那才是你
 if B('end'):
     a, b = T('end'), E('end')
-    t_y, t_t, t_l = T('end', 'years'), T('end', 'try'), T('end', 'life')
-    e_body = t_l or b
-    for a_, b_, nm in chord_spans(a, e_body):
+    t_y, t_t, t_lv, t_u = (T('end', x) for x in ('years', 'try', 'love', 'you'))
+    e_body = t_u or b
+    for a_, b_, nm in chord_spans(a, e_body):    # intimate again: piano + quiet strings
         bs, up = CHORDS[nm]
-        for j, k in enumerate(up + [up[-1] + 12]):
-            note(SSTR, k, a_, b_ - a_ + 0.5, 62, 0.11, -0.5 + 0.33 * j, rv=0.5, bg=0.6, env=[(0, 0.6 if a_ > a else 0.2), (0.6, 1.0)])
-        note(CELLO, bs + 12, a_, b_ - a_ + 0.5, 62, 0.22, 0, rv=0.45, bg=0.5)
-        note(CBASS, bs + 12, a_, b_ - a_ + 0.5, 52, 0.12, 0, rv=0.3)
-        pno(bs + 12, a_, b_ - a_ + 0.8, 44, 0.45, -0.1, rv=0.45, bg=0.5)
-        pchord(up, a_ + BT, b_ - a_, 34, 0.32, rv=0.45, bg=0.5)
-    pads(a, e_body, PAD, 50, 0.09, rv=0.45, bg=0.5, fi=1.0)
-    if ok(t_y):                                 # 你已经做了很多年的好孩子了: the theme, sung (piano + violins + cellos)
+        strings(up, a_, b_ - a_ + 0.5, 50, 0.10, fi=0.6 if a_ > a else 1.5, spread=0.5)
+        note(CELLO, bs + 12, a_, b_ - a_ + 0.5, 50, 0.16, 0, rv=0.45, bg=0.5, env=[(0, 0.4), (0.6, 1.0)])
+        pno(bs + 12, a_, b_ - a_ + 0.8, 42, 0.45, -0.1, rv=0.45, bg=0.5)
+        pchord(up, a_ + BT, b_ - a_, 32, 0.32, rv=0.45, bg=0.5)
+    if ok(t_y):                                 # 你已经做了很多年的好孩子了: the piano alone, gently
+        theme(t_y + BT, [('G#4', 1), ('B4', 1), ('E5', 2)], vel=36, g=0.45, rv=0.5, bg=0.6)
+    if ok(t_t):                                 # Have a try: a breath of light, waiting on the dominant
+        pno(m('B4'), t_t + BT, 2.0, 34, 0.42, 0.15); pno(m('C#5'), t_t + 2 * BT, 2.0, 34, 0.42, 0.15)
+    if ok(t_lv):                                # 找回你自己热爱的…: the theme's last statement, sung by piano + strings
         seq = [('E4', 1), ('B4', 1), ('A4', 1), ('G#4', 1), ('F#4', 4)]
-        theme(t_y, seq, vel=50, g=0.6, rv=0.5, bg=0.6, strings_too=(VLN, 62, 0.11, 1), human=0.006)
-        melody(t_y, seq, lambda k, t, d: note(CELLO, k - 12, t, d * 1.02, 58, 0.16, -0.2, rv=0.5, bg=0.5, tail=2.5, env=[(0, 0.3), (0.3, 1.0)]))
-        melody(t_y, seq, lambda k, t, d: note(OOHS, k, t, d * 1.05, 46, 0.035, 0.1, rv=0.5, bg=0.7, tail=2.5, env=[(0, 0.0), (0.4, 1.0)]))
-    if ok(t_t):                                 # Have a try: the answer. F# no longer waits: G#, B, home on E (an octave up)
-        seq = [('G#4', 1), ('B4', 1), ('E5', 4)]
-        theme(t_t, seq, vel=48, g=0.6, rv=0.5, bg=0.7, strings_too=(VLN, 60, 0.11, 1), human=0.0)
-        melody(t_t, seq, lambda k, t, d: note(CELLO, k - 12, t, d * 1.02, 56, 0.15, -0.2, rv=0.5, bg=0.6, tail=2.5, env=[(0, 0.3), (0.3, 1.0)]))
-        h_resolve(t_t + 2 * BT) if not cue_in('resolve', t_t, b) else None
-    if ok(t_l):                                 # 试试不一样的生活: the long warm last chord, fading to silence
-        L = b - t_l; env = [(0, 1), (L * 0.3, 0.8), (L - 0.3, 0.0)]
-        for j, k in enumerate(ms('E1', 'E2', 'B2', 'G#3', 'B3', 'F#4', 'G#4', 'B4')):
-            pno(k, t_l + 0.025 * j, L, 50 - 2 * j, 0.42, -0.4 + 0.1 * j, rv=0.45, bg=0.9, tail=2, human=0, mech=0.6 if j == 0 else 0.2, nominal=t_l)
-            note(SSTR, k + 12, t_l, L, 52, 0.07, 0.4 - 0.1 * j, rv=0.5, bg=0.9, tail=1, env=[(0, 0.8), (1.0, 1), (L * 0.55, 0.6), (L - 0.3, 0.0)])
-        note(OOHS, m('B4'), t_l, L, 46, 0.04, 0.0, rv=0.5, bg=0.9, tail=1, env=[(0, 0.6), (L * 0.5, 0.5), (L - 0.3, 0)])
+        theme(t_lv, seq, vel=50, g=0.6, rv=0.5, bg=0.6, strings_too=(VLN, 58, 0.10, 1), human=0.006)
+        melody(t_lv, seq, lambda k, t, d: note(CELLO, k - 12, t, d * 1.02, 54, 0.14, -0.2, rv=0.5, bg=0.5, tail=2.5, env=[(0, 0.3), (0.3, 1.0)]))
+    if ok(t_u):                                 # 那才是你。: the waiting note rises home, the warm last E major chord
+        t_fin = first(('title', 'glow', 'resolve', 'land', 'peak', 'beat'), t_u, b, t_u + 2 * BT)
+        t_fg = snap(t_fin, BT) if abs(t_fin - snap(t_fin, BT)) < 0.05 else t_fin
+        t_li = snap(t_fg, BT) - 2 * BT if t_fg - snap(t_fg, BT) > -0.2 else snap(t_fg, BT) - 3 * BT
+        if t_li >= t_u - 0.01:
+            theme(t_li, [('G#4', 1), ('B4', 1)], vel=44, g=0.55, rv=0.5, bg=0.7, strings_too=(VLN, 56, 0.09, 1))
+        if t_fg > t_u + BT:                     # under 那才是你: the dominant held softly, waiting for the word
+            Lb = t_fg - t_u
+            strings(ms('F#3', 'B3', 'D#4', 'F#4'), t_u, Lb + 0.15, 50, 0.09, fi=1.0, cut=t_fg, cutf=0.15)
+            note(CELLO, m('B2'), t_u, Lb + 0.15, 50, 0.15, 0, rv=0.45, bg=0.5, env=[(0, 0.3), (1.0, 1.0)], cut=t_fg, cutf=0.15)
+            pno(m('B2'), t_u, Lb, 40, 0.42, -0.1, rv=0.45, bg=0.5); pchord(ms('F#3', 'B3', 'D#4'), t_u + BT, Lb - BT, 32, 0.32, rv=0.45, bg=0.5)
+        L = b - t_fg; env = [(0, 1), (L * 0.3, 0.8), (L - 0.3, 0.0)]
+        IN_SYNC[0] = abs(t_fg - snap(t_fg, BT)) > 1e-3     # on a cue time (sync), else on the grid
+        for j, k in enumerate(ms('E1', 'E2', 'B2', 'G#3', 'B3', 'E4', 'F#4', 'G#4', 'E5')):
+            pno(k, t_fg + 0.025 * j, L, 54 - 2 * j, 0.45, -0.4 + 0.1 * j, rv=0.45, bg=0.9, tail=2, human=0, mech=0.6 if j == 0 else 0.2, nominal=t_fg)
+            note(SSTR, k + 12, t_fg, L, 54, 0.07, 0.4 - 0.1 * j, rv=0.5, bg=0.9, tail=1, env=[(0, 0.5), (1.2, 1), (L * 0.55, 0.6), (L - 0.3, 0.0)])
+        note(VLN, m('E5'), t_fg, L, 54, 0.09, 0.15, rv=0.5, bg=0.9, tail=1, env=[(0, 1), (L * 0.5, 0.6), (L - 0.3, 0)])
+        note(OOHS, m('B4'), t_fg, L, 48, 0.045, 0.0, rv=0.5, bg=0.9, tail=1, env=[(0, 0.6), (L * 0.5, 0.5), (L - 0.3, 0)])
+        MUS.add(t_fg, glow_tone(mtof(m('E5')), L, 1.5, L * 0.45), 0.035, -0.1, rv=0.5, bg=0.9)
+        IN_SYNC[0] = False
         for i, (k, d) in enumerate([('E6', 2), ('B6', 2), ('G#6', 4)]):       # the theme's head, a last high echo
-            note(CEL, m(k), t_l + (2 + 2 * i) * BT, 1.5, 44 - 4 * i, 0.07, 0.25, rv=0.5, bg=0.9, tail=3)
-        MUS.add(t_l, glow_tone(mtof(m('E5')), L, 1.5, L * 0.45), 0.03, -0.1, rv=0.5, bg=0.9)
+            note(CEL, m(k), snap(t_fg, BT) + (3 + 2 * i) * BT, 1.5, 42 - 4 * i, 0.06, 0.25, rv=0.5, bg=0.9, tail=3)
 
 # ================================================================ SYNC: every cue in cues.json
 IN_SYNC[0] = True
@@ -1600,7 +1803,9 @@ def env_from(spans, kind):
     return g
 G = env_from(GATE, 'gate')[:, None]; HD = env_from(DUCK, 'duck')[:, None]
 # section trims (dB, by visual type) on the music buses, 80 ms cosine moves on the beat lines
-TRIM = {'feed': -4.0, 'answers': -3.5, 'darkq': -2.5, 'weightless': 1.0}
+TRIM = {'feed': -4.0, 'answers': -3.5, 'darkq': -2.5, 'weightless': 1.0, 'lamp': -1.5, 'leave': -1.5, 'fall': -1.5}
+# the summit must stay the film's loudest moment: the first-half peak (title) and the landing sit a little lower
+FXTRIM = {'leave': 0.8, 'fall': 0.82}
 pts = []
 for b_ in BEATS:
     g_ = 10 ** (TRIM.get(tl.btype(b_), 0.0) / 20)
@@ -1608,6 +1813,7 @@ for b_ in BEATS:
 HD = HD * env_points(nn, pts)[:, None]
 _tf = np.arange(int(nn / SR * 20) + 2) / 20
 _gf = np.convolve(np.array([fxg(x) for x in _tf]), np.ones(3) / 3, mode='same')      # 0.15 s smoothing
+_gf *= np.array([FXTRIM.get(btype_at(x), 1.0) for x in _tf])
 FXE = np.interp(np.arange(nn) / SR, _tf, _gf)[:, None]
 music = (pnob * 1.0 + mus + blur) * HD
 fxs = fxb * FXE
@@ -1630,6 +1836,7 @@ mix = mix[:NOUT]
 end_t = E('end') if B('end') else D
 mix *= env_points(len(mix), [(0, 1), (end_t - 2.5, 1), (end_t - 0.05, 0)])[:, None]
 L0 = lufs(mix); gain = 10 ** ((-16.0 - L0) / 20); mix *= gain
+_pre = mix.copy()
 mix = limiter(mix, ceiling_db=-1.3)
 for _ in range(4):                     # tiny correction loop after limiting
     L1 = lufs(mix)
@@ -1637,6 +1844,10 @@ for _ in range(4):                     # tiny correction loop after limiting
     mix = limiter(mix * 10 ** ((-16 - L1) / 20), ceiling_db=-1.3)
 os.makedirs(OUT, exist_ok=True)
 write(os.path.join(OUT, 'mix.wav'), mix)
+_h = SR // 10; _nb = len(mix) // _h
+_gr = 20 * np.log10((np.abs(mix[:_nb * _h]).reshape(_nb, _h, 2).max((1, 2)) + 1e-9) / (np.abs(_pre[:_nb * _h] * (10 ** ((lufs(mix) - lufs(_pre)) / 20))).reshape(_nb, _h, 2).max((1, 2)) + 1e-9))
+print(f'limiter: max gain reduction {-_gr.min():.1f} dB at {np.argmin(_gr) * 0.1:.1f}s; > 2 dB in {np.mean(_gr < -2) * 100:.1f}% of the film')
+del _pre
 
 # ================================================================ report
 import pyloudnorm as pyln
