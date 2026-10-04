@@ -720,8 +720,10 @@
       }
       // 'love': written by 你's own light, across the open space
       const love = V.lines.love || [];
-      if (love[0]) lightWrite(love[0], 150, 800, 56, S.love + 1.0, 2.0, ct, from, dimTop);
-      if (love[1]) lightWrite(love[1], 214, 892, 56, S.love + 3.6, 2.5, ct, [150 + K.measure(love[0], { size: 56, family: F.serif, weight: 500 }), 780], dimTop, 0.45);
+      // the film's last message: set with weight in the open space between "Have a try" and 那才是你
+      const LS = 62, L0 = [186, 822], L1 = [246, 934];
+      if (love[0]) lightWrite(love[0], L0[0], L0[1], LS, S.love + 1.0, 2.1, ct, from, dimTop);
+      if (love[1]) lightWrite(love[1], L1[0], L1[1], LS, S.love + 3.7, 2.6, ct, [L0[0] + K.measure(love[0], { size: LS, family: F.serif, weight: 500 }), L0[1] - LS * 0.4], dimTop, 0.45);
       // 'you': 那才是 stands up beside 你 — and the sentence ends on 你
       drawStanding(cm, naCloud(V.lines.you), u, v, prog(ct, tY + 2.2, tY + 5.2), ct, Y);
       PX.flush({ exposure: 1.4 });
