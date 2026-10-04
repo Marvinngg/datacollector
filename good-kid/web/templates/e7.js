@@ -810,7 +810,9 @@
       if (A0 <= 0.01) continue;
       proj(cam, x, y, z); if (PP.z < 0.2) continue;
       const X = PP.x, Y = PP.y; if (X < 0 || X >= W || Y < 0 || Y >= H) continue;
+      if (window.E7ST && Y > 1070 && Y < 1250) E7ST.band++;
       if (occ && kC > 0.5 && i < NCL) { const ks = cl.KS[i] + 1, b = Math.floor(X / OCW); if (Y > occ[Math.min(land.NSL, ks) * OCN + b] + 1) continue; }
+      if (window.E7ST && Y > 1070 && Y < 1250) { E7ST.vis++; E7ST.z += PP.z; E7ST.a += A0; }
       const near = clamp(5 / PP.z) * clamp((PP.z - 1.2) / 3);
       out.X[m] = X; out.Y[m] = Y; out.A[m] = A0 * (1.3 - 0.6 * clamp(PP.z / 70)) * (0.55 + 0.6 * near) * clamp((PP.z - 1.0) / 3);
       // sunlit near the sun
