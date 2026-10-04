@@ -759,6 +759,114 @@
         "show": "take",
         "beats": 10
        }
+      ],
+      "fadeOut": 0
+     }
+    },
+    {
+     "id": "b22",
+     "visual": {
+      "type": "kline",
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "lines": {
+       "ticker": "你 · 第一次",
+       "up": "跌下去过，",
+       "back": "也涨回来过。"
+      },
+      "steps": [
+       {
+        "show": "run",
+        "beats": 6
+       },
+       {
+        "show": "dip",
+        "beats": 2
+       },
+       {
+        "show": "climb",
+        "beats": 4
+       }
+      ]
+     }
+    },
+    {
+     "id": "b23",
+     "visual": {
+      "type": "agents",
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "lines": {
+       "stall": "一个小摊，",
+       "company": "长成一家公司。",
+       "roles": [
+        "调研",
+        "写代码",
+        "设计",
+        "客服",
+        "增长",
+        "运营",
+        "法务",
+        "数据"
+       ],
+       "command": "一个人，指挥一千个 Agent。"
+      },
+      "steps": [
+       {
+        "show": "found",
+        "beats": 4
+       },
+       {
+        "show": "spawn",
+        "beats": 6
+       },
+       {
+        "show": "command",
+        "beats": 6
+       }
+      ]
+     }
+    },
+    {
+     "id": "b24",
+     "visual": {
+      "type": "summit",
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "lines": {
+       "top": "会当凌绝顶，",
+       "small": "一览众山小。"
+      },
+      "steps": [
+       {
+        "show": "climb",
+        "beats": 4
+       },
+       {
+        "show": "peak",
+        "beats": 8
+       }
+      ]
+     }
+    },
+    {
+     "id": "b25",
+     "visual": {
+      "type": "journey",
+      "fadeIn": 0,
+      "lines": {
+       "wind": "风吹在脸上，",
+       "feel": "原来是这种感觉。"
+      },
+      "steps": [
+       {
+        "show": "ride",
+        "beats": 8
+       },
+       {
+        "show": "free",
+        "beats": 4
+       }
       ]
      }
     },
@@ -769,19 +877,27 @@
       "lines": {
        "years": "你已经做了很多年的好孩子了。",
        "try": "Have a try",
-       "life": "试试不一样的生活。"
+       "love": [
+        "找回你自己热爱的，",
+        "并愿意为它付出一生——"
+       ],
+       "you": "那才是你。"
       },
       "steps": [
        {
         "show": "years",
-        "beats": 8
+        "beats": 6
        },
        {
         "show": "try",
         "beats": 4
        },
        {
-        "show": "life",
+        "show": "love",
+        "beats": 8
+       },
+       {
+        "show": "you",
         "beats": 12
        }
       ]
