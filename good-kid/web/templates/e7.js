@@ -246,8 +246,8 @@
     // tiny live numbers on the big candles
     for (const q of cand) {
       const j = q[6], i = q[7]; if (j === jNow) continue;
-      const r = (Math.exp(M.Cl[j] - M.O[j]) - 1) * 100; if (Math.abs(r) < 3.2) continue;
-      const age = tau - (i + 1) * DT, a = ss(0, 0.15, age) * (1 - ss(1.6, 2.4, age)); if (a <= 0) continue;
+      const r = (Math.exp(M.Cl[j] - M.O[j]) - 1) * 100; if (Math.abs(r) < 3.6 || (r > 0 && i % 2)) continue;
+      const age = tau - (i + 1) * DT, a = ss(0, 0.15, age) * (1 - ss(1.1, 1.8, age)); if (a <= 0) continue;
       const up = r >= 0;
       const e = ease.out(clamp(age / 0.3));
       text(fmtC(r), q[0] - bw / 2 - 8 - 4 * e, up ? q[3] + 6 : q[4] + 4, { size: 20, family: F.mono, color: up ? UPC : DNC, align: 'right', alpha: a * 0.9 });
@@ -279,7 +279,7 @@
     }
     const pk = ss(M.tHi, M.tHi + 0.3, tau) * ss(S.dip + 0.3, S.dip + 0.8, ct);
     if (pk > 0) {                                           // the old high: a dashed line that waits to be crossed
-      const x0 = cam.x(M.tHi), y = cam.y(M.pHi), x1 = Math.min(cam.x(Math.min(tau, M.tRec)) + 30, xh);
+      const x0 = cam.x(M.tHi), y = cam.y(M.pHi), x1 = Math.min(cam.x(Math.min(tau, M.tRec)) + 30 + 380 * ss(M.tRec, M.tRec + 0.8, tau), xh + 380);
       ctx.globalAlpha = aCh * 0.5 * pk; ctx.strokeStyle = rgbS(HAND); ctx.lineWidth = 1.2; ctx.setLineDash([6, 7]);
       ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(Math.max(x0, x1), y); ctx.stroke(); ctx.setLineDash([]);
       if (tau > M.tRec) { const k = ease.out(prog(tau, M.tRec, M.tRec + 0.4)); ctx.globalAlpha = aCh * k; ctx.beginPath(); ctx.arc(cam.x(M.tRec), y, 5 + 10 * (1 - k), 0, TAU); ctx.stroke(); }
@@ -305,9 +305,11 @@
     PX.points(tb.X, tb.Y, nt, LC.warm, { a: 0.42 * aCh * (ct < f ? 1 : 1 - ss(f, f + 0.4, ct)), A: tb.A, glow: 0.5 });
     // the notes in your hand
     const up = Ls.up, back = Ls.back;
-    ptx(up, ch.lowX, Math.min(1585, ch.lowY + 132), { size: 60, family: F.hand, weight: 400, color: HAND, a: 0.42, crisp: 0.95, k: prog(ct, M.tLow + 0.55, M.tLow + 1.35), out: prog(ct, f + 0.1, f + 0.9) * 0.0 + 0, seed: 31, t: ct, from: [ch.lowX, ch.lowY + 40], spread: 0.6 });
-    const ry = cam.y(M.pHi) + sink;
-    ptx(back, Math.max(80 + 6 * 60, cam.x(M.tRec) - 26), ry - 30, { size: 60, family: F.hand, weight: 400, align: 'right', color: HAND, a: 0.42, crisp: 0.95, k: prog(tau, M.tRec + 0.05, M.tRec + 0.85), seed: 37, t: ct });
+    const outA = prog(ct, f + 0.05, f + 0.8);
+    ptx(up, Math.max(240, ch.lowX), Math.min(1600, ch.lowY + 132), { size: 60, family: F.hand, weight: 400, color: HAND, a: 0.42, crisp: 0.95, k: prog(ct, M.tLow + 0.55, M.tLow + 1.35), out: outA, seed: 31, t: ct, from: [ch.lowX, ch.lowY + 40], spread: 0.6 });
+    // 也涨回来过。 sits just under the old high, to the right of where the line crossed it (the empty side of the climb)
+    const ry = cam.y(M.pHi) + sink, rx = cam.x(M.tRec);
+    ptx(back, Math.min(1000 - 6 * 60, rx + 34), ry + 72, { size: 60, family: F.hand, weight: 400, align: 'left', color: HAND, a: 0.42, crisp: 0.95, k: prog(tau, M.tRec + 0.05, M.tRec + 0.85), out: outA, seed: 37, t: ct, from: [rx, ry], spread: 0.5 });
   }
   // the ticker header: 你 · 第一次 and the live numbers (canvas; fades with the chart)
   function ticker(ct, S, Ls, ch) {
@@ -316,7 +318,7 @@
     const y = 318;
     text(Ls.ticker, 96, y, { size: 46, family: F.serif, weight: 600, color: '#ece7dc' });
     text('你', 96, y, { size: 46, family: F.serif, weight: 600, color: KIT.C.warm });
-    const M = ch.M, lo = Math.min(...[0, 1, 2].map(() => 0)), p = Math.exp(M.P(ch.tau));
+    const M = ch.M, p = Math.exp(M.P(ch.tau));
     let hi = -1e9, lw = 1e9; for (let t = 0; t <= ch.tau; t += 0.05) { const v = M.P(t); hi = Math.max(hi, v); lw = Math.min(lw, v); }
     text(`开 100.00   高 ${Math.exp(hi).toFixed(2)}   低 ${Math.exp(lw).toFixed(2)}`, 98, y + 44, { size: 20, family: F.mono, color: 'rgba(236,231,220,0.45)' });
     text(p.toFixed(2), 1000, y, { size: 58, family: F.mono, weight: 700, color: ch.colNow, align: 'right' });
@@ -325,7 +327,6 @@
     const bl = 0.5 + 0.5 * Math.sin(ct * 6);
     ctx.fillStyle = KIT.C.warm; ctx.globalAlpha = a * (0.4 + 0.6 * bl); ctx.beginPath(); ctx.arc(84, y + 37, 4, 0, TAU); ctx.fill();
     ctx.restore();
-    void lo;
   }
 
   // ================================================================ B. the stall, the company, the galaxy (b23)
@@ -532,7 +533,6 @@
     const all = [];
     pts.forEach((c, li) => { for (let i = 0; i < c.n; i++) all.push([c.X[i], c.Y[i], li]); });
     all.sort((a, b) => a[2] - b[2] || a[0] - b[0]);
-    while (all.length < NN) all.push(all[all.length % Math.max(1, all.length)]);
     // agents ordered by angle (a depth-first sweep of the tree) take the points left to right
     const net = NET, order = Array.from({ length: NN }, (_, i) => i).sort((a, b) => {
       const ta = ((net.th0[a] - 0.35) % TAU + TAU) % TAU, tb2 = ((net.th0[b] - 0.35) % TAU + TAU) % TAU; return ta - tb2;
@@ -565,7 +565,6 @@
       proj(cam, WX[i], WY[i], WZ[i]); SX[i] = PP.x; SY[i] = PP.y; SZ[i] = PP.z;
     }
     // ---- the command: the agents fly into the sentence and let go again
-    const kTx = new Float32Array(0); void kTx;
     const lines = Ls.command ? splitCmd(Ls.command) : null, cmT = lines ? cmdTargets(lines) : null;
     const t0 = cm + 0.45, tR = cm + 3.55;
     if (cmT && ct > t0 && ct < tR + 1.4) {
@@ -665,7 +664,7 @@
     const X = new Float32Array(NCL), Y = new Float32Array(NCL), Z = new Float32Array(NCL), B = new Float32Array(NCL), KS = new Int32Array(NCL);
     const Tm = terrain(), zs = Tm.zs;
     for (let i = 0; i < NCL; i++) {
-      const u = R(i, 601), z = 1 / lerp(1 / 1.5, 1 / 190, Math.pow(u, 0.8)), half = (6 + 0.95 * z) * 1.05;
+      const u = R(i, 601), z = 1 / lerp(1 / 2.5, 1 / 200, Math.pow(u, 0.62)), half = 4 + 0.6 * z;      // fills the summit's view
       const x = (R(i, 602) - 0.5) * 2 * half;
       const b = fbm(x * 0.16 + 3, z * 0.16 + 9, 4), b2 = fbm(x * 0.6, z * 0.6, 2);
       X[i] = x; Z[i] = z; Y[i] = CLOUD - 0.2 + 1.3 * (b - 0.5) + 0.3 * (b2 - 0.5) + (R(i, 603) - 0.5) * 0.06;
@@ -676,7 +675,7 @@
   }
 
   // ================================================================ C. the land: ridge lines, clouds, the sun (b24)
-  const OCN = 216, OCW = W / OCN;
+  const OCN = 216, OCW = W / OCN, galK = [1];
   let OCC = null;
   function drawLand(ct, S, Ls, cam, aL, flat) {
     const Tm = terrain(), { zs, NSL, NX, SX: TX, SH } = Tm, kr = riseK(ct, S);
@@ -739,13 +738,17 @@
     ctx.restore();
     return { occ, NSL };
   }
-  let SUNX = 600;
+  let SUNX = 630;
   // the sky at dawn and the sun breaking the cloud horizon (drawn before the land; the land hides its lower half)
   function drawSky(ct, S, cam, aS) {
     if (aS <= 0.003) return null;
-    const pk = S.peak, pre = ss(S.sclimb, pk, ct), sunK = ss(pk - 0.3, pk + 1.2, ct), big = ss(pk, pk + 5.5, ct);
-    proj(cam, 0, CLOUD, 4000); const hy = PP.y, sx = SUNX;
-    const sy = hy + 70 - 40 * Math.max(0, ct - pk + 0.05) * (1 - 0.35 * ss(pk + 1, pk + 6, ct));
+    const pk = S.peak, pre = ss(S.sclimb, pk, ct), sunK = ss(pk - 0.15, pk + 0.6, ct), big = ss(pk, pk + 5.5, ct) * (1 - 0.7 * ss(S.ride, S.ride + 1.2, ct));
+    proj(cam, 0, CLOUD, 4000); const kd = ease.inOut(prog(ct, S.ride + 0.1, S.ride + 1.3));
+    let hy = PP.y, sx = SUNX;
+    const u = Math.max(0, ct - pk + 0.05);
+    let sy = hy + 66 - 62 * (1 - Math.exp(-u / 0.9)) - 13 * u;
+    // the dive: the sun is carried down to where the evening sea will have it (low, right)
+    if (kd > 0) { sx = lerp(sx, 800, kd); sy = lerp(sy, HZ + 10, kd); hy = lerp(hy, HZ, kd); }
     ctx.save(); ctx.globalAlpha *= aS; ctx.globalCompositeOperation = 'lighter';
     // a dawn band along the horizon (before the sun: a promise; after: gold)
     const band = 0.10 * pre + 0.28 * sunK + 0.12 * big;
@@ -756,6 +759,12 @@
       ctx.fillStyle = g; ctx.fillRect(-1600, -1600, 3200, 3200); ctx.restore();
     }
     if (sunK > 0) {
+      // the break: first light runs along the cloud horizon
+      const fl = ss(pk - 0.1, pk + 0.25, ct) * (0.55 + 0.45 * Math.exp(-Math.max(0, ct - pk) / 1.6));
+      ctx.save(); ctx.translate(sx, hy - 2); ctx.scale(1, 0.035);
+      let gf = ctx.createRadialGradient(0, 0, 0, 0, 0, 900);
+      gf.addColorStop(0, `rgba(255,236,200,${0.9 * fl})`); gf.addColorStop(0.3, `rgba(255,190,120,${0.35 * fl})`); gf.addColorStop(1, 'rgba(255,160,90,0)');
+      ctx.fillStyle = gf; ctx.fillRect(-900, -900, 1800, 1800); ctx.restore();
       // the bloom: a fast first light, then a slow, huge swell
       const r1 = 240 + 260 * big, r2 = 700 + 1100 * big;
       let g = ctx.createRadialGradient(sx, sy, 0, sx, sy, r2);
@@ -800,24 +809,24 @@
         let gx = r * Math.cos(th), gz = r * Math.sin(th), gy = net.dy[i];
         const kb = ease.out(clamp((ct - net.dtb[i]) / 1.2)); gx *= kb; gz *= kb; gy *= kb;
         const d = ease.inOut(clamp(kC * 1.5 - R(i, 611) * 0.5));
-        x = lerp(gx, cx, d); y = lerp(gy, cy, d); z = lerp(gz, cz, d);
+        x = lerp(gx, cx, d); y = lerp(gy, cy, d); z = lerp(gz, cz, d); galK[0] = d;
         A0 = lerp((a === -1 ? 0.35 : a === -2 ? 0.28 : 0.42) * clamp(kb * 1.5), cl.B[i], d);
         if (d < 1 && kC < 1) A0 = lerp(A0, A0 * aDust / Math.max(0.01, aL), 1 - d);
       } else {
         const fi = ss(S.sclimb + 0.2 + R(i, 612) * 1.2, S.sclimb + 1.6 + R(i, 612) * 1.2, ct); if (fi <= 0) continue;
-        x = cx; y = cy; z = cz; A0 = cl.B[i] * fi;
+        x = cx; y = cy; z = cz; A0 = cl.B[i] * fi; galK[0] = 1;
       }
       if (A0 <= 0.01) continue;
       proj(cam, x, y, z); if (PP.z < 0.2) continue;
       const X = PP.x, Y = PP.y; if (X < 0 || X >= W || Y < 0 || Y >= H) continue;
-      if (window.E7ST && Y > 1070 && Y < 1250) E7ST.band++;
       if (occ && kC > 0.5 && i < NCL) { const ks = cl.KS[i] + 1, b = Math.floor(X / OCW); if (Y > occ[Math.min(land.NSL, ks) * OCN + b] + 1) continue; }
-      if (window.E7ST && Y > 1070 && Y < 1250) { E7ST.vis++; E7ST.z += PP.z; E7ST.a += A0; }
       const near = clamp(5 / PP.z) * clamp((PP.z - 1.2) / 3);
-      out.X[m] = X; out.Y[m] = Y; out.A[m] = A0 * (1.3 - 0.6 * clamp(PP.z / 70)) * (0.55 + 0.6 * near) * clamp((PP.z - 1.0) / 3);
+      out.X[m] = X; out.Y[m] = Y; out.A[m] = A0 * (0.8 + 0.9 * clamp(PP.z / 50) * (0.4 + sunK)) * (0.55 + 0.6 * near) * clamp((PP.z - 1.0) / 3);
       // sunlit near the sun
-      const sw = sunK * (0.25 + 0.75 * Math.exp(-(Math.abs(X - sx) * 0.8 + Math.abs(Y - sy) * 1.6) / 600));
-      out.C[m * 3] = lerp(g0, 1.0, sw); out.C[m * 3 + 1] = lerp(g1, 0.78, sw); out.C[m * 3 + 2] = lerp(g2, 0.5, sw);
+      const sw = sunK * (0.42 + 0.58 * Math.exp(-(Math.abs(X - sx) * 0.8 + Math.abs(Y - sy) * 1.6) / 600));
+      let c0 = lerp(g0, 1.0, sw), c1 = lerp(g1, 0.76, sw), c2 = lerp(g2, 0.5, sw);
+      if (galK[0] < 1) { const q = galK[0]; c0 = lerp(1.0, c0, q); c1 = lerp(0.86, c1, q); c2 = lerp(0.68, c2, q); }    // the galaxy's warm dust
+      out.C[m * 3] = c0; out.C[m * 3 + 1] = c1; out.C[m * 3 + 2] = c2;
       m++;
     }
     if (m) PX.points(out.X, out.Y, m, null, { a: 0.4 * aL * (1 - 0.6 * kDive) * (1 + 0.5 * sunK), A: out.A, C: out.C, glow: 0.85 });
@@ -833,6 +842,12 @@
     const u = ct - tf, v = V1 + (V0 - V1) * Math.exp(-u / tau);
     return { v, s: s0 + 2200 + V1 * u + (V0 - V1) * tau * (1 - Math.exp(-u / tau)) };
   }
+  function seaSeat(ct, S) {
+    const { v } = speed(ct, S), zoom = lerp(1, 0.8, ease.inOut(prog(ct, S.free, S.end + 0.2)));
+    const bob = Math.sin(ct * 8.3) * 1.2 * clamp(v / 600) + Math.sin(ct * 13.1) * 0.5 * clamp(v / 600);
+    const x = BIKE.x - 26 * BIKE.s, y = BIKE.ground - 38 * BIKE.s + bob - 86 * BIKE.s;
+    return { x: 540 + (x - 540) * zoom, y: HZ + (y - HZ) * zoom, size: 150 * zoom, rot: 0.13 * clamp(v / 900) };
+  }
   function drawSea(ct, S, Ls, aS) {
     if (aS <= 0.003) return null;
     const { v, s } = speed(ct, S), fr = S.free, end = S.end;
@@ -840,9 +855,11 @@
     ctx.save(); ctx.globalAlpha *= aS;
     // sky light: golden hour, then dusk
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    let g = ctx.createLinearGradient(0, HZ - 700, 0, HZ + 40);
-    g.addColorStop(0, 'rgba(255,150,90,0)'); g.addColorStop(0.75, `rgba(255,150,90,${0.07 * (1 - 0.5 * dusk)})`); g.addColorStop(1, `rgba(255,170,110,${0.16 * (1 - 0.55 * dusk)})`);
-    ctx.fillStyle = g; ctx.fillRect(0, HZ - 700, W, 740);
+    let g = ctx.createLinearGradient(0, HZ - 820, 0, HZ + 420);
+    const gk = 1 - 0.55 * dusk;
+    g.addColorStop(0, 'rgba(255,150,90,0)'); g.addColorStop(0.45, `rgba(255,150,90,${0.08 * gk})`); g.addColorStop(0.66, `rgba(255,170,110,${0.2 * gk})`);
+    g.addColorStop(0.75, `rgba(255,160,100,${0.08 * gk})`); g.addColorStop(1, 'rgba(255,150,90,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, HZ - 820, W, 1240);
     g = ctx.createLinearGradient(0, HZ - 300, 0, HZ + 6);
     g.addColorStop(0, 'rgba(150,120,200,0)'); g.addColorStop(1, `rgba(170,120,190,${0.10 * dusk})`);
     ctx.fillStyle = g; ctx.fillRect(0, HZ - 300, W, 306);
@@ -853,10 +870,11 @@
     const line = (x0, y0, x1, y1, a, w = 1, col = 'rgb(236,231,220)') => { ctx.globalAlpha = aS * a; ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); };
     // the sun on the horizon (half set, then setting), its path on the water
     const sunX = 800, sunY = HZ + 10 + 66 * ss(fr, end + 0.3, ct), sunA = 1 - 0.75 * dusk;
-    L.light(sunX, HZ, 260, `rgba(255,150,90,${0.12 * sunA})`, 1);
+    L.light(sunX, HZ, 520, `rgba(255,160,100,${0.2 * sunA})`, 1);
+    L.light(sunX, HZ - 10, 170, `rgba(255,214,160,${0.35 * sunA})`, 1);
     ctx.save(); ctx.beginPath(); ctx.rect(X0, 0, X1 - X0, HZ); ctx.clip();
     ctx.globalAlpha = aS * 0.75 * sunA; ctx.strokeStyle = KIT.C.free; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(sunX, sunY, 58, 0, TAU); ctx.stroke();
-    ctx.globalAlpha = aS * 0.08 * sunA; ctx.fillStyle = '#ffb27a'; ctx.fill();
+    ctx.globalAlpha = aS * 0.55 * sunA; ctx.fillStyle = '#ffcf98'; ctx.fill();
     ctx.restore();
     line(X0, HZ, X1, HZ, 0.45, 1.2);
     // a far headland on the left
@@ -865,7 +883,7 @@
     ctx.stroke();
     // the sea: rows of swells, slower and closer together toward the horizon (parallax)
     for (let r = 0; r < 16; r++) {
-      const v01 = r / 15, y = HZ + 12 + Math.pow(v01, 1.75) * (ROAD0 - HZ - 70), par = 0.03 + 0.42 * v01 * v01, dash = 8 + 40 * v01, per = dash * 3.2;
+      const v01 = r / 15, y = HZ + 12 + Math.pow(v01, 1.75) * (ROAD0 - HZ + 10), par = 0.03 + 0.42 * v01 * v01, dash = 8 + 40 * v01, per = dash * 3.2;
       const off = (s * par + r * 53) % per; ctx.beginPath();
       for (let x = X0 - off, q = 0; x < X1; x += per, q++) {
         const id = Math.floor((s * par + r * 53) / per) - q; if (R(id & 4095, 650 + r) < 0.42) continue;
@@ -878,14 +896,14 @@
       ctx.globalAlpha = aS * (0.25 + 0.35 * (0.5 + 0.5 * Math.sin(ct * 2.3 + r * 1.7))) * (1 - v01 * 0.5) * sunA; ctx.strokeStyle = KIT.C.free; ctx.lineWidth = 1.4; ctx.stroke();
     }
     // guardrail (posts race past), the road
-    const RT = ROAD0 - 34;
+    const RT = ROAD0 + 34;
     line(X0, RT, X1, RT, 0.55, 1.4); line(X0, RT + 12, X1, RT + 12, 0.3, 1);
     ctx.beginPath(); const pp = 120, po = s % pp;
-    for (let x = X0 - po; x < X1; x += pp) { ctx.moveTo(x, RT); ctx.lineTo(x, ROAD0); }
+    for (let x = X0 - po; x < X1; x += pp) { ctx.moveTo(x, RT); ctx.lineTo(x, RT + 34); }
     ctx.globalAlpha = aS * 0.42; ctx.lineWidth = 1.3; ctx.stroke();
-    line(X0, ROAD0, X1, ROAD0, 0.45, 1.3); line(X0, ROAD1, X1, ROAD1, 0.32, 1.3);
+    line(X0, RT + 34, X1, RT + 34, 0.45, 1.3); line(X0, ROAD1, X1, ROAD1, 0.32, 1.3);
     ctx.beginPath(); const dp = 210, doff = (s * 1.0) % dp;
-    for (let x = X0 - doff; x < X1; x += dp) { ctx.moveTo(x, 1400); ctx.lineTo(x + 90, 1400); }
+    for (let x = X0 - doff; x < X1; x += dp) { ctx.moveTo(x, 1436); ctx.lineTo(x + 90, 1436); }
     ctx.globalAlpha = aS * 0.28; ctx.lineWidth = 1.7; ctx.stroke();
     ctx.beginPath(); for (let x = X0 - (s * 1.25) % 170; x < X1; x += 170) { ctx.moveTo(x, 1480); ctx.lineTo(x + 22, 1480); }
     ctx.globalAlpha = aS * 0.15; ctx.lineWidth = 1; ctx.stroke();
@@ -904,6 +922,9 @@
     const st = (w, al) => { ctx.globalAlpha = a * al; ctx.lineWidth = w / sc; ctx.strokeStyle = '#ece7dc'; ctx.stroke(); };
     const circ = (x, y, r) => { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); };
     const path = p => { ctx.beginPath(); ctx.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]); };
+    ctx.fillStyle = BG0; ctx.globalAlpha = a;
+    circ(-86, 0, 38); ctx.fill(); circ(86, 0, 38); ctx.fill();          // the wheels hide the rail behind them
+    ctx.beginPath(); ctx.moveTo(-96, -50); ctx.lineTo(-36, -48); ctx.lineTo(30, -24); ctx.lineTo(18, -2); ctx.lineTo(-86, 0); ctx.closePath(); ctx.fill();
     [[-86, 0], [86, 0]].forEach(([x, y], j) => {
       circ(x, y, 38); st(2.0, 0.95); circ(x, y, 31); st(1.0, 0.5); circ(x, y, 5); st(1.3, 0.8);
       ctx.beginPath(); const rot = dist / (38 * sc) + j;
@@ -992,7 +1013,7 @@
     const sky = cam && ct > sc - 0.5 ? drawSky(ct, S, cam, aDive) : null;
     // the flattening of the ridges into sea swells during the dive
     const flatK = ss(rd + 0.25, rd + 1.35, ct);
-    const flat = flatK > 0 ? { k: flatK, y: (k, x) => { const Tm = terrain(), z = Math.max(1, Tm.zs[k]); return HZ + 12 + Math.pow(clamp(1 - Math.log(z) / Math.log(190)), 1.75) * (ROAD0 - HZ - 70); } } : null;
+    const flat = flatK > 0 ? { k: flatK, y: (k, x) => { const Tm = terrain(), z = Math.max(1, Tm.zs[k]); return HZ + 12 + Math.pow(clamp(1 - Math.log(z) / Math.log(190)), 1.75) * (ROAD0 - HZ + 10); } } : null;
     const land = cam && ct > cm + 3.5 ? drawLand(ct, S, Ls, cam, aDive, flat) : null;
     // stall (screen space, scaled with the camera's pull-back)
     const stA = ct > f - 0.01 ? (1 - ss(sp + 1.2, sp + 2.8, ct)) : 0;
@@ -1021,7 +1042,7 @@
       yrot = 0.42 * crash * Math.sin((ct - S.dip) * 7) + 0.12 * ss(S.kclimb, S.kclimb + 0.6, ct) * (1 - ss(f - 0.3, f, ct));
       ysz = lerp(300, 112, k); yx = lerp(625, hx, k); yy = lerp(955, hy - 112 * 0.56, k);
       yown = 1 - 0.38 * (ch ? ch.dipK : 0);
-      ya = 0.5; haloR = 1; haloA = 0.85 * yown;
+      ya = lerp(0.95, 0.5, k); haloR = lerp(1.25, 1, k); haloA = lerp(1.0, 0.85, k) * yown;      // b20's lamp-bright 你, settling
     } else if (ct < sp + 0.3) {
       // down off the candle, behind the counter of the stall
       const k = ease.inOut(prog(ct, f + 0.15, f + 1.15)), M = market(S), cam2 = chartCam(f, S, M);
@@ -1029,7 +1050,7 @@
       ysz = lerp(112, 150, k); yx = lerp(hx, 540, k); yy = lerp(hy, 1030, k) - Math.sin(Math.PI * k) * 60; clipY = k > 0.6 ? 1100 : null;
       const k2 = ease.inOut(prog(ct, sp - 0.4, sp + 0.3)); yy = lerp(yy, SY0, k2); clipY = k2 > 0.3 ? null : clipY;
       haloA = 0.75;
-    } else if (!cam) { ya = 0;
+    } else if (!cam) { ya = 0;   // (the sea draws 你 from here on)
     } else {
       // the core of the network; then on the land, climbing; the summit; the dive
       const yp = youPath(ct, S); proj(cam, yp[0], yp[1], yp[2]);
@@ -1039,10 +1060,13 @@
       yx = PP.x; yy = lerp(PP.y, PP.y - ysz * 0.5, kl);
       yrot = 0.1 * ss(sc + 0.4, sc + 0.9, ct) * (1 - ss(pk - 0.4, pk, ct));
       haloA = lerp(0.6, 0.9, kl); haloR = 1 + 0.4 * ss(sp, cm, ct) * (1 - kl);
-      if (ct > rd + 0.6) { const kk = ss(rd + 0.6, rd + 1.5, ct); ya = 0.55 * (1 - kk); }
+      if (ct > rd + 0.5) {                                  // the dive lands on the bike: one 你 all the way
+        const kk = ease.inOut(prog(ct, rd + 0.5, rd + 1.45)), seat = seaSeat(ct, S);
+        yx = lerp(yx, seat.x, kk); yy = lerp(yy, seat.y, kk); ysz = lerp(ysz, seat.size, kk); yrot = lerp(yrot, seat.rot, kk);
+      }
     }
     let youB = null;
-    const youOn = !(sea && ct > rd + 1.45);
+    const youOn = !(sea && ct >= rd + 1.45);
     if (youOn && ya > 0.01) youB = you(yx, yy, ysz, { t: ct, rot: yrot, own: yown, a: ya, clipY });
     // the stall's bulb
     if (ct > f + 0.9 && ct < sp + 3) {
@@ -1062,8 +1086,9 @@
     // ---------- the journey
     if (sea) {
       wind(ct, S, sea, aSea);
+      if (ct >= rd + 1.45) {
       const sz = sea.size, lean = 0.13 * clamp(sea.v / 900);
-      const yb = you(sea.you[0], sea.you[1], sz, { t: ct, rot: lean, own: 1, a: 0.55 * aSea, tag: 1 });
+      const yb = you(sea.you[0], sea.you[1], sz, { t: ct, rot: lean, own: 1, a: 0.55, tag: 1 });
       // light torn off 你 by the wind
       const n = 600, tb = buf('torn', n), vf = clamp(sea.v / 1150);
       for (let i = 0; i < n; i++) {
@@ -1071,14 +1096,15 @@
         tb.X[i] = yb.X[j] - age * (60 + 340 * R(i, 723)) * (0.15 + vf); tb.Y[i] = yb.Y[j] - age * 24 * R(i, 724) + Math.sin(age * 6 + i) * 5 * age;
         tb.A[i] = Math.pow(1 - age, 1.3) * (0.4 + 0.8 * R(i, 725)) * (0.25 + 0.75 * vf);
       }
-      PX.points(tb.X, tb.Y, n, LC.warm, { a: 0.4 * aSea, A: tb.A, glow: 0.5 });
+      PX.points(tb.X, tb.Y, n, LC.warm, { a: 0.4, A: tb.A, glow: 0.5 });
+      }
       windText(Ls.wind, 110, 520, { size: 92, align: 'left', ct, seed: 81, tIn: rd + 1.7, tOut: fr + 1.2, vOut: 180, color: [1, 0.86, 0.66], a: 0.5 });
       windText(Ls.feel, 975, 668, { size: 92, align: 'right', ct, seed: 87, tIn: rd + 3.1, tOut: fr + 1.6, vOut: 150, color: [1, 0.86, 0.66], a: 0.5 });
     }
     PX.flush({ exposure: 1.4 });
     // halos after the light (soft, additive)
     if (youOn && ya > 0.01) halo(yx, yy, haloR * ysz * 1.15, haloA * Math.min(1, ya / 0.55));
-    if (sea) halo(sea.you[0], sea.you[1], sea.size * 1.2, 0.8 * aSea * (1 + 0.25 * sea.dusk));
+    if (sea && ct >= rd + 1.45) halo(sea.you[0], sea.you[1], sea.size * 1.2, 0.8 * (1 + 0.25 * sea.dusk));
     if (ct > f + 0.9 && ct < sp + 1) { const kb = ss(f + 1.0, f + 1.4, ct) * (1 - ss(sp - 0.4, sp + 0.4, ct)); halo(O2[0], 896, 200, kb); }
   }
 

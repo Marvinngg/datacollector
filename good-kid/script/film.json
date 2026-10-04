@@ -822,7 +822,7 @@
        },
        {
         "show": "command",
-        "beats": 6
+        "beats": 7
        }
       ]
      }
@@ -844,7 +844,7 @@
        },
        {
         "show": "peak",
-        "beats": 8
+        "beats": 7
        }
       ]
      }
@@ -867,7 +867,8 @@
         "show": "free",
         "beats": 4
        }
-      ]
+      ],
+      "fadeOut": 1.2
      }
     },
     {
@@ -900,7 +901,8 @@
         "show": "you",
         "beats": 12
        }
-      ]
+      ],
+      "fadeIn": 1.2
      }
     }
    ]
