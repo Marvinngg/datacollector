@@ -132,6 +132,10 @@ CHORDS = {
     'Aadd9':    (m('A1'),  ms('B3', 'C#4', 'E4')),
     'C#m7':     (m('C#2'), ms('G#3', 'B3', 'E4')),
     'B':        (m('B1'),  ms('F#3', 'B3', 'D#4')),
+    'B/D#':     (m('D#2'), ms('F#3', 'B3', 'D#4')),
+    'C#m':      (m('C#2'), ms('G#3', 'C#4', 'E4')),
+    'F#m7':     (m('F#1'), ms('A3', 'C#4', 'E4')),
+    'A':        (m('A1'),  ms('A3', 'C#4', 'E4')),
 }
 HARM = []                                   # [(t0, t1, chord)]
 def harm(t0, t1, names):
@@ -164,14 +168,17 @@ EMIN = [0, 2, 3, 5, 7, 8, 10]              # natural minor from E
 PENT = [0, 3, 5, 7, 10]                    # E minor pentatonic
 def scale_note(deg, base=m('E4'), sc=EMIN):
     deg = int(deg); return base + 12 * (deg // len(sc)) + sc[deg % len(sc)]
-def major_now(t): return chord_at(t) in ('E', 'Eadd9', 'Emaj9', 'E/G#', 'Amaj7', 'Aadd9', 'C#m7', 'B')
+def major_now(t): return chord_at(t) in ('E', 'Eadd9', 'Emaj9', 'E/G#', 'Amaj7', 'Aadd9', 'C#m7', 'B', 'B/D#', 'C#m', 'F#m7', 'A')
 
 # ================================================================ instruments + buses
 ensure_sf2(); sf2 = SF2()
 PNO, EP, CEL, GLK, MBOX, VIB, TUB = 0, 4, 8, 9, 10, 11, 14
 GTR, VLN, VLA, CELLO, CBASS, TREM, PIZZ, HARP, STR, SSTR = 25, 40, 41, 42, 43, 44, 45, 46, 48, 49
 CHOIR, OOHS, PAD, HALO, GLASS = 52, 53, 89, 94, 92
-CALKEY = {CBASS: m('E2'), CELLO: m('E3'), GTR: m('E3')}
+TIMP, HORN, BRASS, REVCYM = 47, 60, 61, 119
+KIT_STD, KIT_ORCH = 0, 48                            # GM drum kits (bank 128): standard, orchestral
+KICK, LTOM, LTOM2, MTOM, CRASH, CRASH2, SHAKER, CONGA_HI, CONGA_LO, CONGA_MUTE, BASSDRUM = 36, 41, 43, 45, 49, 57, 70, 62, 64, 63, 35
+CALKEY = {CBASS: m('E2'), CELLO: m('E3'), GTR: m('E3'), TIMP: m('E2'), HORN: m('E3'), BRASS: m('E3')}
 _CAL = {}
 def cal(preset, bank=0):
     k = (bank, preset)
@@ -180,6 +187,14 @@ def cal(preset, bank=0):
         r = np.sqrt((x[:n_of(0.5)] ** 2).mean()) + 1e-9
         _CAL[k] = 0.1 / r                   # every preset -> -20 dBFS RMS at velocity 100
     return _CAL[k]
+
+_DCAL = {}
+def dcal(key, kit=KIT_STD):
+    if (key, kit) not in _DCAL:
+        x = sf2.note(128, kit, key, 100, 0.3, tail=0.6, drums=True)
+        r = np.sqrt((x[:n_of(0.25)] ** 2).mean()) + 1e-9
+        _DCAL[(key, kit)] = 0.1 / r
+    return _DCAL[(key, kit)]
 
 GATE = []          # (t0, t1): true silence on every bus but POST
 def next_gate(t):
@@ -249,6 +264,14 @@ ONSETS = []        # composed onsets (nominal, before humanising): checked again
 IN_SYNC = [False]
 
 def local_env(n, pts): return env_points(n, [(a, g) for a, g in pts])
+
+def drum(key, t, vel, g=1.0, pan=0.0, rv=0.15, bg=0.0, kit=KIT_STD, bus=None, nominal=None, cut=None):
+    """one GM drum hit (the drums only enter for the climax)"""
+    if t is None or t >= D: return
+    if not IN_SYNC[0]: ONSETS.append(nominal if nominal is not None else t)
+    vel = int(np.clip(round(vel / 4) * 4, 4, 124))
+    x = sf2.note(128, kit, key, vel, 0.3, tail=1.2, drums=True)
+    (bus or MUS).add(t, x, g * dcal(key, kit), pan, rv, bg, cut=cut)
 
 def note(preset, key, t, dur, vel, g=1.0, pan=0.0, rv=0.3, bg=0.0, bus=None, tail=3.0, env=None, cut=None, cutf=0.12,
          bank=0, nominal=None, free=False):
@@ -349,6 +372,23 @@ def shimmer(keys, dur, beat_hz=0.35, seed=0):
         y[:, j % 2] += a * np.sin(2 * np.pi * f * t + rng.uniform(0, 6))
         y[:, (j + 1) % 2] += a * np.sin(2 * np.pi * (f + d) * t + rng.uniform(0, 6))
     return y / max(1, len(keys))
+def pluck(midi, dur, bright=6.0, decay=0.25, nh=30):
+    return cached(('pl', midi, round(dur, 3), bright, decay, nh),
+                  lambda: pluck_additive(mtof(midi), dur, bright=bright, decay=decay, nh=nh, tilt=1.0) * 0.6)
+def kick(f0=110, f1=44, tau=0.22, dur=0.8, click=0.18):
+    def mk():
+        n = n_of(dur); t = tvec(n); f = f1 + (f0 - f1) * np.exp(-t / 0.035)
+        x = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t / tau) * np.minimum(1, t / 0.0015)
+        return x + filt(wnoise(n, 3), 'hp', 1500) * np.exp(-t / 0.003) * click
+    return cached(('kick', f0, f1, tau, dur, click), mk)
+def revcym(L=2.0, seed=12):
+    """a reversed cymbal swelling into the next downbeat"""
+    def mk():
+        n = n_of(L); tt = tvec(n)
+        x = np.stack([filt(wnoise(n, seed), 'hp', 3000), filt(wnoise(n, seed + 1), 'hp', 3000)], 1) * np.exp(-tt / 0.7)[:, None]
+        met = sum(np.sin(2 * np.pi * f * tt) * np.exp(-tt / 0.6) for f in (3150, 4420, 5870, 7240)) * 0.12
+        return (x + to_stereo(met))[::-1] * local_env(n, [(0, 0), (L - 0.02, 1), (L, 0)])[:, None]
+    return cached(('revcym', L, seed), mk)
 def eclick(seed=0):
     """a tiny electrical click (a phone's switch)"""
     def mk():
@@ -421,6 +461,8 @@ def roomtone(dur, seed=0, hum=True):
 # ================================================================ registry, ducks
 DUCK = []          # (t0, t1, depth, release) on the music buses
 CUTS = {}          # bus-level stops: name -> [(t, fade)]
+CLIMAX = ('kline', 'agents', 'summit', 'journey')
+PEAK_AT = []       # the sun-break time(s) the template cues inside summit
 PRINTING = []      # printer spans (overlapping print cues are one printer running longer)
 DONE = {}          # sync-hit registry (form and cues share handlers; no double hits)
 def seen(kind, t, win=0.12):
@@ -814,9 +856,88 @@ def h_resolve(t, **_):
         note(HARP, k, t + j * 0.06, 1.5, 54, 0.14, -0.4 + 0.15 * j, rv=0.5, bg=0.4, bus=FX)
     FX.add(t, glow_tone(mtof(up[0] + 24), 3.5, 0.2, 1.4), 0.025, 0.1, rv=0.5, bg=0.5)
 
+@sync
+def h_beat(t, **kw):
+    """a downbeat hit: low tom + kick (+ timpani in the climb), on the chord root"""
+    if 'visual' in kw: return                  # a scene marker, not a hit
+    if seen('beathit', t, 0.15): return
+    bt = btype_at(t); root = CHORDS[chord_at(t + 0.02)][0]
+    if bt in CLIMAX:
+        FX.add(t, kick(95, 40, 0.3, 1.0, 0.1), 0.45, 0, rv=0.15, bg=0.1)
+        drum(LTOM, t, 100, 0.55, -0.15, rv=0.3, bg=0.2, bus=FX)
+        if bt in ('kline', 'summit'): note(TIMP, root + 12, t, 1.0, 96, 0.5, 0.05, rv=0.3, bg=0.3, bus=FX)
+        return
+    FX.add(t, thump(80, 44, 0.12, 0.6, 200), 0.3, 0, rv=0.15)
+
+@sync
+def h_rise(t, dur=2.0, **_):
+    """a riser that lands at t + dur: air sweeping up, a rising tone, a reversed cymbal"""
+    if seen('rise', t, 0.3): return
+    dur = min(10.0, max(0.4, float(dur or 2.0))); n = n_of(dur); u = np.arange(n) / n
+    a = air(dur, 300, 7000, q=1.3, seed=int(t * 10) % 997) * (u ** 2.0)[:, None]
+    f = mtof(CHORDS[chord_at(t + dur + 0.02)][0] + 24) * 2 ** (u * 1.0)
+    tone = np.sin(2 * np.pi * np.cumsum(f) / SR) * u ** 2.5 * 0.3
+    x = (a * 0.6 + to_stereo(tone)) * local_env(n, [(0, 1), (dur - 0.03, 1), (dur, 0)])[:, None]
+    k = 1.0 if btype_at(t + dur - 0.05) in CLIMAX else 0.45
+    FX.add(t, x, 0.10 * k, 0, rv=0.3)
+    L = min(dur, 2.0); FX.add(t + dur - L, revcym(round(L, 2)), 0.10 * k, 0, rv=0.3, bg=0.3)
+
+@sync
+def h_drop(t, **_):
+    """the dip: everything cut to one low hit (the silence itself is set up before composing)"""
+    if seen('drop', t, 0.3): return
+    root = CHORDS[chord_at(t + 0.02)][0]
+    bus = POST if gated(t) else FX
+    note(PNO, root - 12, t, 3.0, 110, 0.9, 0, rv=0.3, bg=0.6, bus=bus, tail=5)
+    note(PNO, root, t + 0.008, 3.0, 96, 0.5, 0, rv=0.3, bg=0.6, bus=bus, tail=5)
+    note(TIMP, root + 12, t, 2.0, 120, 0.8, 0, rv=0.3, bg=0.6, bus=bus)
+    bus.add(t, kick(70, 30, 0.6, 2.0, 0.15), 0.6, 0, rv=0.2, bg=0.5)
+    drum(BASSDRUM, t, 120, 0.5, 0, rv=0.3, bg=0.5, kit=KIT_ORCH, bus=bus)
+
+@sync
+def h_spawn(t, dur=1.5, n=24, **_):
+    """agents spawning: a rising cascade of tiny plucks fanning out across the stereo field"""
+    if seen('spawn', t, 0.2): return
+    dur = min(6.0, max(0.2, float(dur or 1.5))); n = int(max(1, n or 24))
+    div = S16 / 2; mm = int(min(n, max(1, dur / div), 32))
+    slots = sorted(set(int(round((t + dur * i / max(1, mm - 1)) / div)) for i in range(mm))) if mm > 1 else [int(round(t / div))]
+    up = CHORDS[chord_at(t + 0.02)][1]; tones = [k + 12 * o for o in (1, 2) for k in up]
+    w = len(DONE['spawn']) - 1
+    for i, sl in enumerate(slots):
+        tt = sl * div; u = i / max(1, len(slots) - 1)
+        key = tones[min(len(tones) - 1, int(u * len(tones)))] + (12 if (w % 2 and u > 0.6) else 0)
+        x = pluck(int(key), 0.5, 9.0, 0.12, 24)
+        FX.add(tt, x, 0.05 * (0.6 + 0.4 * u), np.sin(i * 2.4 + w) * (0.3 + 0.6 * u), rv=0.35, bg=0.3)
+    if n > len(slots) * 2:                     # many more agents than notes: a glittering bed under the cascade
+        FX.add(t, air(dur, 4000, 9000, q=2, seed=n % 97) * np.hanning(n_of(dur))[:, None], 0.02, 0, rv=0.4)
+
+@sync
+def h_pulse(t, **_):
+    """a pulse through the network: a soft sub kick and a short bright chord"""
+    if seen('pulse', t, 0.1): return
+    FX.add(t, kick(70, 42, 0.18, 0.6, 0.05), 0.25, 0, rv=0.15)
+    for j, k in enumerate(CHORDS[chord_at(t + 0.02)][1]):
+        FX.add(t, pluck(k + 12, 0.4, 7.0, 0.1, 20), 0.035, -0.4 + 0.4 * j, rv=0.4, bg=0.2)
+
+@sync
+def h_peak(t, **_):
+    """the sun breaks: the film's peak (in summit composed by the form at this time); elsewhere a big warm hit"""
+    if seen('peak', t, 0.3): return
+    if btype_at(t) == 'summit': PEAK_AT.append(t); return
+    drum(CRASH, t, 90, 0.35, 0.3, rv=0.4, bg=0.4, bus=FX)
+    note(TIMP, CHORDS[chord_at(t + 0.02)][0] + 12, t, 1.5, 100, 0.5, 0, rv=0.3, bg=0.4, bus=FX)
+
+@sync
+def h_wind(t, dur=3.0, **_):
+    if seen('wind', t, 0.3): return
+    dur = min(12.0, max(0.5, float(dur or 3.0))); n = n_of(dur)
+    w = wind(dur, int(t * 3) % 997, 300, 2400, 0.9) * local_env(n, [(0, 0), (min(1.0, dur / 3), 1), (dur * 0.7, 0.9), (dur, 0)])[:, None]
+    FX.add(t, w, 0.11, 0, rv=0.3)
+
 HANDLERS = {'type': h_type, 'swipe': h_swipe, 'tick': h_tick, 'ticks': h_ticks, 'pen': h_pen, 'stamp': h_stamp,
             'print': h_print, 'click': h_click, 'off': h_off, 'hush': h_hush, 'swell': h_swell, 'whoosh': h_whoosh,
-            'fall': h_fall, 'land': h_land, 'glow': h_glow, 'title': h_title, 'freeze': h_freeze, 'resolve': h_resolve}
+            'fall': h_fall, 'land': h_land, 'glow': h_glow, 'title': h_title, 'freeze': h_freeze, 'resolve': h_resolve,
+            'beat': h_beat, 'rise': h_rise, 'drop': h_drop, 'spawn': h_spawn, 'pulse': h_pulse, 'peak': h_peak, 'wind': h_wind}
 def anchor(kind, vtype, name, k=0.0, **kw):
     """a form-level hit at a step start (+k beats), unless the template already cues this kind inside that step"""
     t0, t1 = T(vtype, name), E(vtype, name)
@@ -860,9 +981,16 @@ HB('fall', 'floor', [('Cmaj7', 2), ('Am7', 2), ('D', 99)])
 H('stand', 'not', 'Em9'); H('stand', 'up', ['C', 'D', 'G/B', 'Cadd9']); H('stand', 'given', ['Am9', 'Am9', 'Dsus4'])
 H('stand', 'kid', ['Em9', 'Em9', 'Em9', 'Cmaj7'])
 H('tries', 'try', ['G', 'D/F#', 'Em7']); H('tries', 't1', ['C', 'G']); H('tries', 't2', ['D', 'Em7']); H('tries', 't3', ['C', 'G/B'])
-H('tries', 't4', ['Am7', 'D']); H('tries', 'fine', ['C', 'G', 'D'])
+H('tries', 't4', ['Am7', 'D']); H('tries', 't5', ['Em7', 'C']); H('tries', 't6', ['G', 'D']); H('tries', 'fine', ['C', 'G', 'D'])
 HB('lamp', 'take', [('Cmaj7', 2), ('Dadd9', 2), ('Eadd9', 99)])
-HB('end', 'years', [('E', 2), ('Amaj7', 2), ('Bsus4', 2), ('B', 99)]); HB('end', 'try', [('E/G#', 1), ('Aadd9', 1), ('Eadd9', 99)])
+# the climax (E major)
+HB('kline', 'run', [('E', 2), ('C#m7', 2), ('A', 1), ('B', 99)]); HB('kline', 'dip', [('C#m', 99)]); HB('kline', 'climb', [('A', 2), ('B', 99)])
+HB('agents', 'found', [('Eadd9', 2), ('E/G#', 99)]); HB('agents', 'spawn', [('A', 2), ('B', 2), ('C#m7', 99)])
+HB('agents', 'command', [('A', 2), ('F#m7', 2), ('Bsus4', 1), ('B', 99)])
+HB('summit', 'climb', [('Bsus4', 2), ('B7', 99)]); HB('summit', 'peak', [('E', 2), ('Amaj7', 2), ('B', 2), ('E/G#', 99)])
+HB('journey', 'ride', [('E', 2), ('B/D#', 2), ('C#m7', 2), ('A', 99)]); HB('journey', 'free', [('Aadd9', 2), ('Eadd9', 99)])
+HB('end', 'years', [('E', 2), ('C#m7', 2), ('Aadd9', 99)]); HB('end', 'try', [('Aadd9', 2), ('Bsus4', 99)])
+HB('end', 'love', [('E', 2), ('Amaj7', 2), ('Bsus4', 2), ('B', 99)]); HB('end', 'you', [('Eadd9', 99)])
 H('end', 'life', 'Eadd9')
 
 # ================================================================ FORM
@@ -876,6 +1004,10 @@ if B('darkq'):
     t_q = T('darkq', 'q') or E('darkq')
     GATE.append((T_OFF, t_q if t_q > T_OFF + BT else T_OFF + 2 * BT))
     h_off(T_OFF)
+if B('kline'):                              # the dip: a dead cut to one low hit, then the build
+    _d0, _d1 = T('kline', 'dip') or T('kline'), T('kline', 'climb') or E('kline')
+    T_DROP = first('drop', T('kline'), E('kline'), _d0)
+    GATE.append((T_DROP, min(_d1 - 0.05, T_DROP + BT) if _d1 > T_DROP + 0.5 * BT else T_DROP + 0.5 * BT))
 if B('trap') and not any(beat_of(a) is B('trap') for a, _ in GATE):
     h_freeze(first('freeze', T('trap', 'climb') or T('trap'), E('trap'), T('trap', 'back') or T('trap', 'rank') or T('trap')))
 
@@ -1438,7 +1570,7 @@ IN_SYNC[0] = True
 used = {}
 for c in CUES:
     ty = c.get('type'); fn = HANDLERS.get(ty)
-    if not fn: continue
+    if not fn or (ty == 'beat' and 'visual' in c): continue
     kw = {k: v for k, v in c.items() if k not in ('t', 'type', 'beat', 'chapter', 'visual')}
     try:
         fn(float(c['t']), **kw); used[ty] = used.get(ty, 0) + 1

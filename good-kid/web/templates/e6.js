@@ -498,7 +498,7 @@
       const L = LAMPS[i % 3], v = R(i, 72), top = L.y - LAMP_H, half = lerp(22, 120, v);
       const x0 = L.x + (R(i, 73) * 2 - 1) * half * 0.85, y0 = top + v * LAMP_H * 0.85 + ((ct * 14 * (0.4 + R(i, 77))) % 60);
       const k1 = ease.inOut(clamp((ct - take - 0.25 - tw.D[i] * 1.1) / 1.1));
-      const k2 = clamp((ct - take - 5.5 - tw.D[i] * 1.2 - R(i, 78) * 0.3) / 1.3);
+      const k2 = clamp((ct - take - 5.1 - tw.D[i] * 1.0 - R(i, 78) * 0.3) / 1.2);
       const sw = Math.sin(Math.PI * k1) * (R(i, 74) - 0.5) * 50;
       let x = lerp(x0, tw.TX[i], k1) + sw + Math.sin(ct * (0.9 + R(i, 79)) + i) * 0.4, y = lerp(y0, tw.TY[i], k1);
       if (k2 > 0) { const j = (i * 13) % Y.n, e = ease.in(k2) * 0.6 + ease.inOut(k2) * 0.4; x = lerp(x, Y.X[j], e) + Math.sin(k2 * Math.PI) * (R(i, 75) - 0.5) * 60; y = lerp(y, Y.Y[j], e); }
@@ -526,7 +526,9 @@
     // the lights: each try kindles one; the lamp's light fills the rest
     const em = tr.kin.map(k => { const e = ss(k, k + 0.5, ct); return e * (1 + 0.9 * Math.exp(-Math.max(0, ct - k) * 2.2)) * (0.92 + 0.08 * Math.sin(ct * 1.7 + k)); });
     const ownTry = 0.08 * em.reduce((a, b) => a + Math.min(1, b), 0);
-    const kOwn = ss(take + 5.9, take + 8.0, ct);
+    const kOwn = ss(take + 5.6, take + 7.5, ct);
+    // the last second of b20 gathers like a held breath: the hard cut into the climax lands on 你 at full light
+    const launch = ss(take + 6.9, take + 8.33, ct);
     const own = lerp(ownTry, 1, kOwn), gray = Math.max(0, 1 - own * 1.9);
     const emK = em.map(e => e * (1 - 0.7 * kOwn));
     // 你 straightens up (end of b18 it was looking down at the child)
@@ -535,8 +537,8 @@
     // ---- the paper floor
     drawSheet(cm, { a: 1, head: 1, print: 1 });
     // warm light on the floor: a little from the first lights, all of it once the light is yours
-    const pool = 0.25 * ownTry + ss(take + 6.0, take + 8.3, ct) * 1.0;
-    floorLight(cm, STAND_U, STAND_V, 230 + 260 * ss(take + 6.0, take + 8.4, ct), pool, 1);
+    const pool = 0.25 * ownTry + ss(take + 5.8, take + 7.8, ct) * (1 + 0.5 * launch);
+    floorLight(cm, STAND_U, STAND_V, 230 + 260 * ss(take + 5.8, take + 7.8, ct) + 120 * launch, pool, 1);
     // ---- the tries, by hand
     const dimL = lerp(1, 0.06, ss(take + 0.1, take + 1.3, ct));
     let tip = null;
@@ -566,8 +568,8 @@
     if (lampK > 0.003) LAMPS.forEach((L, i) => KIT.spot(L.x, L.y, { k: lampK * 0.26, w: 120, h: LAMP_H }));
     // ---- light
     PX.begin();
-    drawKid(cm, { k: 1, phi: lerp(104 * DEG, 92 * DEG, ss(take + 6, take + 8.3, ct)), own: 0.55 * ss(take + 6.2, take + 8.3, ct), t: lt + 30 });
-    const Y = drawYou(cm, { u: STAND_U, v: STAND_V, occ: 1 + 0.2 * own, phi, yaw, t: lt + 20, gray, own, a: lerp(3.0, 1.5, own), em: emK });
+    drawKid(cm, { k: 1, phi: lerp(104 * DEG, 92 * DEG, ss(take + 6, take + 8.3, ct)), own: 0.55 * ss(take + 5.8, take + 7.8, ct), t: lt + 30 });
+    const Y = drawYou(cm, { u: STAND_U, v: STAND_V, occ: 1 + 0.2 * own, phi, yaw, t: lt + 20, gray, own, a: lerp(3.0, 1.5, own) * (1 + 0.55 * launch), em: emK });
     // sparks from each finished line into its light
     tr.Ls.forEach((L, li) => {
       const k = prog(ct, tr.done[li] + 0.1, tr.kin[li]); if (k <= 0 || k >= 1) return;
@@ -578,8 +580,8 @@
     // the lamps' dust gathers into the sentence in their beams, warms, then streams down into 你
     const takeL = api.beat.visual.lines && api.beat.visual.lines.take;
     if (takeL && ct > take) lampWords(takeL, ct, take, Y);
-    PX.flush({ exposure: 1.4 });
-    halo(Y.x, Y.y, 260 * Y.s / 0.7, own * 0.9 + 0.25 * kOwn * (0.9 + 0.1 * Math.sin(ct * 1.3)));
+    PX.flush({ exposure: 1.4 + 0.5 * launch, glow: 1 + 0.7 * launch });
+    halo(Y.x, Y.y, 260 * Y.s / 0.7 * (1 + 0.6 * launch), own * 0.9 + 0.25 * kOwn * (0.9 + 0.1 * Math.sin(ct * 1.3)) + 0.9 * launch);
   }
   const chainDraw = (ctx, V, lt, api) => { const S = steps(api), ct = lt - api.chainStart; drawChain(ctx, V, ct, S, api, ct); };
   const chainCues = (V, api) => {
@@ -606,68 +608,132 @@
   });
 
   // ================================================================ b21 end
+  /* After the climax: quiet and full. The paper is gone — 你 alone at full own light, on dark ground that takes its
+     light, seen almost at eye level. 'years': a typographic moment. 'try': "Have a try" flows out of 你. 'love': a spark
+     of 你's own light writes 找回你自己热爱的，/ 并愿意为它付出一生—— across the open space. 'you': the view drifts, and
+     那才是 stands up beside 你, in its plane, at its size, in its font — the sentence 「那才是你。」 ends on 你's own body. */
+  const CAM_E = cam({ th: 80 * DEG, D: 1900, Cy: 700, Yc: 960, cx: 170, cu: 0, fade: 0 });
+  const PAN = 530;                                       // world units the view drifts to make room for 那才是
   let TXT = null;
   function tryCloud() {
     const fk = document.fonts.check(`400 40px ${F.serif}`, 'Have a try');
     if (TXT && TXT.fk === fk) return TXT;
-    const c = PX.text('Have a try', { size: 116, family: F.serif, weight: 400, x: W / 2, y: 716, step: 1.0, jitter: 0.7, seed: 9 });
-    // flow order: left to right, a little loose
+    const c = PX.text('Have a try', { size: 116, family: F.serif, weight: 400, x: W / 2, y: 640, step: 1.0, jitter: 0.7, seed: 9 });
     const n = c.n, D = new Float32Array(n); let x0 = 1e9, x1 = -1e9;
     for (let i = 0; i < n; i++) { x0 = Math.min(x0, c.X[i]); x1 = Math.max(x1, c.X[i]); }
     for (let i = 0; i < n; i++) D[i] = clamp(0.72 * (c.X[i] - x0) / (x1 - x0) + 0.28 * R(i, 81));
     return (TXT = { fk, c, n, D, X: new Float32Array(n), Y: new Float32Array(n), A: new Float32Array(n) });
   }
+  // 那才是 … 。 in 你's own glyph space: same font, size and sampling, standing to its left (and the full stop to its right)
+  let NA = null;
+  function naCloud(str) {
+    const fk = document.fonts.check(`600 40px ${F.serif}`, str);
+    if (NA && NA.fk === fk) return NA;
+    const yc = youCloud(), S = 420, sc = PSIZE / S, w = K.measure('你', { size: S, family: F.serif, weight: 600 });
+    const head = [...str.replace(/你。?$/, '')].join(''), parts = [];
+    const a = PX.text(head, { size: S, family: F.serif, weight: 600, x: -w / 2, y: S * 0.38, align: 'right', step: 2.0, seed: 19 });
+    const b = PX.text('。', { size: S, family: F.serif, weight: 600, x: w / 2, y: S * 0.38, align: 'left', step: 2.0, seed: 21 });
+    const n = a.n + b.n, GX = new Float32Array(n), UP = new Float32Array(n), D = new Float32Array(n);
+    const hw = K.measure(head, { size: S, family: F.serif, weight: 600 }), nc = [...head].length;
+    for (let i = 0; i < n; i++) {
+      const fromA = i < a.n, X = fromA ? a.X[i] : b.X[i - a.n], Yv = fromA ? a.Y[i] : b.Y[i - a.n];
+      GX[i] = X * sc; UP[i] = yc.baseYoff - Yv * sc;
+      const ci = fromA ? Math.floor(clamp((X + w / 2 + hw) / hw, 0, 0.999) * nc) : nc + 1.4;   // which character (reading order)
+      D[i] = ci / (nc + 1.4) * 0.62 + R(i, 91) * 0.12;
+    }
+    return (NA = { fk, n, GX, UP, D, X: new Float32Array(n), Y: new Float32Array(n), A: new Float32Array(n) });
+  }
+  // the words condense out of 你's own light: each grain leaves 你's body and arcs to its place in the line
+  function drawStanding(cm, na, u, v, k, t, Y) {
+    if (k <= 0) return;
+    const q = {}, n = na.n;
+    for (let i = 0; i < n; i++) {
+      const kk = ease.inOut(clamp((k - na.D[i]) / 0.32));
+      if (kk <= 0) { na.A[i] = 0; continue; }
+      P(cm, u + na.GX[i], v, na.UP[i], q);
+      const j = (i * 11) % Y.n, sx = Y.X[j], sy = Y.Y[j], w = 1 - kk;
+      const mx = (sx + q.x) / 2, my = Math.min(sy, q.y) - 70 - 90 * R(i, 93);
+      na.X[i] = w * w * sx + 2 * w * kk * mx + kk * kk * q.x + Math.sin(t * (1.1 + R(i, 95)) + i) * 0.5 * kk;
+      na.Y[i] = w * w * sy + 2 * w * kk * my + kk * kk * q.y + Math.cos(t * (0.9 + R(i, 96)) + i) * 0.5 * kk;
+      na.A[i] = (0.35 + 0.65 * kk) * (1 + 1.4 * Math.sin(Math.PI * kk));
+    }
+    PX.points(na.X, na.Y, n, [1.0, 0.9, 0.74], { a: 0.12, A: na.A, glow: 0.2 });
+  }
+  // a spark of 你's own light that writes a line across the open space (the glyphs stay as warm particles + ink)
+  const LWB = new Map();
+  function lightWrite(str, x, y, size, t0, dur, ct, from, dim, travel = 0.55) {
+    if (ct < t0 - travel) return;
+    const cl = PX.text(str, { size, family: F.serif, weight: 500, x, y, align: 'left', step: 1.3, seed: 41 + str.length });
+    const n = cl.n; let b = LWB.get(cl); if (!b) LWB.set(cl, b = { X: new Float32Array(n), Y: new Float32Array(n), A: new Float32Array(n) });
+    const tw = K.measure(str, { size, family: F.serif, weight: 500 }), x1 = x + tw;
+    const kw = prog(ct, t0, t0 + dur), wx = lerp(x - 4, x1 + 6, kw);
+    for (let i = 0; i < n; i++) {
+      const d = wx - cl.X[i];
+      b.X[i] = cl.X[i] + Math.sin(ct * (0.8 + R(i, 97)) + i) * 0.35; b.Y[i] = cl.Y[i];
+      b.A[i] = d <= 0 ? 0 : clamp(d / 26) * (1 + 2.2 * Math.exp(-d / 22) * (kw < 1 ? 1 : 0));
+    }
+    if (kw > 0) PX.points(b.X, b.Y, n, LC.warm, { a: 0.26 * dim, A: b.A, glow: 0.45 });
+    if (kw > 0) {                                        // the ink, revealed behind the spark
+      const ctx = K.ctx; ctx.save(); ctx.beginPath(); ctx.rect(x - 10, y - size * 1.3, Math.max(0, wx - 18 - x + 10), size * 1.8); ctx.clip();
+      K.text(str, x, y, { size, family: F.serif, weight: 500, color: '#ffd9a8', alpha: 0.72 * dim * ss(0, 0.2, kw) }); ctx.restore();
+    }
+    // the spark: it leaves 你, travels to the line, then rides the writing front
+    let sx, sy, on = 0;
+    if (ct < t0) { const k = ease.inOut(prog(ct, t0 - travel, t0)); sx = lerp(from[0], x, k); sy = lerp(from[1], y - size * 0.35, k) - Math.sin(Math.PI * k) * 60; on = 1; }
+    else if (kw < 1) { sx = wx; sy = y - size * 0.35 + Math.sin(ct * 17) * size * 0.18; on = 1; }
+    if (on) { PX.dot(sx, sy, LC.warm, 1.4, 0.9); PX.dot(sx - 2, sy + 1, [1, 0.95, 0.85], 0.8, 0.3); }
+  }
   T.register('end', {
     draw(ctx, V, lt, api) {
       const S = steps(api), ct = lt, yc = youCloud();
-      // the step: forward, off the near edge of the paper, onto the dark ground
-      const tS = S.life + 1.9, kStep = ease.inOut(prog(ct, tS, tS + 1.7));
-      const kc = ease.inOut(prog(ct, 0.3, 8.0)), cm = camMix(CAM1, CAM2, kc);
-      cm.D += 240 * ease.inOut(prog(ct, tS - 0.3, tS + 4.5));          // the camera gives it room as it comes forward
-      const v = lerp(STAND_V, SH + 70, kStep), u = lerp(STAND_U, STAND_U - 40, kStep), lift = 22 * Math.sin(Math.PI * kStep);
-      const phi = 90 * DEG - 7 * DEG * Math.sin(Math.PI * kStep);
-      const breath = 0.5 + 0.5 * Math.sin(ct * 1.25);
-      const own = 1 + 0.06 * Math.sin(ct * 1.25 + 0.6);
+      const tY = S.you, kPan = ease.inOut(prog(ct, tY + 0.2, tY + 2.8));
+      const cm = cam({ ...CAM_E, D: CAM_E.D + 220 * (1 - ease.inOut(prog(ct, 0, S.you))), cx: CAM_E.cx - PAN * kPan });
+      const u = STAND_U, v = STAND_V, breath = 0.5 + 0.5 * Math.sin(ct * 1.25);
+      // the payoff: when 那才是 has stood up beside it, 你 flares once, softly, and keeps breathing
+      const tDone = tY + 5.1, flare = Math.exp(-Math.max(0, ct - tDone) * 1.2) * ss(tDone - 0.5, tDone, ct);
+      const own = 1 + 0.06 * Math.sin(ct * 1.25 + 0.6) + 0.25 * flare;
       // 'years': the picture recedes a little while the sentence holds the frame
       const rec = ss(S.years + 0.3, S.years + 1.8, ct) * (1 - ss(S.try - 1.0, S.try + 0.6, ct));
-      const sheetA = lerp(1, 0.55, ss(tS + 0.8, tS + 5, ct)) * (1 - 0.45 * rec);
-      drawSheet(cm, { a: sheetA, head: 1, print: 1 });
-      // the warm pool travels with 你; off the paper it falls on bare ground
-      const offK = ss(tS + 0.9, tS + 1.8, ct);
-      floorLight(cm, u, v, 490 + 30 * breath, 1 - 0.4 * rec, 1 - 0.5 * offK);
-      // ground: a faint warm line where the paper ends and the ground begins, lit only near 你
+      floorLight(cm, u, v, 420 + 30 * breath + 60 * flare, (1 - 0.4 * rec) * (0.9 + 0.3 * flare), 0);
       PX.begin();
-      const kid = ss(1.2, 5.2, ct);
-      const Y = drawYou(cm, { u, v, occ: 1.2, phi, lift, t: ct + 40, own, gray: 0, a: 1.5 * (1 - 0.35 * rec) });
-      drawKid(cm, { k: 1, phi: 92 * DEG, own: 0.55, t: ct + 60, to: kid, dest: Y });
-      // Have a try: warm particles flowing out of 你's light
+      const Y = drawYou(cm, { u, v, occ: 1.2, phi: 90 * DEG, t: ct + 40, own, gray: 0, a: 1.5 * (1 - 0.35 * rec) * (1 + 0.3 * flare) });
+      const from = [Y.x, Y.y];
+      // 'years': a typographic moment of its own — a quiet line, then 好孩子 set large in the grey of the good life
+      const yrs = noDot(V.lines.years), yc2 = yrs.indexOf('好孩子'), yOut = prog(ct, S.try - 1.2, S.try - 0.05);
+      KIT.ptext(yrs.slice(0, yc2), 150, 560, { size: 50, weight: 400, align: 'left', color: LC.ink, a: 0.42, crisp: 0.9, k: prog(ct, S.years + 0.5, S.years + 2.4), out: yOut, t: ct, seed: 4, tag: 3, drift: 0.4 });
+      KIT.ptext(yrs.slice(yc2), 142, 706, { size: 116, weight: 500, align: 'left', spacing: 10, color: [0.72, 0.74, 0.78], a: 0.38, crisp: 0.9, k: prog(ct, S.years + 1.5, S.years + 3.5), out: yOut, t: ct, seed: 6, tag: 4, drift: 0.4 });
+      // 'try': Have a try, warm particles flowing out of 你's light
+      const dimTop = lerp(1, 0.55, ss(tY + 0.2, tY + 2.5, ct));
       const T0 = S.try + 0.15, tc = tryCloud(), n = tc.n;
       if (ct > T0) {
         for (let i = 0; i < n; i++) {
-          const d = T0 + tc.D[i] * 1.7, k = clamp((ct - d) / 1.6);
+          const d = T0 + tc.D[i] * 1.5, k = clamp((ct - d) / 1.5);
           if (k <= 0) { tc.A[i] = 0; continue; }
           const j = (i * 7) % Y.n, sx = Y.X[j], sy = Y.Y[j], tx = tc.c.X[i], ty = tc.c.Y[i];
-          const e = ease.inOut(k), u = 1 - e;
+          const e = ease.inOut(k), w = 1 - e;
           const mx = lerp(sx, tx, 0.35) + (R(i, 82) - 0.5) * 260, my = lerp(sy, ty, 0.55) + (R(i, 83) - 0.3) * 120;
-          const sh = 0.5 * Math.sin(ct * (1.1 + R(i, 84)) + i) * e;
-          tc.X[i] = u * u * sx + 2 * u * e * mx + e * e * tx + sh; tc.Y[i] = u * u * sy + 2 * u * e * my + e * e * ty + 0.5 * Math.cos(ct * (0.9 + R(i, 85)) + i) * e;
+          tc.X[i] = w * w * sx + 2 * w * e * mx + e * e * tx + 0.5 * Math.sin(ct * (1.1 + R(i, 84)) + i) * e;
+          tc.Y[i] = w * w * sy + 2 * w * e * my + e * e * ty + 0.5 * Math.cos(ct * (0.9 + R(i, 85)) + i) * e;
           tc.A[i] = (1 + 1.4 * Math.sin(Math.PI * k) ** 2) * (k < 0.08 ? k / 0.08 : 1) * (0.9 + 0.1 * Math.sin(ct * 1.25 + tc.c.X[i] * 0.01));
         }
-        PX.points(tc.X, tc.Y, n, LC.warm, { a: 0.34, A: tc.A, glow: 0.22 });
+        PX.points(tc.X, tc.Y, n, LC.warm, { a: 0.34 * dimTop, A: tc.A, glow: 0.22 });
       }
-      /* 'years': a typographic moment of its own — a quiet line, then 好孩子 set large in the grey of the good life,
-         gathering from dust and dissolving upward before "Have a try" */
-      const yrs = noDot(V.lines.years), yc2 = yrs.indexOf('好孩子'), yOut = prog(ct, S.try - 1.2, S.try - 0.05);
-      KIT.ptext(yrs.slice(0, yc2), 150, 560, { size: 50, weight: 400, align: 'left', color: LC.ink, a: 0.42, crisp: 0.9, k: prog(ct, S.years + 0.5, S.years + 2.5), out: yOut, t: ct, seed: 4, tag: 3, drift: 0.4 });
-      KIT.ptext(yrs.slice(yc2), 142, 706, { size: 116, weight: 500, align: 'left', spacing: 10, color: [0.72, 0.74, 0.78], a: 0.38, crisp: 0.9, k: prog(ct, S.years + 1.8, S.years + 4.0), out: yOut, t: ct, seed: 6, tag: 4, drift: 0.4 });
-      // 'life': beneath "Have a try", gathering out of 你's light
-      KIT.ptext(noDot(V.lines.life), 540, 858, { size: 48, weight: 400, color: LC.ink, a: 0.4, crisp: 0.95, k: prog(ct, S.life + 0.2, S.life + 2.4), from: [Y.x, Y.y], t: ct, seed: 8, tag: 5, drift: 0.3 });
+      // 'love': written by 你's own light, across the open space
+      const love = V.lines.love || [];
+      if (love[0]) lightWrite(love[0], 150, 800, 56, S.love + 1.0, 2.0, ct, from, dimTop);
+      if (love[1]) lightWrite(love[1], 214, 892, 56, S.love + 3.6, 2.5, ct, [150 + K.measure(love[0], { size: 56, family: F.serif, weight: 500 }), 780], dimTop, 0.45);
+      // 'you': 那才是 stands up beside 你 — and the sentence ends on 你
+      drawStanding(cm, naCloud(V.lines.you), u, v, prog(ct, tY + 2.2, tY + 5.2), ct, Y);
       PX.flush({ exposure: 1.4 });
-      halo(Y.x, Y.y, 300 * Y.s / 0.6, (0.9 + 0.12 * breath) * (1 - 0.4 * rec));
+      halo(Y.x, Y.y, 300 * Y.s / 0.6 * (1 + 0.3 * flare), (0.9 + 0.12 * breath) * (1 - 0.4 * rec) + 0.5 * flare);
     },
     cues(V, api) {
       const S = steps(api);
-      return [{ t: S.try + 0.15, type: 'title' }, { t: S.life + 1.9 + 1.5, type: 'resolve' }, { t: S.try + 0.15, type: 'swell', dur: 3.5 }];
+      return [
+        { t: S.try + 0.15, type: 'title' }, { t: S.try + 0.15, type: 'swell', dur: 3.2 },
+        { t: S.love + 0.45, type: 'glow' }, { t: S.love + 1.0, type: 'type', dur: 5.1 },
+        { t: S.you + 2.2, type: 'swell', dur: 3.0 }, { t: S.you + 5.1, type: 'resolve' },
+      ];
     },
   });
 })();
