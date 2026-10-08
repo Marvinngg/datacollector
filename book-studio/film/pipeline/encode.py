@@ -23,9 +23,10 @@ def encode(P):
     d = os.path.join(build, f"part{P['part']}")
     vid, wav, dst = os.path.join(d, 'video.mp4'), os.path.join(d, 'mix.wav'), os.path.join(out, f"part{P['part']}.mp4")
     dur = P['dur']
-    stamp_key = hashlib.md5(json.dumps([os.path.getsize(vid), os.path.getmtime(vid), os.path.getsize(wav), os.path.getmtime(wav), dur,
+    seglist = open(vid + '.txt').read() if os.path.exists(vid + '.txt') else str(os.path.getmtime(vid))   # names carry content hashes
+    stamp_key = hashlib.md5(json.dumps([seglist, os.path.getsize(vid), os.path.getsize(wav), os.path.getmtime(wav), dur,
                                         open(__file__).read()]).encode()).hexdigest()
-    stamp = dst + '.stamp'
+    stamp = os.path.join(d, 'encode.stamp')
     if os.path.exists(dst) and os.path.exists(stamp) and open(stamp).read() == stamp_key and os.path.getsize(dst) <= LIMIT:
         print(f"part{P['part']}: unchanged ({os.path.getsize(dst) / 2**20:.2f} MiB)")
     else:

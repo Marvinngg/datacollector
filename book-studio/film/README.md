@@ -71,9 +71,12 @@ with a 4× oversampled limiter at −1.6 dBTP.
 
 ## Render time (4 cores)
 
-For the dafen book (2 parts, 3.6 min of film, 6 400 frames): frames ≈ 11–12 min (≈ 9 frames/s across 4 Chromium
-workers; the score renders alongside), encode ≈ 2–3 min, total ≈ 14 min from scratch; a re-run with nothing changed
-takes a few seconds, a text change in one scene ≈ 1 min plus the encode of that part.
+Measured on the dafen book (2 parts, 3.6 min of film, 6 422 frames at 1080x1920): frames 5.5–11 min (≈ 10–19
+frames/s across 4 Chromium workers, ~200 ms per frame per worker; the score, ≈ 50 s per part, renders alongside),
+two-pass encode ≈ 3 min (both parts in parallel) — about 9–14 min from scratch, roughly 3–4x the film's length.
+A re-run with nothing changed takes ~1 s; editing one scene re-renders that scene and its two neighbours
+(cross-fades) and re-encodes its part (≈ 2–3 min). Changing anything in `web/` or `pipeline/render.mjs`
+invalidates every cached frame. The build cache is ≈ 370 MB for this book.
 
 ## Limitations
 

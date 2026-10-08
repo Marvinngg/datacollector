@@ -123,7 +123,9 @@ async function main() {
         for (const p of pages.values()) await p.close();
       }));
       for (const { segs, out } of partSegs) {
-        const list = out + '.txt'; fs.writeFileSync(list, segs.map(s => `file '${s.file}'`).join('\n'));
+        const list = out + '.txt', body = segs.map(s => `file '${s.file}'`).join('\n');
+        if (fs.existsSync(out) && fs.existsSync(list) && fs.readFileSync(list, 'utf8') === body) continue;   // unchanged: keep the file (and its mtime)
+        fs.writeFileSync(list, body);
         await ff(['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', out]);
       }
       const keep = new Set(partSegs.flatMap(p => p.segs.map(s => path.basename(s.file))));
