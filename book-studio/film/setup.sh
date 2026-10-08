@@ -60,7 +60,7 @@ else
     curl -fL --retry 4 --retry-delay 2 -o "$SF2.part" "$SF2_URL" && mv "$SF2.part" "$SF2"
   fi
   ok_sf2 || { echo "SoundFont checksum mismatch: $SF2"; exit 1; }
-  curl -fsL -o models/sf2/LICENSE.txt https://raw.githubusercontent.com/mrbumpy409/GeneralUser-GS/main/LICENSE.txt || true
+  curl -fsL -o models/sf2/LICENSE.txt https://raw.githubusercontent.com/mrbumpy409/GeneralUser-GS/main/documentation/LICENSE.txt || true
   echo "ok   $SF2"
 fi
 
