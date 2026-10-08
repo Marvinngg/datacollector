@@ -1,4 +1,4 @@
-"""Shared helpers for the 《博弈论：看局、解局、改局》 audio pipeline (music.py / sfx.py / mix.py).
+"""Shared audio helpers (copied from good-kid/pipeline/audio/common.py; paths adapted for book-studio/film).
 
 Everything time-related is read from build/timeline.json (and optionally build/cues.json) at run time.
 Audio is float32/float64 numpy, stereo arrays have shape (n, 2), SR = 48 kHz.
@@ -11,10 +11,11 @@ from scipy import signal
 
 SR = 48000
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(os.path.dirname(HERE))          # game-theory/
+ROOT = os.path.dirname(os.path.dirname(HERE))          # book-studio/film/
 BUILD = os.path.join(ROOT, 'build')
-OUT = os.environ.get('GT_OUT') or os.path.join(BUILD, 'audio')   # GT_OUT: robustness tests only
-SF2_PATH = os.path.join(ROOT, 'models', 'sf2', 'GeneralUser-GS.sf2')
+OUT = os.path.join(BUILD, 'audio')
+# the General MIDI SoundFont (GeneralUser GS 32 MB); setup.sh fetches it, FILM_SF2 overrides the path
+SF2_PATH = os.environ.get('FILM_SF2') or os.path.join(ROOT, 'models', 'sf2', 'GeneralUser-GS.sf2')
 SF2_URL = 'https://raw.githubusercontent.com/mrbumpy409/GeneralUser-GS/main/GeneralUser-GS.sf2'
 
 

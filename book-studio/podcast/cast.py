@@ -15,6 +15,7 @@ from lib import Kokoro, locate, normalize, trim, f0_track, make_asr, transcribe,
 
 OUT = os.path.join(HERE, 'cast')
 os.makedirs(OUT, exist_ok=True)
+S1 = os.path.join(OUT, 'stage1.jsonl')
 
 STAGE1 = '你有没有想过，为什么我们总是在深夜，才开始怀疑自己？'
 PROBES = ['今天想跟你聊一个很多人都有、却很少说出口的感觉。',
@@ -55,13 +56,22 @@ def main():
     rep = {'stage1': [], 'stage2': []}
     t0 = time.time()
     engines = {}
+    done = {}
+    if os.path.exists(S1):
+        for l in open(S1, encoding='utf-8'):
+            r = json.loads(l); done[f"{r['model']}:{r['sid']}"] = r
     for model in ['kokoro-multi-lang-v1_1', 'kokoro-multi-lang-v1_0']:
         if not locate(model, required=False):
             continue
         k = engines[model] = Kokoro(locate(model))
         for sid, nm in names(model).items():
+            key = f'{model}:{sid}'
+            if key in done:                       # resumable: stage-1 results are cached in cast/stage1.jsonl
+                rep['stage1'].append(done[key]); continue
             m = measure(k(STAGE1, sid), k.sr, STAGE1, asr)
             rep['stage1'].append(dict(model=model, sid=sid, name=nm, **m))
+            with open(S1, 'a') as f:
+                f.write(json.dumps(rep['stage1'][-1], ensure_ascii=False) + '\n')
             print(f'{model[-4:]} {sid:3d} {nm:11s} cer {m["cer"]:.2f} f0 {m["f0"]:5.0f} st {m["f0_st"]:.2f} '
                   f'jit {m["jitter"]:.3f} rate {m["rate"]:.1f} peak {m["peak"]:.2f}  {m["hyp"]}', flush=True)
     s1 = rep['stage1']
@@ -73,7 +83,7 @@ def main():
     short = []
     for g in ['zf', 'zm']:
         c = sorted([r for r in s1 if r['name'].startswith(g) and r['cer'] <= 0.05 and r['f0'] > 0], key=score1)
-        short += c[:8]
+        short += c[:5]
     for r in short:
         k = engines[r['model']]
         ms = []

@@ -177,7 +177,7 @@ def main(book_path, outdir):
     title = pod.get('title') or book.get('title', '')
     book_id = book.get('id', 'book')
     os.makedirs(outdir, exist_ok=True)
-    work = os.path.join(outdir, 'build')
+    work = os.path.join(outdir, 'build', 'podcast')     # build/ is shared with other pipelines
     os.makedirs(work, exist_ok=True)
     cfg = json.load(open(os.path.join(HERE, 'voices.json'), encoding='utf-8'))
 

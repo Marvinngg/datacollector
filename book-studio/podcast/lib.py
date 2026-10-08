@@ -206,27 +206,29 @@ def trim(x, sr, thresh_db=-45, pad=0.03):
 
 
 def f0_track(x, sr, fmin=70, fmax=400, hop=0.01, win=0.04):
-    """simple normalised-autocorrelation pitch tracker -> (f0 array of voiced frames)"""
+    """normalised-autocorrelation pitch tracker (vectorised over frames) -> f0 of the voiced frames"""
     x = x.astype(np.float64)
     n, h = int(win * sr), int(hop * sr)
     lo, hi = int(sr / fmax), int(sr / fmin)
+    starts = np.arange(0, len(x) - n - hi, h)
+    if not len(starts):
+        return np.zeros(0)
+    F = x[starts[:, None] + np.arange(n + hi)[None, :]]
+    A = F[:, :n] - F[:, :n].mean(1, keepdims=True)
     rms_all = np.sqrt(np.mean(x ** 2)) + 1e-12
-    f0 = []
-    for i in range(0, len(x) - n - hi, h):
-        fr = x[i:i + n + hi]
-        a = fr[:n] - fr[:n].mean()
-        if np.sqrt(np.mean(a ** 2)) < 0.3 * rms_all:
-            continue
-        best, lag = 0, 0
-        e0 = np.dot(a, a)
-        for L in range(lo, hi):
-            b = fr[L:L + n] - fr[L:L + n].mean()
-            c = np.dot(a, b) / np.sqrt(e0 * np.dot(b, b) + 1e-12)
-            if c > best:
-                best, lag = c, L
-        if best > 0.75:
-            f0.append(sr / lag)
-    return np.array(f0)
+    keep = np.sqrt((A ** 2).mean(1)) >= 0.3 * rms_all
+    A, F = A[keep], F[keep]
+    if not len(A):
+        return np.zeros(0)
+    e0 = (A ** 2).sum(1)
+    best, lag = np.zeros(len(A)), np.ones(len(A))
+    for L in range(lo, hi):
+        B = F[:, L:L + n]
+        B = B - B.mean(1, keepdims=True)
+        c = (A * B).sum(1) / np.sqrt(e0 * (B ** 2).sum(1) + 1e-12)
+        m = c > best
+        best[m], lag[m] = c[m], L
+    return sr / lag[best > 0.75]
 
 
 def make_asr(threads=4):

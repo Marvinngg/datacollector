@@ -101,7 +101,17 @@
     };
     const maxS = Math.round((o.max || 80) / 2) * 2, minS = Math.max(16, Math.round((o.min || 36) / 2) * 2);
     let res = null;
-    for (let size = maxS; size >= 16; size -= 2) {
+    // 1) clause lines: when every clause (split after strong punctuation) fits on its own line at a generous size,
+    //    one clause per line reads best ("你没有变差，/是给你打分的人走了")
+    const clauses = []; { let a = 0; for (let b = 1; b <= m; b++) if (b === m || BRK.has(chars[toks[b - 1].i1 - 1] === ' ' ? chars[toks[b - 1].i1 - 2] : chars[toks[b - 1].i1 - 1])) { clauses.push([a, b]); a = b; } }
+    if (clauses.length > 1 && clauses.length <= maxL) {
+      const floor = Math.max(minS, Math.round(maxS * 0.72 / 2) * 2);
+      for (let size = maxS; size >= floor; size -= 2) {
+        const ok = clauses.every(([a, b], j) => { const [i0, i1] = lineChars(a, b, j === clauses.length - 1); return widthOf(i0, i1, size) <= maxW; });
+        if (ok && (clauses.length - 1) * lh * size + size <= maxH) { res = { size, cuts: clauses }; break; }
+      }
+    }
+    for (let size = maxS; !res && size >= 16; size -= 2) {
       let n = greedy(size); if (n >= 99) continue;
       const room = l => (l - 1) * lh * size + size <= maxH;
       if (size >= minS && (n > maxL || !room(n))) continue;
@@ -183,11 +193,11 @@
       if (ko > 0) { px += Math.cos(an) * ko * size * 0.9; py -= ko * size * (0.6 + 1.8 * r2); }
       b.X[i] = px; b.Y[i] = py;
       const kf = cl.key[i] ? keyK : 0;
-      b.A[i] = (0.22 + 0.78 * kk) * (1 - ko) * dim * (1 + 0.7 * kf);
+      b.A[i] = (0.75 + 0.25 * kk) * (1 - ko) * dim * (1 + 0.7 * kf) * Math.min(1, k * 4);
       const c = kf ? mix(tc, kc, kf) : tc;
       b.C[i * 3] = c[0]; b.C[i * 3 + 1] = c[1]; b.C[i * 3 + 2] = c[2];
     }
-    PX.points(b.X, b.Y, n, null, { a: o.a == null ? 0.42 : o.a, A: b.A, C: b.C, glow: 0.32 });
+    PX.points(b.X, b.Y, n, null, { a: (o.a == null ? 0.42 : o.a) * 1.25, A: b.A, C: b.C, glow: 0.4 });
     // crisp layer
     const crisp = (o.crisp == null ? 0.92 : o.crisp) * dim * (1 - ease.in(clamp(out * 1.4)));
     if (crisp <= 0.003) return;
@@ -311,12 +321,6 @@
     draw(ctx, V, lt, api) {
       const M = api.mood, dur = api.dur, v = variant(V, 2), formed = api.mark('formed') || 1.6, out = outK(lt, dur);
       const n = String(V.n || ''), short = [...n].length <= 2;
-      const ghost = n && short ? 1 : 0;
-      if (ghost) {                     // a huge faint numeral behind, slowly drifting
-        ctx.save(); ctx.globalAlpha *= 0.045 * ease.out(prog(lt, 0, 2)) * (1 - out);
-        ctx.font = `600 560px ${SERIF}`; ctx.textAlign = 'center'; ctx.fillStyle = M.text;
-        ctx.fillText(n, W / 2 + (v ? 160 : 0) - lt * 3, 1160); ctx.restore();
-      }
       if (v === 0) {                   // centred: numeral in a ring, a hairline, the title
         const L = V.title ? fit(V.title, { max: 92, min: 48, maxW: 820, maxH: 380, maxLines: 3, lh: 1.32, wt: 600, sp: 0.1 }) : null;
         const ry = 780, r = 56, ty = 930;
@@ -358,7 +362,8 @@
       const keyK = V.key ? ease.inOut(prog(lt, api.mark('key') || formed + 0.5, (api.mark('key') || formed + 0.5) + 1.0)) : 0;
       // mood light
       const lk = ease.out(prog(lt, 0, formed + 0.8)) * (1 - out * 0.5);
-      if (V.mood === 'cold') cone(cx, 0, y + L.h + 60, Math.max(260, L.w * 0.62), M.css, 0.75 * lk);
+      if (V.mood === 'cold' && P === LINE_LAYOUTS[0]) cone(cx, 0, y + L.h + 60, Math.max(260, L.w * 0.62), M.css, 0.75 * lk);
+      else if (V.mood === 'cold') orb(cx, y - 260, 620, M.css, 0.22 * lk);
       else if (V.mood === 'warm') orb(cx, y + L.h * 0.55, Math.max(380, L.w * 0.75), M.css, 0.5 * lk + 0.25 * keyK);
       let from = null, k = gatherK(lt, 0.1, formed);
       if (P.rule) hair(104, y - 10, 104, y + L.h + 14, ease.inOut(prog(lt, 0, 0.9)), M.line, 1.3, 0.85 * (1 - out));
@@ -491,10 +496,10 @@
       const step = (t0, d) => { const u = lt - t0; return u <= 0 ? 0 : d * (1 - Math.exp(-u * 2.0) * Math.cos(u * 4.2)); };
       const th = (step(tl, -7) + step(tr, 11) + step(tb, -4)) * Math.PI / 180;
       const fitSide = (s, w) => ({
-        lab: s.label ? fit(s.label, { max: 64, min: 36, maxW: w, maxH: 150, maxLines: 2, wt: 600, sp: 0.1, lh: 1.3 }) : null,
-        txt: s.text ? fit(s.text, { max: 46, min: 32, maxW: w, maxH: 230, maxLines: 4, wt: 400, sp: 0.04, lh: 1.5 }) : null,
+        lab: s.label ? fit(s.label, { max: 74, min: 36, maxW: w, maxH: 150, maxLines: 2, wt: 600, sp: 0.1, lh: 1.3 }) : null,
+        txt: s.text ? fit(s.text, { max: 54, min: 32, maxW: w, maxH: 230, maxLines: 4, wt: 400, sp: 0.04, lh: 1.5 }) : null,
       });
-      let A = fitSide(V.left, 360), B = fitSide(V.right, 360);
+      let A = fitSide(V.left, 380), B = fitSide(V.right, 380);
       const tooBig = s => (s.txt && (s.txt.size < 36 || s.txt.n > 3)) || (s.lab && s.lab.size < 40);
       const side = (S, x, y, align, M, t0, seed) => {
         let yy = y;
@@ -507,10 +512,10 @@
       const lineC = 'rgba(236,231,220,0.42)', draw = ease.inOut(prog(lt, 0, 1.2)) * (1 - out);
       if (!tooBig(A) && !tooBig(B)) {
         // side by side under a balance scale
-        const px = W / 2, py = 640, Lb = 270;
+        const px = W / 2, py = 700, Lb = 270;
         const ex = s => px + s * Lb * Math.cos(th), ey = s => py + s * Lb * Math.sin(th);
-        hair(px, py + 8, px, 1430, draw, lineC, 1.2);
-        hair(px - 70, 1430, px + 70, 1430, draw, lineC, 1.2);
+        hair(px, py + 26, px, 1520, draw, lineC, 1.2);
+        hair(px - 70, 1520, px + 70, 1520, draw, lineC, 1.2);
         ctx.save(); ctx.globalAlpha *= draw; ctx.strokeStyle = lineC; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px - 16, py + 26); ctx.lineTo(px + 16, py + 26); ctx.closePath(); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(ex(-1), ey(-1)); ctx.lineTo(ex(1), ey(1)); ctx.stroke(); ctx.restore();
         for (const s of [-1, 1]) {
@@ -519,7 +524,7 @@
           ctx.save(); ctx.globalAlpha *= draw; ctx.strokeStyle = lineC; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.ellipse(x, py2, 110, 14, 0, 0, Math.PI); ctx.stroke(); ctx.restore();
           blob(x, py2 - 16, 26, 380, M.keyL, 1 - out, ease.out(prog(lt, t0, t0 + 1.4)), lt, s < 0 ? 1 : 2);
           orb(x, py2 - 16, 150, M.css, 0.45 * ease.out(prog(lt, t0, t0 + 1.5)) * (1 - out));
-          side(s < 0 ? A : B, x, py2 + 64, 'center', M, t0, s < 0 ? 70 : 80);
+          side(s < 0 ? A : B, x, py2 + 70, 'center', M, t0, s < 0 ? 70 : 80);
         }
       } else {
         // stacked: the cold side above, a tilting beam, the warm side below

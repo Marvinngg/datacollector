@@ -1,6 +1,7 @@
 out/
 build/
 node_modules/
-models/
 *.wav
+# the SoundFont fetched by film/setup.sh
+film/models/
 __pycache__/
