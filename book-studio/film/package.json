@@ -1,0 +1,14 @@
+{
+  "name": "book-studio-film",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Generic kinetic-typography film pipeline: book.json -> vertical films",
+  "type": "module",
+  "dependencies": {
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/noto-sans-sc": "^5.3.0",
+    "@fontsource/noto-serif-sc": "^5.3.0",
+    "lxgw-wenkai-webfont": "^1.7.0",
+    "playwright": "1.56.1"
+  }
+}

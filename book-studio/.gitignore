@@ -1,0 +1,6 @@
+out/
+build/
+node_modules/
+models/
+*.wav
+__pycache__/
