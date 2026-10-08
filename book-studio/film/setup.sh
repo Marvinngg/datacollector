@@ -35,7 +35,8 @@ else
 fi
 
 echo "== ffmpeg"
-if command -v ffmpeg >/dev/null && ffmpeg -hide_banner -encoders 2>/dev/null | grep -q libx264; then
+ENC="$(ffmpeg -hide_banner -encoders 2>/dev/null || true)"     # (no `| grep -q`: SIGPIPE + pipefail)
+if command -v ffmpeg >/dev/null && grep -q libx264 <<<"$ENC"; then
   echo "using system ffmpeg: $(command -v ffmpeg)"
 else
   $PIP "imageio-ffmpeg>=0.5" 2>/dev/null || $PIP --break-system-packages "imageio-ffmpeg>=0.5"

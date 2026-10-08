@@ -7,3 +7,4 @@ film/models/
 __pycache__/
 # models / fonts fetched by podcast/setup.sh
 podcast/models/
+film/.bin/
