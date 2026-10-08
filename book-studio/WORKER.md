@@ -26,8 +26,17 @@ The Routine prompt has already put you in a checkout of branch `claude/vm-enviro
 ```bash
 bash book-studio/setup.sh          # models (GitHub releases), npm, pip — idempotent, ~5 min the first time
 ```
-Load the artifact tools: `ToolSearch` → `select:ArtifactData,ArtifactComments`. Then `Artifact` `action:"read"`
-on the studio URL once (required before uploading assets to it).
+**Artifact tools — they are spelled differently in different sessions.** Check your own tool list:
+- If you have `ArtifactData` / `ArtifactComments` (or can load them with `ToolSearch` → `select:ArtifactData,ArtifactComments`),
+  use them: `ArtifactData` `action: get|list|query|set|update|batch`, `ArtifactComments` `action: read|reply|resolve`.
+- Otherwise the same operations live on the `Artifact` tool itself: `action: "read_db"` (with `db_op`:
+  get|list|query) and `action: "write_db"` (with `db_op`: set|update|delete|batch), same `collection`,
+  `doc_id`, `data`/`file_path`, `if_version` fields; comments via the `Artifact` tool's comment actions if it
+  has them. Read the tool's own description for the exact field names before the first call.
+- If neither exists, you cannot do the job: write nothing, and say so plainly in your final report.
+
+Then `Artifact` `action:"read"` on the studio URL once (required before uploading assets to it). Test the
+database access right away with one `list` of `library`.
 
 ## 2. Data layout (the page reads exactly this)
 
@@ -52,7 +61,7 @@ keep `stage` short (≤ 8 字).
 
 ## 3. The queue
 
-1. `ArtifactData list inbox` → submitter ids. For each, `list inbox/<uid>/books`. Jobs = docs with `status`
+1. `list inbox` → submitter ids (skip ids starting with `_`). For each, `list inbox/<uid>/books`. Jobs = docs with `status`
    `queued` (or `revise`), oldest `at` first.
 2. Nothing queued → go to step 5.
 
@@ -107,4 +116,9 @@ with `Artifact list scope:"assets"` when a book has many parts; if it's nearly f
 
 ## 6. Report
 
-End with a short summary: books built (ids, durations), declined/failed jobs and why, comment edits made.
+Write a run report into the database, then end your session with the same summary as text:
+`set inbox/_worker/runs/<UTC timestamp like 20261008T0452Z>` =
+`{at, ok: true|false, built: [ids], declined: [sids], failed: [{sid, why}], comments: <n handled>,
+  timings: {setup_s, per_book_s}, problems: "free text: anything that went wrong or was unclear"}`.
+(`inbox/_worker` is not a submitter: skip ids starting with `_` when you list `inbox`.) Write the report even
+when the run failed early — it is how the studio owner sees what happened.
