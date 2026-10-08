@@ -1,0 +1,395 @@
+<title>打分的人走了</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;900&display=swap');
+:root{
+  --bg:#f3efe7; --bg2:#ebe5d9; --ink:#1d1b18; --ink2:#5a554c; --ink3:#8d867a;
+  --line:rgba(29,27,24,.12); --card:#fbf8f2; --warm:#b8661c; --warmglow:rgba(184,102,28,.14);
+  --lamp:#56677f; --red:#b3392b; --chip:#e4ddcf;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#07080b; --bg2:#0d0f14; --ink:#ece6da; --ink2:#a8a195; --ink3:#6c675f;
+    --line:rgba(236,230,218,.10); --card:#0f1117; --warm:#f2b25c; --warmglow:rgba(242,178,92,.16);
+    --lamp:#c9d6e8; --red:#e0574a; --chip:#1a1d25;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#07080b; --bg2:#0d0f14; --ink:#ece6da; --ink2:#a8a195; --ink3:#6c675f;
+  --line:rgba(236,230,218,.10); --card:#0f1117; --warm:#f2b25c; --warmglow:rgba(242,178,92,.16);
+  --lamp:#c9d6e8; --red:#e0574a; --chip:#1a1d25;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Serif SC","Songti SC","STSong",serif;line-height:1.85;-webkit-font-smoothing:antialiased}
+a{color:var(--warm)}
+.wrap{max-width:760px;margin:0 auto;padding:0 16px}
+header.hero{position:relative;min-height:78vh;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:40px;overflow:hidden}
+#you{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hero .t{position:relative;z-index:1}
+.kicker{font-size:13px;letter-spacing:.3em;color:var(--ink3)}
+h1{font-size:clamp(40px,9vw,72px);font-weight:900;line-height:1.15;margin:.2em 0 .25em;letter-spacing:.04em}
+.lede{color:var(--ink2);font-size:16px;max-width:30em;margin:0}
+nav{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+nav a{flex:0 0 auto;padding:12px 12px;text-decoration:none;color:var(--ink3);font-size:15px;border-bottom:2px solid transparent}
+nav a.on{color:var(--ink);border-bottom-color:var(--warm)}
+section.tab{display:none;padding:40px 0 80px;scroll-margin-top:48px}
+section.tab.on{display:block}
+h2{font-size:22px;font-weight:600;margin:2.2em 0 .8em;letter-spacing:.03em}
+h2:first-child{margin-top:0}
+.essay p{margin:0 0 1.2em;font-size:17px}
+.essay strong{color:var(--warm);font-weight:600}
+.essay blockquote{margin:0 0 2em;padding:0 0 0 16px;border-left:2px solid var(--warm);color:var(--ink2)}
+.essay ul{padding-left:1.2em;margin:0 0 1.2em}
+.essay .end{font-size:22px;font-weight:900;color:var(--warm);margin-top:1.6em}
+.note{color:var(--ink3);font-size:13px;line-height:1.7}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.card{position:relative;aspect-ratio:3/4;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:22px 20px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+.card::before{content:"";position:absolute;left:50%;top:-30%;width:120%;height:70%;transform:translateX(-50%);background:radial-gradient(ellipse at center,var(--glow,var(--warmglow)),transparent 70%);pointer-events:none}
+.card.cold{--glow:color-mix(in srgb,var(--lamp) 14%,transparent)}
+.card .n{font-size:12px;letter-spacing:.25em;color:var(--ink3);position:relative}
+.card .q{position:relative;font-size:20px;line-height:1.6;font-weight:600}
+.card .q em{font-style:normal;color:var(--warm)}
+.card.cold .q em{color:var(--lamp)}
+.card .f{position:relative;font-size:12px;color:var(--ink3);display:flex;justify-content:space-between}
+.eps{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}
+.ep{display:flex;flex-direction:column;gap:8px}
+.ep video{width:100%;aspect-ratio:9/16;background:#000;border-radius:6px;border:1px solid var(--line);display:block}
+.ep .lab{font-size:14px}
+.ep .lab b{color:var(--warm);font-weight:600;margin-right:6px}
+.ep .lab span{color:var(--ink3);font-size:12px;display:block}
+.chip{display:inline-block;font-size:12px;letter-spacing:.1em;padding:3px 10px;border-radius:99px;background:var(--chip);color:var(--ink2)}
+.chip.warm{color:var(--warm)}
+.pod{border:1px dashed var(--line);border-radius:8px;padding:20px;margin:16px 0 28px;background:var(--bg2)}
+.pod p{margin:.4em 0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{border-top:1px solid var(--line);padding:10px 8px;vertical-align:top;text-align:left}
+th{color:var(--ink3);font-weight:400;font-size:12px;letter-spacing:.1em}
+td:first-child{white-space:nowrap;color:var(--ink3);font-size:12px}
+.tablewrap{overflow-x:auto}
+.ask{font-size:19px;margin:0 0 6px}
+textarea{width:100%;min-height:84px;font:inherit;font-size:16px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:12px;resize:vertical}
+textarea:focus{outline:2px solid var(--warm);outline-offset:1px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0}
+button{font:inherit;font-size:15px;padding:9px 16px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button.pri{background:var(--warm);color:var(--bg);border-color:transparent;font-weight:600}
+button:disabled{opacity:.45;cursor:default}
+.msg{font-size:13px;color:var(--ink3);min-height:1.4em}
+.mine{margin:18px 0 0;max-width:340px}
+.wall{list-style:none;padding:0;margin:24px 0 0;columns:2 220px;column-gap:16px}
+.wall li{break-inside:avoid;margin:0 0 16px;padding:14px 16px;background:var(--card);border:1px solid var(--line);border-radius:6px}
+.wall li .tx{font-size:16px;margin:0 0 8px;white-space:pre-wrap;word-break:break-word}
+.wall li .by{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink3)}
+.wall li .by img{width:18px;height:18px;border-radius:50%}
+.wall li .by button{margin-left:auto;font-size:12px;padding:2px 8px}
+.wall li.me{border-color:var(--warm)}
+.empty{color:var(--ink3);font-size:14px;padding:16px 0}
+footer{border-top:1px solid var(--line);padding:24px 0 48px;color:var(--ink3);font-size:12px}
+@media (max-width:520px){.essay p{font-size:16px}.card .q{font-size:18px}}
+</style>
+
+<header class="hero">
+  <canvas id="you" aria-hidden="true"></canvas>
+  <div class="wrap t">
+    <div class="kicker">一本书 · 四种形态</div>
+    <h1>打分的人走了</h1>
+    <p class="lede">你没有变差。同一篇文字，在这里是文章、卡片、影片，还有一期等着被生成的播客。读完，留下一件没人给你打分的事。</p>
+  </div>
+</header>
+
+<nav><div class="wrap">
+  <a href="#text">文字</a>
+  <a href="#cards">卡片</a>
+  <a href="#film">影片</a>
+  <a href="#podcast">播客</a>
+  <a href="#wall">读者墙</a>
+</div></nav>
+
+<main class="wrap">
+
+<section class="tab essay" id="text">
+  <blockquote>从小到大，你都是被拿来比较的那个“别人家的孩子”。可长大以后，你突然成了那个暗暗和别人比较的人。这篇文章写给所有好孩子：不是教你变坏，而是教你拿回一样被拿走很久的东西。</blockquote>
+
+  <h2>一、深夜，你又刷到了他们</h2>
+  <p>凌晨一点，你躺在床上，拇指往上一划。</p>
+  <p>一个男生骑着机车冲上海边公路，风把他的头发吹得乱七八糟。下一条，有人在健身房带学员，笑得很松弛。再下一条，一群人在山顶露营，女孩靠在他肩上，篝火映着脸。</p>
+  <p>你没有点赞，也没有划走。你就那么看着，心里有一点说不清的东西往下沉。</p>
+  <p>你知道自己不是嫉妒。你的工作体面，收入稳定，履历干净，是父母口中“让人省心”的那个。可就在那一刻，你突然觉得，自己的人生像一张标准答案：每一步都对，但整张卷子是灰色的。</p>
+  <p>你关掉手机，告诉自己：别想了，明天还要早起。</p>
+  <p>可那个问题没有关掉。<strong>为什么我什么都做对了，却觉得自己活得很暗？</strong></p>
+
+  <h2>二、那个曾经让你发光的东西，没人问了</h2>
+  <p>毕业几年后的同学聚会，你早早到了。</p>
+  <p>当年坐在最后一排、作业靠抄你的那个同学，最后一个进门。他讲自己怎么辞职开店、怎么亏掉一笔钱又赚回来、怎么一个人骑车去了西藏。满桌的人放下筷子听他讲，笑声一阵一阵。</p>
+  <p>你坐在那里，等着有人问你一句。可是没有人问你考了多少分，没有人提你拿过的奖，也没有人记得你是当年的第一名。</p>
+  <p>那一晚你忽然明白了一件事：<strong>你没有变差，是给你打分的人走了。</strong></p>
+  <p>在学校里，有老师、有排名、有奖状，你的每一份努力都会被看见、被计分、被表扬。你是那套系统里最会得分的人。可社会不发奖状。没人站在讲台上宣布你这个月做得很好。</p>
+  <p>曾经让你发光的那盏灯，不是你自己的灯。它是别人举着的。</p>
+
+  <h2>三、好孩子思维：你的燃料一直是别人的认可</h2>
+  <p>我想给这种状态起个名字，叫<strong>好孩子思维</strong>。</p>
+  <p>它的核心只有一句话：<strong>你的自我价值，押在了别人的评价上。</strong></p>
+  <p>从小，你被夸“懂事”“聪明”“让人省心”。每一次表扬都是一次奖励，你很快学会了怎么拿到更多奖励：听话、考高分、不犯错、不添麻烦。慢慢地，“被认可”不再只是结果，它变成了你前进的燃料。</p>
+  <p>心理学里有一个说法，叫自我价值的“条件性”：有些人的自尊，取决于他是否满足了某个外部标准。标准满足了，他就觉得自己有价值；标准消失了，他就开始失重。</p>
+  <p>还有一个更扎心的发现：长期被夸“你真聪明”的孩子，往往更害怕失败。因为对他们来说，失败不只是一次没做好，而是在证明“我其实没那么聪明”。于是他们会本能地选择有把握的事，绕开可能出丑的事。</p>
+  <p>这就是为什么，好孩子长大后会变成这样：</p>
+  <ul>
+    <li>做事之前先想“这样对不对”，而不是“我想不想”；</li>
+    <li>习惯走被验证过的路，因为那条路有人打分；</li>
+    <li>对没有标准答案的东西，本能地紧张。</li>
+  </ul>
+  <p>你不是没有个性。你只是太早学会了，个性在打分表上不加分。</p>
+
+  <h2>四、你羡慕的，真的是机车和健身房吗？</h2>
+  <p>现在回到那个深夜。</p>
+  <p>诚实地问自己：如果明天真给你一辆机车，你会骑着它冲上海边公路吗？如果让你辞职去当健身教练，你愿意吗？</p>
+  <p>大概率不会。你甚至不太喜欢风吹在脸上的感觉。</p>
+  <p>那你到底在羡慕什么？</p>
+  <p>你羡慕的，是他们身上那种<strong>不在乎</strong>。不在乎别人觉得这样“靠不靠谱”，不在乎父母会不会担心，不在乎这一步走出去有没有人打分。他们想做，就去做了。</p>
+  <p>这才是刺痛你的地方。不是他们的生活比你好，而是他们拥有一种你从来没被允许拥有的东西：<strong>不需要被批准的自由。</strong></p>
+  <p>想明白这一点，你就不必去复制别人的人生了。你真正缺的，从来不是一辆机车。</p>
+
+  <h2>五、他们也在付账，只是账单不同</h2>
+  <p>当然，你也会看到另一面。</p>
+  <p>那个骑机车的男生，可能信用卡分期还没还完。那个当健身教练的人，三十五岁以后要怎么办，他自己也没想好。那个满桌讲故事的同学，开店亏掉的钱，是他父母大半辈子的积蓄。</p>
+  <p>他们承担着更大的财务风险，更多的不确定，往后的选择也可能越来越少。</p>
+  <p>但请注意，我说这些，<strong>不是为了让你松一口气</strong>。</p>
+  <p>如果你看完这一段的感受是“还好，他们其实也没那么好，我的路更稳”，那你又回到了那张打分表上。你只是换了一套算法，让自己重新赢了一次。这恰恰是好孩子思维最狡猾的地方：它连安慰你的方式，都是排名。</p>
+  <p>看见别人的代价，真正的意义只有一个：<strong>每一条路都是一次交换，没有哪一条路被正确打分。</strong></p>
+  <p>他们用稳定换了自由，你用自由换了稳定。没有标准答案，因为根本就没有阅卷人。</p>
+
+  <h2>六、你付出的代价，叫试错权</h2>
+  <p>那么，好孩子的账单上写着什么？</p>
+  <p>不是钱。你的财务很健康。也不是前途，你的前途看起来很光明。</p>
+  <p>你付出的代价，叫<strong>试错权</strong>。</p>
+  <p>你从小就没被允许失败过。一次考砸，换来的是长谈；一次越界，换来的是失望的眼神。所以你学会了不去碰没把握的事。你没在十八岁时为了一件蠢事熬过通宵，没在二十岁时爱错过一个人，没在二十五岁时做过一个所有人都反对的决定。</p>
+  <p>你没有摔过，所以你也从来不知道：<strong>原来摔一跤，人是不会死的。</strong></p>
+  <p>这才是好孩子最深的困境。不是你不够勇敢，而是你没有失败的经验。没有这份经验，每一个新选择看起来都像悬崖，而那些敢跳的人，你只能隔着屏幕羡慕。</p>
+  <p>他们不是比你更勇敢。他们只是早就摔过很多次，知道底下有地。</p>
+
+  <h2>七、Have a try</h2>
+  <p>说了这么多，我并不是要你变成另一个人。</p>
+  <p>好孩子的底色，大概一辈子都洗不掉。你还是会先想“这样对不对”，还是会在意别人的眼光，还是会更喜欢有把握的事。没关系。底色不是罪过，它也给了你自律、可靠和走得很远的能力。</p>
+  <p>你要做的，不是推翻自己，而是<strong>从那张打分表上站起来，看一眼它</strong>。</p>
+  <p>看清它是别人发给你的，看清你不必一直答下去，看清那个深夜让你难受的，从来不是别人的机车，而是你心里那个始终在等分数的小孩。</p>
+  <p>然后，去试一件没人给你打分的事。</p>
+  <p>不用很大。报一个你完全不会的课，一个人去一座陌生的城市，在会上说一句没准备好的话，学一样你注定学不好的东西。重要的不是成功，是你亲手体验一次：做得不好，世界也没有塌。</p>
+  <p>每试一次，你就从别人手里，拿回一点属于自己的灯。</p>
+  <p>你已经做了很多年的好孩子了。</p>
+  <p class="end">Have a try，试试不一样的生活。</p>
+  <p class="note">文中两处心理学说法（自我价值的条件性、被夸聪明的孩子更怕失败）凭记忆写成，正式发布前需核对原始研究。</p>
+</section>
+
+<section class="tab" id="cards">
+  <h2>六张卡片</h2>
+  <div class="cards">
+    <div class="card cold"><div class="n">01 / 深夜</div><div class="q">为什么我什么都做对了，却觉得自己活得<em>很暗</em>？</div><div class="f"><span>打分的人走了</span><span>一</span></div></div>
+    <div class="card cold"><div class="n">02 / 打分的人走了</div><div class="q">你没有变差，<br>是给你<em>打分的人</em>走了。</div><div class="f"><span>打分的人走了</span><span>二</span></div></div>
+    <div class="card cold"><div class="n">03 / 那盏灯</div><div class="q">曾经让你发光的那盏灯，不是你自己的灯。它是<em>别人举着的</em>。</div><div class="f"><span>打分的人走了</span><span>二</span></div></div>
+    <div class="card"><div class="n">04 / 你羡慕的</div><div class="q">你真正缺的，从来不是一辆机车，是<em>不需要被批准的自由</em>。</div><div class="f"><span>打分的人走了</span><span>四</span></div></div>
+    <div class="card"><div class="n">05 / 试错权</div><div class="q">他们不是比你更勇敢。他们只是早就摔过很多次，<em>知道底下有地</em>。</div><div class="f"><span>打分的人走了</span><span>六</span></div></div>
+    <div class="card"><div class="n">06 / Have a try</div><div class="q">每试一次，你就从别人手里，拿回一点<em>属于自己的灯</em>。</div><div class="f"><span>打分的人走了</span><span>七</span></div></div>
+  </div>
+  <p class="note" style="margin-top:20px">冷色卡是“别人的灯”，暖色卡是“你自己的灯”——和影片里的光是同一套颜色。想要一张属于你的卡片，去<a href="#wall">读者墙</a>。</p>
+</section>
+
+<section class="tab" id="film">
+  <h2>影片 · 四集</h2>
+  <p class="note" style="margin:-6px 0 20px">竖屏动态文字影片，无配音，只有画面里的字和配乐。</p>
+  <div class="eps">
+    <div class="ep"><video controls playsinline preload="metadata" src="/_blob/b3bc0a89842c32a78733c481352a7ea4"></video><div class="lab"><b>01</b>深夜 · 打分的人走了<span>灯是别人举着的</span></div></div>
+    <div class="ep"><video controls playsinline preload="metadata" src="/_blob/11cc904bc203c1494ff45ee09be1b54e"></video><div class="lab"><b>02</b>好孩子思维 · 你羡慕的<span>不需要被批准的自由</span></div></div>
+    <div class="ep"><video controls playsinline preload="metadata" src="/_blob/cff727114d15e02cc15568a180665953"></video><div class="lab"><b>03</b>账单不同 · 试错权<span>摔一跤，人是不会死的</span></div></div>
+    <div class="ep"><video controls playsinline preload="metadata" src="/_blob/effe932538e818c2fe9425a6c797795a"></video><div class="lab"><b>04</b>Have a try<span>找回你自己热爱的</span></div></div>
+  </div>
+  <p class="note" style="margin-top:20px">完整版（7 分 56 秒）：<a href="https://github.com/Marvinngg/datacollector/blob/claude/vm-environment-new-branch-av6bg5/good-kid/release/dafen.mp4" target="_blank" rel="noopener">GitHub · dafen.mp4</a></p>
+</section>
+
+<section class="tab" id="podcast">
+  <h2>播客</h2>
+  <div class="pod">
+    <p><span class="chip warm">待生成</span></p>
+    <p>这一期还不存在。它会在有人想听的时候被做出来。</p>
+    <p class="note">想听，就在这一页留一条评论，写上“生成播客”，评论里可以说你想要的样子（多长、什么语气、侧重哪一节）。做这一页的 Claude 会话在线时会被评论唤醒，做好后把音频放回这里，并在评论里回复你。</p>
+  </div>
+  <h2>脚本草稿 · 约 1 分半</h2>
+  <div class="tablewrap"><table>
+    <tr><th>时间</th><th>口播</th><th>画面 / 声音</th></tr>
+    <tr><td>0–3 秒</td><td>你是不是那种，什么都做对了，却觉得自己活得很灰的人？</td><td>深夜，屏幕的光</td></tr>
+    <tr><td>3–15 秒</td><td>从小你就是别人家的孩子。成绩好，听话，让人省心。可长大以后，你刷到那些骑机车、玩露营、活得很松弛的人，心里会往下沉一下。</td><td>奖状、机车、露营、篝火</td></tr>
+    <tr><td>15–30 秒</td><td>我想告诉你：你没有变差，只是给你打分的人走了。学校有排名、有奖状，社会不发奖状。你曾经的光，是别人举着的灯。</td><td>空教室、讲台、熄灯</td></tr>
+    <tr><td>30–45 秒</td><td>诚实地问自己，真给你一辆机车，你会骑吗？大概不会。你羡慕的不是那种生活，是他们身上那种不在乎，不需要被批准的自由。</td><td>停在机车上</td></tr>
+    <tr><td>45–60 秒</td><td>他们也在付账，风险更大，退路更少。但这不是安慰你。每条路都是交换，根本没有阅卷人。</td><td>账单、两条岔路</td></tr>
+    <tr><td>60–80 秒</td><td>好孩子真正付出的代价，叫试错权。你从没被允许失败，所以你不知道，摔一跤，人是不会死的。</td><td>摔倒又站起来</td></tr>
+    <tr><td>80–90 秒</td><td>底色不用洗掉。去试一件没人给你打分的事。你已经当了很多年好孩子了。Have a try，试试不一样的生活。</td><td>出发的背影</td></tr>
+  </table></div>
+</section>
+
+<section class="tab" id="wall">
+  <h2>读者墙</h2>
+  <p class="ask">你最想试的那件“没人打分的事”是什么？</p>
+  <p class="note" style="margin:0 0 12px">每人一条，写在这一页自己的数据里，所有能打开这一页的人都看得到；可以随时改，也可以删。</p>
+  <textarea id="tryText" maxlength="200" placeholder="比如：周末去摆一个小摊。"></textarea>
+  <div class="row">
+    <button class="pri" id="postBtn" disabled>贴到墙上</button>
+    <button id="cardBtn" hidden>生成我的卡片</button>
+    <span class="msg" id="msg"></span>
+  </div>
+  <div id="myCard"></div>
+  <ul class="wall" id="wallList"></ul>
+  <div class="empty" id="wallEmpty">读者墙正在连接…</div>
+</section>
+
+</main>
+
+<footer><div class="wrap">《你没有变差，只是打分的人走了》 · @Marvin · 2026</div></footer>
+
+<script>
+(function(){
+  // ---------- tabs (bare #anchors) ----------
+  const tabs=["text","cards","film","podcast","wall"];
+  function show(){
+    let h=(location.hash||"#text").slice(1); if(!tabs.includes(h)) h="text";
+    for(const t of tabs){
+      document.getElementById(t).classList.toggle("on",t===h);
+      document.querySelector('nav a[href="#'+t+'"]').classList.toggle("on",t===h);
+    }
+    if(location.hash && tabs.includes(location.hash.slice(1))){
+      const nav=document.querySelector("nav"); const y=nav.getBoundingClientRect().top+scrollY;
+      if(scrollY>y) scrollTo({top:y});
+    }
+    for(const v of document.querySelectorAll("video")) if(h!=="film") v.pause();
+  }
+  addEventListener("hashchange",show); show();
+
+  // ---------- hero: the glyph 你, borrowed light turning into its own ----------
+  const cv=document.getElementById("you"), cx=cv.getContext("2d");
+  const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let pts=[],W=0,H=0,dpr=1;
+  function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+  function hex(c){const m=c.match(/^#(..)(..)(..)$/);return m?[parseInt(m[1],16),parseInt(m[2],16),parseInt(m[3],16)]:[200,200,200]}
+  function build(){
+    dpr=Math.min(2,devicePixelRatio||1); W=cv.clientWidth; H=cv.clientHeight;
+    cv.width=W*dpr; cv.height=H*dpr;
+    const s=Math.min(W*0.9,H*0.8), o=document.createElement("canvas"); o.width=o.height=200;
+    const g=o.getContext("2d"); g.fillStyle="#fff"; g.textAlign="center"; g.textBaseline="middle";
+    g.font='900 180px "Noto Serif SC",serif'; g.fillText("你",100,108);
+    const d=g.getImageData(0,0,200,200).data; pts=[];
+    const step=W<520?3:2, ox=W/2-s/2+s*0.12, oy=H*0.06;
+    for(let y=0;y<200;y+=step)for(let x=0;x<200;x+=step){
+      if(d[(y*200+x)*4+3]>128){const r=Math.sin(x*12.9898+y*78.233)*43758.5453; const f=r-Math.floor(r);
+        pts.push({x:ox+x/200*s,y:oy+y/200*s,f,ph:f*6.283});}
+    }
+  }
+  function frame(t){
+    const T=t/1000, a=hex(css("--lamp")), b=hex(css("--warm"));
+    cx.setTransform(dpr,0,0,dpr,0,0); cx.clearRect(0,0,W,H);
+    const own=reduce?1:Math.min(1,Math.max(0,(T-1.2)/6)); // lamp -> own light
+    for(const p of pts){
+      const k=Math.min(1,Math.max(0,own*1.6-p.f*0.6));
+      const c=[0,1,2].map(i=>Math.round(a[i]+(b[i]-a[i])*k));
+      const dx=reduce?0:Math.sin(T*0.6+p.ph)*1.2, dy=reduce?0:Math.cos(T*0.5+p.ph)*1.2;
+      cx.fillStyle="rgba("+c+","+(0.26+0.55*k*(0.6+0.4*Math.sin(T+p.ph)))+")";
+      cx.fillRect(p.x+dx,p.y+dy,1.6,1.6);
+    }
+    if(!reduce) requestAnimationFrame(frame);
+  }
+  const start=()=>{build(); requestAnimationFrame(frame);};
+  (document.fonts&&document.fonts.ready?document.fonts.ready:Promise.resolve()).then(start);
+  addEventListener("resize",()=>{build(); if(reduce) requestAnimationFrame(frame);});
+
+  // ---------- reader wall (db) + my card (sample) ----------
+  const $=id=>document.getElementById(id);
+  const ta=$("tryText"), postBtn=$("postBtn"), cardBtn=$("cardBtn"), msg=$("msg"), list=$("wallList"), empty=$("wallEmpty");
+  let db=null, user=null, sample=null, me=null, docs=[];
+  const say=t=>{msg.textContent=t||""};
+
+  async function render(){
+    const ids=docs.map(d=>d.id);
+    let ps={}; try{ if(user&&ids.length) ps=await user.profiles(ids)||{}; }catch(e){}
+    list.textContent="";
+    for(const d of docs){
+      const v=d.data()||{}; if(typeof v.text!=="string") continue;
+      const li=document.createElement("li"); if(d.id===me) li.className="me";
+      const tx=document.createElement("p"); tx.className="tx"; tx.textContent=v.text; li.append(tx);
+      const by=document.createElement("div"); by.className="by";
+      const p=ps[d.id];
+      if(p&&p.avatarUrl){const im=document.createElement("img"); im.src=p.avatarUrl; im.alt=""; by.append(im);}
+      const nm=document.createElement("span"); nm.textContent=(p&&p.name)||"一位读者"; by.append(nm);
+      if(d.id===me){const del=document.createElement("button"); del.textContent="删除"; del.onclick=remove; by.append(del);}
+      li.append(by); list.append(li);
+    }
+    empty.hidden=docs.length>0;
+    if(!docs.length) empty.textContent="墙还是空的。第一件没人打分的事，可以是你的。";
+  }
+
+  async function post(){
+    const text=ta.value.trim(); if(!text||!db||!me) return;
+    postBtn.disabled=true; say("正在贴上去…");
+    try{ await db.collection("tries").doc(me).set({text:text.slice(0,200),at:Date.now()}); say("贴好了。"); }
+    catch(e){ say(e&&e.code==="invalid_argument"?"你在这一页只有查看权限，暂时不能写。":"没贴上，稍后再试。"); }
+    postBtn.disabled=false;
+  }
+  async function remove(){
+    if(!db||!me) return;
+    try{ await db.collection("tries").doc(me).delete(); ta.value=""; say("已删除。"); }catch(e){ say("删除没成功，稍后再试。"); }
+  }
+
+  function drawMyCard(c){
+    const box=$("myCard"); box.textContent="";
+    const card=document.createElement("div"); card.className="card mine";
+    const n=document.createElement("div"); n.className="n"; n.textContent="你的卡片";
+    const q=document.createElement("div"); q.className="q";
+    const h=document.createElement("div"); h.textContent=c.headline; q.append(h);
+    const em=document.createElement("em"); em.textContent=c.line; em.style.display="block"; em.style.fontSize="16px"; em.style.fontWeight="400"; em.style.marginTop="10px"; q.append(em);
+    const f=document.createElement("div"); f.className="f";
+    const s1=document.createElement("span"); s1.textContent="第一步 · "+c.try; const s2=document.createElement("span"); s2.textContent="Have a try";
+    f.append(s1,s2); card.append(n,q,f); box.append(card);
+  }
+  let busy=false;
+  async function makeCard(){
+    const text=ta.value.trim(); if(!text){ say("先写下你想试的那件事。"); ta.focus(); return; }
+    if(!sample||busy) return; busy=true; cardBtn.disabled=true; say("Claude 正在写你的卡片…");
+    const prompt=[
+      "你在为文章《你没有变差，只是打分的人走了》的读者做一张私人卡片。文章大意：好孩子的光一直是别人举着的灯（老师、排名、奖状）；打分的人走了，光就暗了；你羡慕的是不需要被批准的自由；好孩子真正付出的代价叫试错权；去试一件没人给你打分的事，每试一次就拿回一点属于自己的灯。",
+      "读者写下了他最想试的、没人打分的事：",
+      "「"+text.slice(0,200)+"」",
+      "请写一张卡片，语气克制、温暖、不说教，不夸张，不用感叹号，不提“文章”。只回复 JSON：",
+      '{"headline":"一句话标题，不超过14个汉字","line":"一句对他说的话，不超过36个汉字，呼应灯或打分表的意象","try":"把这件事缩成今天就能做的第一小步，不超过14个汉字"}'
+    ].join("\n");
+    try{
+      const r=await sample.json(prompt,{modelTier:"quick"});
+      if(!r||typeof r.headline!=="string"||typeof r.line!=="string"||typeof r.try!=="string") throw {code:"invalid_json"};
+      drawMyCard({headline:r.headline.slice(0,24),line:r.line.slice(0,60),try:r.try.slice(0,24)}); say("");
+    }catch(e){
+      const c=e&&e.code;
+      if(c==="not_granted"||c==="capability_disabled"){ cardBtn.hidden=true; say("这一页的 Claude 没有被允许使用。"); }
+      else if(c==="rate_limited") say("用得有点频繁，过一会儿再试。");
+      else if(c==="cancelled") say("");
+      else say("这次没写好，可以再点一次。");
+    }
+    busy=false; cardBtn.disabled=false;
+  }
+
+  postBtn.onclick=post; cardBtn.onclick=makeCard;
+  ta.addEventListener("input",()=>{postBtn.disabled=!(db&&me&&ta.value.trim());});
+
+  const use=window.claude&&window.claude.use;
+  if(!use){ empty.textContent="读者墙需要在 Claude 里打开。"; return; }
+  claude.use("sample").then(s=>{ sample=s; if(s) cardBtn.hidden=false; });
+  Promise.all([claude.use("db"),claude.use("user")]).then(async([d,u])=>{
+    db=d; user=u;
+    if(!db){ empty.textContent="登录后可以看到并参与读者墙。"; ta.disabled=true; return; }
+    try{ me=user?await user.id():null; }catch(e){ me=null; }
+    if(!me){ ta.placeholder="登录后可以写下你的那件事。"; }
+    db.collection("tries").orderBy("at","desc").limit(300).onSnapshot(snap=>{
+      docs=snap.docs.filter(x=>x.exists);
+      const mine=docs.find(x=>x.id===me);
+      if(mine&&!ta.value&&document.activeElement!==ta) ta.value=(mine.data()||{}).text||"";
+      postBtn.textContent=mine?"更新我的这一条":"贴到墙上";
+      postBtn.disabled=!(me&&ta.value.trim());
+      render();
+    },()=>{ empty.textContent="读者墙暂时连不上。"; });
+  });
+})();
+</script>
