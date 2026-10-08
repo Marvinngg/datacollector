@@ -76,7 +76,7 @@
         if (w > maxW) return Infinity;
         let c = ((w - target) / target) ** 2 * (last ? 0.6 : 1);
         if (!last && BRK.has(chars[toks[b - 1].i1 - 1] === ' ' ? chars[toks[b - 1].i1 - 2] : chars[toks[b - 1].i1 - 1])) c -= 0.32;
-        if (!last && keyMask[toks[b - 1].i1 - 1] && keyMask[toks[b].i0]) c += 0.4;      // don't split the key
+        if (!last && b < m && keyMask[toks[b - 1].i1 - 1] && keyMask[toks[b].i0]) c += 0.4;      // don't split the key
         if (last && b - a === 1 && n > 1) c += 0.6;                                          // no orphan
         return c;
       };
@@ -197,7 +197,7 @@
       const by = y0 + baseY(L, j);
       for (const ch of l.chars) {
         if (ch.c === ' ') continue;
-        const p = mode === 'write' ? clamp((k - (ch.g / nch) * 0.86 * S / 0.8 * 0.8 - 0.05) / 0.22) : clamp((k - 0.62) / 0.38);
+        const p = mode === 'write' ? clamp((k - (ch.g / nch) * 0.69 - 0.12) / 0.16) : clamp((k - 0.62) / 0.38);
         const a = ease.inOut(p) * crisp; if (a <= 0.003) continue;
         const kf = ch.key ? keyK : 0;
         ctx.globalAlpha = ga * a;
