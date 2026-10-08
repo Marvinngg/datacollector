@@ -11,6 +11,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 BOOK="$(realpath "$1")"
 OUT="$(realpath -m "${2:-$(dirname "$BOOK")/out}")"
 BUILD="$OUT/build"
+export PATH="$HERE/.bin:$PATH"     # a bundled ffmpeg from setup.sh, if the system has none
 mkdir -p "$BUILD"
 [ -d "$HERE/node_modules/playwright" ] || { echo "run: bash $HERE/setup.sh"; exit 1; }
 export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}"

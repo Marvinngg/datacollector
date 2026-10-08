@@ -11,9 +11,12 @@ build, out = sys.argv[1], sys.argv[2]
 parts = json.load(open(os.path.join(build, 'parts.json'), encoding='utf-8'))
 
 
-def probe_dur(f):
-    r = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', f], capture_output=True, text=True)
-    return float(r.stdout.strip())
+def probe_dur(f, default):
+    try:
+        r = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', f], capture_output=True, text=True)
+        return float(r.stdout.strip())
+    except Exception:            # no ffprobe (bundled ffmpeg only): the timeline's duration
+        return default
 
 
 index = []
@@ -48,6 +51,6 @@ for P in parts:
             if f.startswith('x264pass'): os.remove(os.path.join(d, f))
         if os.path.getsize(dst) > LIMIT: raise SystemExit(f'{dst} is still larger than 19 MiB')
         open(stamp, 'w').write(stamp_key)
-    index.append({'file': f"part{P['part']}.mp4", 'title': P['title'], 'dur': round(probe_dur(dst), 2)})
+    index.append({'file': f"part{P['part']}.mp4", 'title': P['title'], 'dur': round(probe_dur(dst, dur), 2)})
 json.dump(index, open(os.path.join(out, 'parts.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 print(json.dumps(index, ensure_ascii=False))
