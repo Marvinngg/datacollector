@@ -71,8 +71,9 @@ h2:first-child{margin-top:0}
 .card .f{position:relative;font-size:12px;color:var(--ink3);display:flex;justify-content:space-between;gap:8px}
 /* film + podcast */
 .eps{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:16px}
+.eps.wide{grid-template-columns:1fr}
 .ep{display:flex;flex-direction:column;gap:8px}
-.ep video{width:100%;aspect-ratio:9/16;background:#000;border-radius:6px;border:1px solid var(--line);display:block}
+ .ep video{width:100%;aspect-ratio:var(--ar,9/16);background:#000;border-radius:6px;border:1px solid var(--line);display:block}
 .ep .lab{font-size:14px}
 .ep .lab b{color:var(--warm);font-weight:600;margin-right:6px}
 .ep .lab span{color:var(--ink3);font-size:12px;display:block}
@@ -199,10 +200,10 @@ function renderHome(m){
   const shelf=el("div",{class:"shelf"});
   for(const b of S.library){const f=formsOf(b);
     const forms=el("div",{class:"forms"});for(const k in FORM_NAMES)forms.append(el("span",{class:"chip"+(f[k]?" ok":""),text:FORM_NAMES[k]}));
-    shelf.append(el("a",{class:"book",href:"#/b/"+encodeURIComponent(b.id)},el("div",{class:"bt",text:b.title||"未命名"}),el("div",{class:"bs",text:b.subtitle||""}),forms,
+    shelf.append(el("a",{class:"book",href:"#/b/"+encodeURIComponent(b.id)},b.meta&&b.meta.kind?el("div",{class:"kicker",style:"position:relative",text:b.meta.kind}):null,el("div",{class:"bt",text:b.title||"未命名"}),el("div",{class:"bs",text:b.subtitle||""}),forms,
       b.status&&b.status!=="done"?el("span",{class:"chip"+(b.status==="error"?" err":""),text:(STATUS[b.status]||b.status)+(b.stage?" · "+b.stage:"")}):null));}
   shelf.append(el("a",{class:"book add",href:"#/new"},el("div",{class:"plus",text:"+"}),el("div",{text:"投一份内容"}),el("div",{class:"note",text:"变成文字、卡片、播客和影片"})));
-  m.append(el("h2",{text:"书架"}),shelf);
+  m.append(el("h2",{text:"书架"+(S.library.length?" · "+S.library.length+" 本":"")}),shelf);
   if(!S.ready)m.append(el("p",{class:"empty",text:"书架正在连接…"}));
   else if(S.libErr)m.append(el("p",{class:"empty",text:"书架暂时连不上，稍后刷新。"}));
   if(S.mine.length){m.append(el("h2",{text:"我的投稿"}),mineList());}
@@ -275,7 +276,8 @@ function draftBook(d){const v=d.v,dr=v.draft||{};
 // ---------------- book ----------------
 function renderBook(m,b,isDraft){
   heroBig(false);
-  setHero(b.title||"未命名",b.subtitle||"",el("a",{href:"#/"},"← 书架"+(isDraft?" · 你的投稿（仅你可见）":"")));
+  const k=el("span",null,el("a",{href:"#/"},"← 书架"),isDraft?" · 你的投稿（仅你可见）":"",b.meta&&b.meta.kind?" · "+b.meta.kind:"",b.meta&&b.meta.source?" · "+b.meta.source:"");
+  setHero(b.title||"未命名",b.subtitle||"",k);
   const f=formsOf(b),base=(isDraft?"#/d/":"#/b/")+encodeURIComponent(b.id)+"/";
   const tabs=[["text","文字"],["cards","卡片"],["podcast","播客"],["film","影片"]];if(!isDraft)tabs.push(["wall","读者墙"]);
   const nav=$("#navIn");nav.textContent="";
@@ -304,9 +306,11 @@ function tPodcast(sec,b){const p=b.podcast;if(!p||!p.asset){waiting(sec,b,"播�
     let cur=-1;v.addEventListener("timeupdate",()=>{let i=-1;for(let k=0;k<rows.length;k++)if(v.currentTime>=rows[k][0])i=k;if(i!==cur){if(cur>=0)rows[cur][1].classList.remove("now");if(i>=0)rows[i][1].classList.add("now");cur=i;}});
     sec.append(el("h2",{text:"文字稿"}),box);}}
 function tFilm(sec,b){const parts=(b.film&&b.film.parts||[]).filter(x=>x.asset);if(!parts.length){waiting(sec,b,"影片");return;}
-  const g=el("div",{class:"eps"});parts.forEach((x,i)=>g.append(el("div",{class:"ep"},el("video",{controls:"",playsinline:"",preload:"metadata",src:blob(x.asset)}),
+  const wide=parts.some(x=>x.w&&x.h&&x.w>x.h);
+  const g=el("div",{class:"eps"+(wide?" wide":"")});parts.forEach((x,i)=>g.append(el("div",{class:"ep"},el("video",{controls:"",playsinline:"",preload:"metadata",src:blob(x.asset),style:x.w&&x.h?"--ar:"+x.w+"/"+x.h:""}),
     el("div",{class:"lab"},el("b",{text:String(i+1).padStart(2,"0")}),x.title||"",el("span",{text:x.sub||(x.dur?fmtT(x.dur):"")})))));
-  sec.append(el("p",{class:"note",style:"margin:-6px 0 20px",text:"竖屏动态文字影片，无配音，只有画面里的字和配乐。"}),g);}
+  const total=parts.reduce((a,x)=>a+(x.dur||0),0);
+  sec.append(el("p",{class:"note",style:"margin:-6px 0 20px",text:(b.film&&b.film.note)||((b.meta&&b.meta.kind?b.meta.kind:"影片")+" · "+parts.length+" 段"+(total?" · 共 "+fmtT(total):""))}),g);}
 
 // ---------------- reader wall (per book) ----------------
 function tWall(sec,b){

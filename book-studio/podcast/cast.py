@@ -6,7 +6,7 @@ Stage 2: the best female and male candidates read five probe sentences (question
          score = ASR accuracy + no clipping + natural pitch movement + steady pitch (low frame-to-frame jitter)
          + speaking rate near the panel median.  Writes cast/report.json and prints the ranking.
 
-    python3 cast.py            # ~10 min on 4 cores; needs the ASR model (setup.sh WITH_ASR=1)
+    python3 cast.py            # ~10 min on 4 cores; needs the ASR model (setup.sh)
 The chosen ids are then written by hand into voices.json (documented there and in README.md).
 """
 import json, os, sys, time
@@ -51,7 +51,7 @@ def measure(x, sr, text, asr):
 def main():
     asr = make_asr()
     if asr is None:
-        sys.exit('ASR model missing: WITH_ASR=1 bash setup.sh')
+        sys.exit('ASR model missing: bash setup.sh')
     rep = {'stage1': [], 'stage2': []}
     t0 = time.time()
     engines = {}
