@@ -212,7 +212,7 @@ def main(book_path, outdir):
     stamps = []
     for i, l in enumerate(seq):
         if i == 1:
-            t = max(ic['speech_at'], t + 0.9)
+            t = max(ic['speech_at'], t + 1.1)
         elif i > 1:
             t += gap(book_id, i, seq[i - 1], l)
         stamps.append(t)
@@ -231,34 +231,28 @@ def main(book_path, outdir):
     mus *= 10 ** ((-24 - lufs(intro)) / 20)
     mus *= duck_gain(voice)[:, None]
     mix = mus + voice[:, None]
-    y = master(mix)
-    wav = os.path.join(work, 'master.wav')
-    sf.write(wav, y.astype(np.float32), SR, subtype='FLOAT')
-    log(f'mixed {total:.1f}s, pre-AAC {lufs(y):.2f} LUFS')
-
-    # package
     png = cover.render(book, os.path.join(work, 'cover.png'), os.environ.get('PODCAST_COVER', '720x720'))
     mp4 = os.path.join(outdir, 'podcast.mp4')
+    wav = os.path.join(work, 'master.wav')
     kbps = int(min(112, (19 * 2 ** 20 * 0.92 * 8 / total - 8000) / 1000))
-    gain_db = 0.0
-    for _ in range(3):
-        src = wav
-        if gain_db:
-            src = os.path.join(work, 'master_adj.wav')
-            sf.write(src, (y * 10 ** (gain_db / 20)).astype(np.float32), SR, subtype='FLOAT')
+    target, ceiling = -16.0, -2.0           # AAC adds ~0.5 dB of inter-sample overshoot; corrected below if needed
+    for attempt in range(4):
+        y = master(mix, target, ceiling)
+        sf.write(wav, y.astype(np.float32), SR, subtype='FLOAT')
+        if not attempt:
+            log(f'mixed {total:.1f}s, pre-AAC {lufs(y):.2f} LUFS')
         subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', '-loop', '1', '-framerate', '1',
-                        '-i', png, '-i', src, '-map', '0:v', '-map', '1:a', '-c:v', 'libx264', '-tune', 'stillimage',
+                        '-i', png, '-i', wav, '-map', '0:v', '-map', '1:a', '-c:v', 'libx264', '-tune', 'stillimage',
                         '-preset', 'slow', '-crf', '24', '-pix_fmt', 'yuv420p', '-r', '1', '-g', '30',
                         '-c:a', 'aac', '-b:a', f'{kbps}k', '-ar', str(SR), '-t', f'{total:.3f}',
                         '-metadata', f'title={title}', '-movflags', '+faststart', mp4], check=True)
         m = ebur128(mp4)
-        if m['TP'] <= -1.0 and abs(m['I'] + 16) <= 0.5:
+        log(f'  encode {attempt + 1}: I {m["I"]} LUFS  TP {m["TP"]} dBTP (limiter ceiling {ceiling:.2f})')
+        if m['TP'] <= -1.0 and abs(m['I'] + 16) <= 0.2:
             break
-        # AAC overshoot: pull the limiter ceiling down by the excess and re-encode
         if m['TP'] > -1.0:
-            y = true_peak_limit(y * 10 ** ((-16 - m['I']) / 20), -1.5 - (m['TP'] + 1.0) - 0.1)
-        else:
-            gain_db = -16 - m['I']
+            ceiling -= m['TP'] + 1.0 + 0.15
+        target += -16 - m['I']
     size = os.path.getsize(mp4)
     tl = [{'t': round(s, 2), 'end': round(s + len(a) / SR, 2), 'who': l['who'], 'text': l['text']}
           for s, a, l in zip(stamps, audio, seq)]

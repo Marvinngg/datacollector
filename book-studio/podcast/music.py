@@ -122,7 +122,7 @@ def intro():
     for i, (beat, k, v) in enumerate([(1.0, 80, 46), (1.5, 77, 40), (2.0, 75, 42), (3.5, 80, 44), (4.0, 85, 40)]):
         ev.append((beat * b, MBOX, k, v, 1.4, 0.45, 0.2 if i % 2 else -0.2))
     length = 8 * b + 1.5
-    return _render(ev, length), {'title_at': 2.3 * b, 'speech_at': 5.2 * b}
+    return _render(ev, length), {'title_at': 3.0 * b, 'speech_at': 6.0 * b}
 
 
 def outro():

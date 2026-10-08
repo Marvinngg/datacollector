@@ -89,9 +89,9 @@
     const s0 = TL.scenes[0]; if (!s0 || s0.type === 'title' || !TL.part.title) return;
     const a = Math.min(ease.out(prog(t, 0.4, 1.6)), 1 - ease.in(prog(t, Math.min(4.5, s0.end - 0.6), Math.min(5.5, s0.end + 0.2))));
     if (a <= 0) return;
-    text(TL.part.title, W / 2, 318, { size: 26, family: F.sans, weight: 400, color: 'rgba(236,231,220,0.62)', align: 'center', spacing: 6, alpha: a });
+    text(TL.part.title, W / 2, 318, { size: 32, family: F.sans, weight: 400, color: 'rgba(236,231,220,0.7)', align: 'center', spacing: 6, alpha: a });
     ctx.save(); ctx.globalAlpha = a * 0.5; ctx.fillStyle = 'rgba(236,231,220,0.5)';
-    const w = 90 * ease.inOut(prog(t, 0.6, 2.0)); ctx.fillRect(W / 2 - w / 2, 344, w, 1); ctx.restore();
+    const w = 90 * ease.inOut(prog(t, 0.6, 2.0)); ctx.fillRect(W / 2 - w / 2, 350, w, 1); ctx.restore();
   }
 
   function missing(V) { text(`[${V.type}]`, W / 2, H / 2, { size: 30, family: F.mono, color: '#666', align: 'center' }); }

@@ -1,0 +1,8 @@
+{
+  "model": "kokoro-multi-lang-v1_1",
+  "voices": {
+    "A": {"sid": 47, "name": "zf_083", "speed": 1.08},
+    "B": {"sid": 97, "name": "zm_091", "speed": 1.08}
+  },
+  "why": "Built-in Kokoro v1.1-zh speakers only (no cloning). cast.py auditioned all 100 v1.1 zh speakers and the 8 v1.0 zh speakers with SenseVoice ASR + pitch analysis; zf_083 and zm_091 ranked best female / male on the 5-probe stage (ASR pinyin CER 0.000 / 0.008, no clipping, steady pitch, natural pitch movement 3.5-3.9 st, matched speaking rate ~4.0 chars/s at speed 1.0). Median F0 254 Hz vs 144 Hz (~10 semitones apart) makes the hosts unmistakable. speed 1.08 brings both to ~4.3 chars/s, a relaxed conversational pace. See cast/report.json."
+}

@@ -19,8 +19,7 @@ def probe_dur(f, default):
         return default
 
 
-index = []
-for P in parts:
+def encode(P):
     d = os.path.join(build, f"part{P['part']}")
     vid, wav, dst = os.path.join(d, 'video.mp4'), os.path.join(d, 'mix.wav'), os.path.join(out, f"part{P['part']}.mp4")
     dur = P['dur']
@@ -30,13 +29,13 @@ for P in parts:
     if os.path.exists(dst) and os.path.exists(stamp) and open(stamp).read() == stamp_key and os.path.getsize(dst) <= LIMIT:
         print(f"part{P['part']}: unchanged ({os.path.getsize(dst) / 2**20:.2f} MiB)")
     else:
-        budget_k = LIMIT * 8 / 1000 / dur * 0.94              # kb/s for the whole file, 6% for container + rate error
+        budget_k = LIMIT * 8 / 1000 / dur * 0.965             # kb/s for the whole file, 3.5% margin for container + rate error
         vk = int(budget_k - AUDIO_K - 8)
         big = vk >= 2600
         scale = 'scale=1080:1920:flags=lanczos' if big else 'scale=720:1280:flags=lanczos'
         for attempt in range(4):
             vk_ = min(vk, 6000)
-            vf = f'hqdn3d=1.2:1.2:3:3,{scale}'
+            vf = f'{scale},hqdn3d=1.2:1.2:3:3'
             common = ['-vf', vf, '-c:v', 'libx264', '-preset', 'slow', '-profile:v', 'high', '-b:v', f'{vk_}k',
                       '-maxrate', f'{int(vk_ * 1.6)}k', '-bufsize', f'{int(vk_ * 2.5)}k', '-pix_fmt', 'yuv420p', '-g', '60']
             plog = os.path.join(d, 'x264pass')
@@ -51,6 +50,11 @@ for P in parts:
             if f.startswith('x264pass'): os.remove(os.path.join(d, f))
         if os.path.getsize(dst) > LIMIT: raise SystemExit(f'{dst} is still larger than 19 MiB')
         open(stamp, 'w').write(stamp_key)
-    index.append({'file': f"part{P['part']}.mp4", 'title': P['title'], 'dur': round(probe_dur(dst, dur), 2)})
+    return {'file': f"part{P['part']}.mp4", 'title': P['title'], 'dur': round(probe_dur(dst, dur), 2)}
+
+
+from concurrent.futures import ThreadPoolExecutor
+with ThreadPoolExecutor(max_workers=2) as ex:      # x264 is multi-threaded; two parts at a time keep 4 cores busy
+    index = list(ex.map(encode, parts))
 json.dump(index, open(os.path.join(out, 'parts.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 print(json.dumps(index, ensure_ascii=False))

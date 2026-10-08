@@ -76,7 +76,7 @@
         if (w > maxW) return Infinity;
         let c = ((w - target) / target) ** 2 * (last ? 0.6 : 1);
         if (!last && BRK.has(chars[toks[b - 1].i1 - 1] === ' ' ? chars[toks[b - 1].i1 - 2] : chars[toks[b - 1].i1 - 1])) c -= 0.32;
-        if (!last && b < m && keyMask[toks[b - 1].i1 - 1] && keyMask[toks[b].i0]) c += 0.4;      // don't split the key
+        if (!last && b < m && keyMask[toks[b - 1].i1 - 1] && keyMask[toks[b].i0]) c += 0.9;      // don't split the key
         if (last && b - a === 1 && n > 1) c += 0.6;                                          // no orphan
         return c;
       };
@@ -104,11 +104,22 @@
     // 1) clause lines: when every clause (split after strong punctuation) fits on its own line at a generous size,
     //    one clause per line reads best ("你没有变差，/是给你打分的人走了")
     const clauses = []; { let a = 0; for (let b = 1; b <= m; b++) if (b === m || BRK.has(chars[toks[b - 1].i1 - 1] === ' ' ? chars[toks[b - 1].i1 - 2] : chars[toks[b - 1].i1 - 1])) { clauses.push([a, b]); a = b; } }
-    if (clauses.length > 1 && clauses.length <= maxL) {
-      const floor = Math.max(minS, Math.round(maxS * 0.72 / 2) * 2);
-      for (let size = maxS; size >= floor; size -= 2) {
-        const ok = clauses.every(([a, b], j) => { const [i0, i1] = lineChars(a, b, j === clauses.length - 1); return widthOf(i0, i1, size) <= maxW; });
-        if (ok && (clauses.length - 1) * lh * size + size <= maxH) { res = { size, cuts: clauses }; break; }
+    if (clauses.length > 1 && clauses.length <= 10) {
+      // break only between clauses: try every grouping of consecutive clauses into lines (<= 2^9), at the largest
+      // size where one fits; among those, the fewest lines, then the most even
+      const floor = Math.max(minS, Math.round(maxS * 0.66 / 2) * 2), C = clauses.length;
+      for (let size = maxS; !res && size >= floor; size -= 2) {
+        let best = null;
+        for (let mask = 0; mask < (1 << (C - 1)); mask++) {
+          const cuts = []; let a0 = 0;
+          for (let j = 0; j < C; j++) if (j === C - 1 || (mask >> j) & 1) { cuts.push([clauses[a0][0], clauses[j][1]]); a0 = j + 1; }
+          if (cuts.length > maxL || (cuts.length - 1) * lh * size + size > maxH) continue;
+          const ws = cuts.map(([x, y], j) => { const [i0, i1] = lineChars(x, y, j === cuts.length - 1); return widthOf(i0, i1, size); });
+          if (Math.max(...ws) > maxW) continue;
+          const mean = ws.reduce((u, v) => u + v, 0) / ws.length, sc = cuts.length * 10 + ws.reduce((u, v) => u + ((v - mean) / mean) ** 2, 0);
+          if (!best || sc < best.sc) best = { sc, cuts };
+        }
+        if (best) res = { size, cuts: best.cuts, clause: true };
       }
     }
     for (let size = maxS; !res && size >= 16; size -= 2) {
@@ -124,6 +135,14 @@
         if (c2 && !ends(cuts) && ends(c2) && n === 1 && chars.length > 12) cuts = c2;
       }
       if (cuts) { res = { size, cuts }; break; }
+    }
+    // fewer lines beat a slightly bigger font: re-flow to n-1 lines if that costs at most ~18% of the size
+    if (res && res.cuts.length > 1 && !res.clause) {
+      const n0 = res.cuts.length;
+      for (let size = res.size - 2; size >= Math.max(minS, res.size * 0.82); size -= 2) {
+        const n = greedy(size);
+        if (n < n0 && (n - 1) * lh * size + size <= maxH) { const c = solve(size, n); if (c) { res = { size, cuts: c }; break; } }
+      }
     }
     if (!res) res = { size: 16, cuts: [[0, m]] };
     const size = res.size, lines = res.cuts.map(([a, b], j) => {
@@ -302,7 +321,7 @@
     draw(ctx, V, lt, api) {
       const M = api.mood, dur = api.dur, v = variant(V, 2), formed = api.mark('formed') || 2.5;
       const L = fit(V.title, { max: 128, min: 56, maxW: 860, maxH: 560, maxLines: 3, lh: 1.32, wt: 600, sp: 0.08 });
-      const SL = V.sub ? fit(V.sub, { fam: SANS, wt: 300, max: 40, min: 26, maxW: 820, maxH: 150, maxLines: 2, sp: 0.22, lh: 1.6 }) : null;
+      const SL = V.sub ? fit(V.sub, { fam: SANS, wt: 300, max: 46, min: 32, maxW: 820, maxH: 150, maxLines: 2, sp: 0.22, lh: 1.6 }) : null;
       const gap = SL ? 96 : 0, total = L.h + (SL ? gap + SL.h : 0), y = clamp(880 - total / 2, 300, 1650 - total);
       const out = outK(lt, dur, 1.1);
       if (V.mood === 'cold') cone(W / 2, 0, y + L.h + 40, 420, M.css, 0.9 * ease.out(prog(lt, 0, 2.5)));
@@ -336,7 +355,7 @@
         const x = 196, ty = 920, h = (L ? L.h : 0) + 170;
         hair(150, 760, 150, 760 + h, ease.inOut(prog(lt, 0.1, 1.6)), M.line, 1.3, 1 - out);
         if (n) {
-          const NL = fit(short ? n : n, { max: 42, min: 24, maxW: 760, maxH: 60, maxLines: 1, wt: 400, sp: 0.3, fam: short ? SERIF : SANS });
+          const NL = fit(n, { max: 52, min: 30, maxW: 760, maxH: 60, maxLines: 1, wt: 400, sp: 0.3, fam: short ? SERIF : SANS });
           text(NL, { x, y: 790, align: 'left', k: gatherK(lt, 0.3, 1.3), mode: 'write', out, t: lt, mood: M, a: 0.35, seed: 23, tag: 3, dim: 0.75 });
           hair(x, 870, x + 80, 870, ease.inOut(prog(lt, 0.8, 1.7)), M.line, 1.1, 0.8 * (1 - out));
         }
@@ -356,7 +375,7 @@
     draw(ctx, V, lt, api) {
       const M = api.mood, dur = api.dur, P = LINE_LAYOUTS[variant(V, LINE_LAYOUTS.length)];
       const formed = api.mark('formed') || 1.6, out = outK(lt, dur);
-      const L = fit(V.text, { max: 80, min: 40, maxW: P.maxW, maxH: 700, maxLines: 5, lh: 1.5, wt: 500, sp: 0.06, key: V.key });
+      const L = fit(V.text, { max: 84, min: 42, maxW: P.maxW, maxH: 700, maxLines: 5, lh: 1.5, wt: 500, sp: 0.06, key: V.key });
       const y = clamp(P.cy - L.h / 2 - lt * 2.2, 300, 1640 - L.h), x = P.align === 'left' ? P.x : W / 2;
       const cx = P.align === 'left' ? P.x + L.w / 2 : W / 2;
       const keyK = V.key ? ease.inOut(prog(lt, api.mark('key') || formed + 0.5, (api.mark('key') || formed + 0.5) + 1.0)) : 0;
@@ -450,9 +469,9 @@
       const items = V.items, n = items.length, at = (api.marks.items || []).slice();
       while (at.length < n) at.push((at[at.length - 1] || 1) + 1.6);
       // one font size for every item: the largest that fits all of them and the column
-      const head = V.head ? fit(V.head, { fam: SANS, wt: 400, max: 36, min: 24, maxW: 820, maxH: 110, maxLines: 2, sp: 0.24, lh: 1.5 }) : null;
+      const head = V.head ? fit(V.head, { fam: SANS, wt: 400, max: 42, min: 32, maxW: 820, maxH: 110, maxLines: 2, sp: 0.24, lh: 1.5 }) : null;
       const markW = 64, maxW = 820 - markW;
-      let size = 66, Ls;
+      let size = 72, Ls;
       for (; size >= 30; size -= 2) {
         Ls = items.map(s => fit(s, { max: size, min: size, maxW, maxH: size * 2.5, maxLines: 2, lh: 1.32, wt: 500, sp: 0.05 }));
         const gapI = size * 0.95, tot = Ls.reduce((a, L) => a + L.h, 0) + gapI * (n - 1) + (head ? head.h + 110 : 0);
@@ -464,7 +483,7 @@
       let y = y0;
       if (head) {
         const hk = gatherK(lt, (api.mark('head') || 0.4) - 0.1, (api.mark('head') || 0.4) + 1.0);
-        text(head, { x: x0, y, align: 'left', k: hk, mode: 'write', out, t: lt, mood: M, dim: 0.62, a: 0.28, crisp: 0.9, seed: 60, tag: 8 });
+        text(head, { x: x0, y, align: 'left', k: hk, mode: 'write', out, t: lt, mood: M, dim: 0.78, a: 0.28, crisp: 0.9, seed: 60, tag: 8 });
         hair(x0, y + head.h + 40, x0 + Math.min(blockW, 520), y + head.h + 40, ease.inOut(prog(lt, 0.6, 1.8)), M.line, 1.1, 0.6 * (1 - out));
         y += head.h + 110;
       }
@@ -500,7 +519,7 @@
         txt: s.text ? fit(s.text, { max: 54, min: 32, maxW: w, maxH: 230, maxLines: 4, wt: 400, sp: 0.04, lh: 1.5 }) : null,
       });
       let A = fitSide(V.left, 380), B = fitSide(V.right, 380);
-      const tooBig = s => (s.txt && (s.txt.size < 36 || s.txt.n > 3)) || (s.lab && s.lab.size < 40);
+      const tooBig = s => (s.txt && (s.txt.size < 42 || s.txt.n > 2)) || (s.lab && s.lab.size < 44);
       const side = (S, x, y, align, M, t0, seed) => {
         let yy = y;
         const k1 = gatherK(lt, t0, t0 + 1.0), k2 = gatherK(lt, t0 + 0.5, t0 + 1.4 + (S.txt ? S.txt.nch * 0.05 : 0));
@@ -613,7 +632,7 @@
     draw(ctx, V, lt, api) {
       const M = api.mood, dur = api.dur, formed = api.mark('formed') || 2.8;
       const L = fit(V.text, { max: 116, min: 52, maxW: 860, maxH: 520, maxLines: 3, lh: 1.3, wt: 600, sp: 0.06 });
-      const SL = V.sub ? fit(V.sub, { max: 50, min: 30, maxW: 820, maxH: 200, maxLines: 2, wt: 400, sp: 0.14, lh: 1.5 }) : null;
+      const SL = V.sub ? fit(V.sub, { max: 58, min: 34, maxW: 820, maxH: 200, maxLines: 2, wt: 400, sp: 0.14, lh: 1.5 }) : null;
       const total = L.h + (SL ? 90 + SL.h : 0), y = clamp(840 - total / 2, 320, 1400 - total);
       const sy = Math.min(1560, y + total + 260);                       // your own light, below the words
       const breathe = 0.85 + 0.15 * Math.sin(lt * 1.3);

@@ -7,7 +7,7 @@
   AAC audio at their timestamps and transcribed; pinyin CER is reported.
 Exit 1 on a hard failure (size, loudness, missing streams, timestamps).
 """
-import json, os, subprocess, sys
+import json, os, re, subprocess, sys
 import numpy as np
 from lib import make_asr, transcribe, cer_pinyin, normalize
 from build import ebur128
@@ -17,15 +17,17 @@ def main(outdir, n_spot=6):
     meta = json.load(open(os.path.join(outdir, 'podcast.json'), encoding='utf-8'))
     mp4 = os.path.join(outdir, meta['file'])
     fails = []
-    pr = json.loads(subprocess.run(['ffprobe', '-v', 'error', '-show_format', '-show_streams', '-of', 'json', mp4],
-                                   capture_output=True, text=True).stdout)
-    dur = float(pr['format']['duration']); size = os.path.getsize(mp4)
-    codecs = {s['codec_type']: s for s in pr['streams']}
-    a, v = codecs.get('audio', {}), codecs.get('video', {})
+    info = subprocess.run(['ffmpeg', '-hide_banner', '-i', mp4], capture_output=True, text=True).stderr  # no ffprobe needed
+    h, mi, se = re.search(r'Duration: (\d+):(\d+):([\d.]+)', info).groups()
+    dur = int(h) * 3600 + int(mi) * 60 + float(se); size = os.path.getsize(mp4)
+    a = re.search(r'Audio: (\w+).*?(\d+) Hz, (\w+).*?(\d+) kb/s', info)
+    v = re.search(r'Video: (\w+).*?(\d{2,5})x(\d{2,5}).*?([\d.]+) fps', info)
+    a = {'codec_name': a.group(1), 'rate': a.group(2), 'ch': a.group(3), 'kbps': a.group(4)} if a else {}
+    v = {'codec_name': v.group(1), 'size': f'{v.group(2)}x{v.group(3)}', 'fps': v.group(4)} if v else {}
     print(f'file      {mp4}')
     print(f'duration  {dur:.2f}s (json {meta["dur"]}s)   size {size / 2 ** 20:.2f} MiB')
-    print(f'audio     {a.get("codec_name")} {int(a.get("bit_rate", 0)) // 1000} kb/s {a.get("sample_rate")} Hz {a.get("channels")} ch')
-    print(f'video     {v.get("codec_name")} {v.get("width")}x{v.get("height")} @ {v.get("avg_frame_rate")}')
+    print(f'audio     {a.get("codec_name")} {a.get("kbps")} kb/s {a.get("rate")} Hz {a.get("ch")}')
+    print(f'video     {v.get("codec_name")} {v.get("size")} @ {v.get("fps")} fps')
     head = open(mp4, 'rb').read(64 * 1024)
     faststart = 0 <= head.find(b'moov') < (head.find(b'mdat') if b'mdat' in head else 1 << 30)
     print(f'faststart {faststart}')
