@@ -144,6 +144,7 @@ def normalize(text):
     t = re.sub(r'(?<!\d)([1-9]\d{0,3})\s*[-–~～]\s*([1-9]\d{0,3})(?!\d)', lambda m: m.group(1) + '到' + m.group(2), t)
     t = re.sub(r'\d+(?:\.\d+)?', _number, t)
     # ALL-CAPS acronyms are spelled out letter by letter (AI -> A I); other English is left to the lexicon
+    t = re.sub(r'([a-z])([A-Z]{2,5})(?![A-Za-z])', lambda m: m.group(1) + ' ' + ' '.join(m.group(2)), t)  # ChatGPT
     t = re.sub(r'(?<![A-Za-z])([A-Z]{2,5})(?![A-Za-z])', lambda m: ' '.join(m.group(1)), t)
     for k, v in SYMBOLS.items():
         t = t.replace(k, v)

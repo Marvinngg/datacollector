@@ -19,8 +19,12 @@ if ! command -v ffmpeg >/dev/null; then
 fi
 
 # --- python
-python3 -m pip install -q --disable-pip-version-check \
-  "sherpa-onnx==1.13.8" soundfile numpy scipy pillow pyloudnorm tinysoundfont pypinyin 2>&1 | grep -v -i "already satisfied" || true
+PIP="python3 -m pip install -q --disable-pip-version-check"
+$PIP "sherpa-onnx==1.13.8" soundfile numpy scipy pillow pyloudnorm pypinyin
+# tinysoundfont declares pyaudio (realtime playback only, needs portaudio headers); offline rendering does not use it
+$PIP --no-deps tinysoundfont
+python3 -c "import sherpa_onnx, soundfile, numpy, scipy, PIL, pyloudnorm, pypinyin, tinysoundfont" \
+  || { echo "python deps missing" >&2; exit 1; }
 
 have() { [ -e "$M/$1" ] || [ -e "$SHARED/$1" ]; }
 

@@ -5,7 +5,7 @@ Turns the `podcast` section of any `book.json` (see `../SCHEMA.md`) into a finis
 ```bash
 bash book-studio/podcast/setup.sh                                   # once per fresh container
 bash book-studio/podcast/make.sh book-studio/books/dafen/book.json book-studio/books/dafen/out
-#  -> out/podcast.mp4   AAC 112 kb/s + 720x720 still cover at 1 fps, +faststart, <= 19 MiB
+#  -> out/podcast.mp4   AAC (112 kb/s target, ~105 actual) + 720x720 still cover at 1 fps, +faststart, <= 19 MiB
 #  -> out/podcast.json  {"file","dur","lines":[{"t","end","who","text"}], "title","hosts","voices","loudness"}
 ```
 
@@ -19,7 +19,19 @@ seconds from the start of the file (for a live transcript). Intermediates and th
 Both hosts are built-in speakers of **Kokoro-82M v1.1-zh** (sherpa-onnx, Apache-2.0), chosen by speaker id in
 `voices.json`. No voice cloning, no voice prompts, no reference recordings (ZipVoice is deliberately not used).
 
-VOICES_SECTION
+| host | speaker (sid) | median F0 | why |
+|---|---|---|---|
+| A 主持 | `zf_083` (47), female | 254 Hz | best overall in the audition: 0 ASR errors on all probes, steady pitch, lively but not sing-song |
+| B 嘉宾 | `zm_091` (97), male | 144 Hz | best male: ASR pinyin CER 0.8 %, natural pitch movement, rate matched to A |
+
+How they were chosen (`cast.py`, no listening possible, so judged objectively): all 100 Chinese speakers of
+Kokoro v1.1-zh plus the 8 of Kokoro v1.0 read a probe question; each take was transcribed with SenseVoice (pinyin
+error rate), checked for clipping, and measured for speaking rate, median F0, pitch movement (st. dev. in semitones)
+and pitch jitter (frame-to-frame instability, a proxy for warbly / robotic prosody). The best 5 female and 5 male
+voices then read five probes (statement, question, percentages + year, English word + numbers, short reply) and were
+ranked on ASR accuracy, clipping, jitter, pitch movement near the panel norm and rate near the panel median.
+zf_083 and zm_091 ranked first in their groups; ~10 semitones apart in pitch they are unmistakable as two people.
+Both run at `speed` 1.08 (≈4.5 chars/s of speech: relaxed, conversational). Full numbers: `cast/report.json`.
 
 ## What the pipeline does (`build.py`)
 
